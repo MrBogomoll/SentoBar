@@ -6,7 +6,7 @@ $hash=(Get-FileHash -LiteralPath $Setup -Algorithm SHA256).Hash
 if (!(Test-Path -LiteralPath $Arm64Setup -PathType Leaf)) { throw 'A real ARM64 setup file is required.' }
 $arm64Hash=(Get-FileHash -LiteralPath $Arm64Setup -Algorithm SHA256).Hash
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
-$base="BillyNabil.NabyScape"
+$base="MrBogomoll.SentoBar"
 @"
 # yaml-language-server: `$schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
 PackageIdentifier: $base
@@ -21,10 +21,10 @@ InstallerSwitches:
 UpgradeBehavior: install
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/BillyNabil/nabyscape/releases/download/v$Version/NabyScape-win-x64-Setup.exe
+  InstallerUrl: https://github.com/MrBogomoll/nabyscape/releases/download/v$Version/SentoBar-win-x64-Setup.exe
   InstallerSha256: $hash
 - Architecture: arm64
-  InstallerUrl: https://github.com/BillyNabil/nabyscape/releases/download/v$Version/NabyScape-win-arm64-Setup.exe
+  InstallerUrl: https://github.com/MrBogomoll/nabyscape/releases/download/v$Version/SentoBar-win-arm64-Setup.exe
   InstallerSha256: $arm64Hash
 ManifestType: installer
 ManifestVersion: 1.10.0
@@ -42,16 +42,16 @@ ManifestVersion: 1.10.0
 PackageIdentifier: $base
 PackageVersion: $Version
 PackageLocale: en-US
-Publisher: BillyNabil
-PackageName: NabyScape
+Publisher: MrBogomoll
+PackageName: SentoBar
 License: MIT
-LicenseUrl: https://github.com/BillyNabil/nabyscape/blob/main/LICENSE
+LicenseUrl: https://github.com/MrBogomoll/nabyscape/blob/main/LICENSE
 ShortDescription: A desktop island for music, focus, and everyday tools.
-PackageUrl: https://github.com/BillyNabil/nabyscape
+PackageUrl: https://github.com/MrBogomoll/nabyscape
 ManifestType: defaultLocale
 ManifestVersion: 1.10.0
 "@ | Set-Content -LiteralPath (Join-Path $OutputDirectory "$base.locale.en-US.yaml") -Encoding utf8
 # Generator invariant checks run without installing or reaching the network.
 $installer=Get-Content -LiteralPath (Join-Path $OutputDirectory "$base.installer.yaml") -Raw
-foreach($required in @("InstallerSha256: $hash",'Scope: user','Silent: --silent',"/v$Version/NabyScape-win-x64-Setup.exe",'Architecture: x64')) { if (!$installer.Contains($required)) { throw "Manifest invariant missing: $required" } }
-foreach($required in @("InstallerSha256: $arm64Hash", "/v$Version/NabyScape-win-arm64-Setup.exe",'Architecture: arm64')) { if (!$installer.Contains($required)) { throw "Manifest invariant missing: $required" } }
+foreach($required in @("InstallerSha256: $hash",'Scope: user','Silent: --silent',"/v$Version/SentoBar-win-x64-Setup.exe",'Architecture: x64')) { if (!$installer.Contains($required)) { throw "Manifest invariant missing: $required" } }
+foreach($required in @("InstallerSha256: $arm64Hash", "/v$Version/SentoBar-win-arm64-Setup.exe",'Architecture: arm64')) { if (!$installer.Contains($required)) { throw "Manifest invariant missing: $required" } }

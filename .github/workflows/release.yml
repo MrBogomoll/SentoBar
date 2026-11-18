@@ -26,7 +26,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: NabyScape-release-test-reports
+          name: SentoBar-release-test-reports
           path: ${{ runner.temp }}/release/publish/*/unit-report.txt*
           if-no-files-found: warn
           retention-days: 14
@@ -35,5 +35,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$env:GITHUB_REF_NAME" --repo "$env:GITHUB_REPOSITORY" --verify-tag --draft --generate-notes "$env:RUNNER_TEMP/release/NabyScape-win-x64-Setup.exe" "$env:RUNNER_TEMP/release/NabyScape-win-x64-Portable.zip" "$env:RUNNER_TEMP/release/NabyScape-win-arm64-Setup.exe" "$env:RUNNER_TEMP/release/NabyScape-win-arm64-Portable.zip" "$env:RUNNER_TEMP/release/NabyScape-Notices.zip" "$env:RUNNER_TEMP/release/SHA256SUMS"
+          gh release create "$env:GITHUB_REF_NAME" --repo "$env:GITHUB_REPOSITORY" --verify-tag --draft --generate-notes "$env:RUNNER_TEMP/release/SentoBar-win-x64-Setup.exe" "$env:RUNNER_TEMP/release/SentoBar-win-x64-Portable.zip" "$env:RUNNER_TEMP/release/SentoBar-win-arm64-Setup.exe" "$env:RUNNER_TEMP/release/SentoBar-win-arm64-Portable.zip" "$env:RUNNER_TEMP/release/SentoBar-Notices.zip" "$env:RUNNER_TEMP/release/SHA256SUMS"
           if ($LASTEXITCODE -ne 0) { throw 'Draft creation failed; existing releases are never changed.' }

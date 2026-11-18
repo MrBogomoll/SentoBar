@@ -69,11 +69,11 @@ def label(img, number, title, subtitle, x, y):
     text(img, (x, y + 91), subtitle, 21, fill=MUTED)
 
 
-logo = Image.open(ROOT / 'src' / 'NabyScape' / 'Assets' / 'island.ico').convert('RGBA')
+logo = Image.open(ROOT / 'src' / 'SentoBar' / 'Assets' / 'island.ico').convert('RGBA')
 # GitHub's social image is separate from the README hero; use its 2:1 format.
 social = backdrop((1280, 640))
 place(social, logo, (64, 56), 46, False)
-text(social, (124, 58), 'NabyScape', 32, True)
+text(social, (124, 58), 'SentoBar', 32, True)
 text(social, (64, 155), 'Your desktop,\nwithin reach.', 74, True)
 text(social, (69, 356), 'Music, quick tools, and system stats.\nA customizable island for Windows 11.', 24, fill=MUTED)
 place(social, Image.open(OUT / 'media-raw.png').convert('RGBA'), (699, 157), 513)
@@ -88,7 +88,7 @@ if sys.argv[1] == '--social-only':
 # A legible repository header with the app itself as the hero.
 hero = backdrop((1600, 1000))
 place(hero, logo, (80, 57), 42, False)
-text(hero, (135, 57), 'NabyScape', 31, True)
+text(hero, (135, 57), 'SentoBar', 31, True)
 text(hero, (83, 173), 'Your desktop,\nwithin reach.', 96, True)
 text(hero, (88, 431), 'Music, quick tools, and a quieter workflow.\nA customizable island for Windows 11.', 29, fill=MUTED)
 text(hero, (88, 554), 'LOCAL DATA  /  OPEN SOURCE  /  WINDOWS 11', 18, True, MUTED)
@@ -130,7 +130,7 @@ for name, title, description in features:
     im = shot(name)
     width = min(650, round(im.width * min(1.17, 500 / im.height)))
     place(poster, im, ((1100 - width) // 2, 190), width)
-    text(poster, (56, 727), 'NabyScape 2.4.2 · Midnight Notch', 18, fill=MUTED)
+    text(poster, (56, 727), 'SentoBar 2.4.2 · Midnight Notch', 18, fill=MUTED)
     save(poster, name + '.png')
 
 for name in ['closed', 'hover-music', 'media']:
@@ -167,7 +167,7 @@ save(perf, 'performance.png')
 # Silent MP4 and GitHub-friendly inline GIF from the actual WPF frame sequence.
 meta = json.loads((SRC / 'chapters.json').read_text(encoding='utf-8-sig'))
 bg = backdrop((1280, 800))
-text(bg, (64, 600), 'NabyScape', 28, True)
+text(bg, (64, 600), 'SentoBar', 28, True)
 text(bg, (64, 650), 'Midnight Notch · Windows 11 · v2.4.2', 20, fill=MUTED)
 text(bg, (64, 746), 'Actual app views · sample media and local content · silent demo', 17, fill=MUTED)
 bg_path = SRC / 'video-background.png'

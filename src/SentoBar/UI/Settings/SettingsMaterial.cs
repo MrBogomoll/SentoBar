@@ -1,0 +1,39 @@
+using System;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Shell;
+using System.Windows.Threading;
+
+namespace SentoBar;
+public sealed partial class SettingsWindow
+{
+    private readonly DispatcherTimer materialTimer=new(){Interval=TimeSpan.FromSeconds(3)};
+    private (string,SettingsBackdrop.Conditions)? materialKey;
+    internal SettingsBackdrop.Result MaterialResult {get;private set;}
+    private void InitializeMaterial()
+    {
+        SourceInitialized+=(_,_)=>ApplyMaterial();
+        materialTimer.Tick+=(_,_)=>ApplyMaterial();Loaded+=(_,_)=>materialTimer.Start();Closed+=(_,_)=>materialTimer.Stop();
+    }
+    internal void ApplyMaterial()
+    {
+        if(interactiveBounds)return;var hwnd=new WindowInteropHelper(this).Handle;if(hwnd==IntPtr.Zero)return;
+        string requested=app.Settings.WindowEffects?SettingsBackdrop.Requested(app.Settings):"Solid";var conditions=SettingsBackdrop.ReadConditions() with{HighContrast=Accessibility.HighContrast};
+        if(materialKey is {} key && key==(requested,conditions))return;materialKey=(requested,conditions);
+        MaterialResult=AllowsTransparency && requested is "Native Mica" or "Native Acrylic"?new(requested,"Simulated glass", "Rounded windows use a soft solid surface."):SettingsBackdrop.Resolve(requested,conditions,type=>SettingsBackdrop.Apply(hwnd,type));
+        if(!MaterialResult.Native)SettingsBackdrop.Apply(hwnd,1);
+        // Apply only the final frame state. Cycling through full glass for a solid
+        // surface needlessly discards retained WPF client resources.
+        var chrome=WindowChrome.GetWindowChrome(this);chrome.GlassFrameThickness=MaterialResult.Native?new Thickness(-1):new Thickness(0);
+        var source=HwndSource.FromHwnd(hwnd);if(source?.CompositionTarget!=null)source.CompositionTarget.BackgroundColor=Colors.Transparent;
+        // Retain native blur beneath a dark client tint so secondary text stays readable.
+        Background=Accessibility.HighContrast?SystemColors.WindowBrush:Brushes.Transparent;
+        windowPalette["SettingsCanvas"]=SettingsPalette.Create(app.Settings,MaterialResult.Native)["SettingsCanvas"];
+        // Repaint retained examples once after the HWND composition change settles;
+        // do not rebuild controls or attach a continuous rendering callback.
+        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle,()=>{if(IsVisible)foreach(var scene in settingExamples)scene.InvalidateVisual();});
+    }
+
+}

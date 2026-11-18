@@ -1,6 +1,6 @@
 param([string]$Repository=(Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference='Stop'
-$settings=Join-Path $Repository 'src\NabyScape\UI\Settings'
+$settings=Join-Path $Repository 'src\SentoBar\UI\Settings'
 $scene=Get-Content -LiteralPath (Join-Path $settings 'SettingsScene.cs') -Raw
 $registry=[regex]::Match($scene,'Sections=\{([^}]+)\}').Groups[1].Value
 $registered=@([regex]::Matches($registry,'"([^"]+)"') | ForEach-Object {$_.Groups[1].Value})

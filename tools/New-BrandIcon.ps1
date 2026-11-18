@@ -1,8 +1,8 @@
 # Render the approved vector at each native icon size, without raster resizing.
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName PresentationCore,WindowsBase
-$iconTarget=Join-Path (Split-Path $PSScriptRoot -Parent) 'src/NabyScape/Assets/island.ico'
-$sourcePath=Join-Path (Split-Path $PSScriptRoot -Parent) 'src/NabyScape/Assets/brand-mark.svg'
+$iconTarget=Join-Path (Split-Path $PSScriptRoot -Parent) 'src/SentoBar/Assets/island.ico'
+$sourcePath=Join-Path (Split-Path $PSScriptRoot -Parent) 'src/SentoBar/Assets/brand-mark.svg'
 [xml]$svg=Get-Content -LiteralPath $sourcePath -Raw
 $art=[Windows.Media.GeometryGroup]::new();$art.FillRule=[Windows.Media.FillRule]::Nonzero
 foreach($path in $svg.SelectNodes('//*[local-name()="path"]')){$art.Children.Add([Windows.Media.Geometry]::Parse($path.d))}
@@ -25,7 +25,7 @@ foreach($size in $sizes) {
     $encoder.Frames.Add([Windows.Media.Imaging.BitmapFrame]::Create($bitmap))
     $stream=[IO.MemoryStream]::new();$encoder.Save($stream)
     $frames+=,@($size,$stream.ToArray())
-    if($size -eq 256){[IO.File]::WriteAllBytes((Join-Path (Split-Path $PSScriptRoot -Parent) 'src/NabyScape/Assets/brand-avatar.png'),$stream.ToArray())}
+    if($size -eq 256){[IO.File]::WriteAllBytes((Join-Path (Split-Path $PSScriptRoot -Parent) 'src/SentoBar/Assets/brand-avatar.png'),$stream.ToArray())}
     $stream.Dispose()
 }
 $stream=[IO.File]::Create($iconTarget);$writer=[IO.BinaryWriter]::new($stream)

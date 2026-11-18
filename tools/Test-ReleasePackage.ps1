@@ -1,7 +1,7 @@
 param([Parameter(Mandatory)][string]$OutputDirectory,[switch]$ValidateWinGet)
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath($OutputDirectory)
-$expected=@('NabyScape-win-x64-Setup.exe','NabyScape-win-x64-Portable.zip','NabyScape-win-arm64-Setup.exe','NabyScape-win-arm64-Portable.zip','NabyScape-Notices.zip')
+$expected=@('SentoBar-win-x64-Setup.exe','SentoBar-win-x64-Portable.zip','SentoBar-win-arm64-Setup.exe','SentoBar-win-arm64-Portable.zip','SentoBar-Notices.zip')
 $lines=@(Get-Content -LiteralPath (Join-Path $root 'SHA256SUMS'))
 if ($lines.Count -ne $expected.Count) { throw 'Unexpected checksum entries.' }
 foreach($name in $expected) {
@@ -24,19 +24,19 @@ function Read-PeMachine([IO.Stream]$Stream) {
     } finally { $reader.Dispose() }
 }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$manifest=Get-Content -LiteralPath (Join-Path $root 'winget/BillyNabil.NabyScape.installer.yaml') -Raw
+$manifest=Get-Content -LiteralPath (Join-Path $root 'winget/MrBogomoll.SentoBar.installer.yaml') -Raw
 foreach($architecture in @('x64','arm64')) {
     $rid="win-$architecture"
     $machine=if($architecture -eq 'arm64'){0xAA64}else{0x8664}
-    $setupPath=Join-Path $root "NabyScape-$rid-Setup.exe"
+    $setupPath=Join-Path $root "SentoBar-$rid-Setup.exe"
     $stream=[IO.File]::OpenRead($setupPath)
     try { if ((Read-PeMachine $stream) -ne $machine) { throw "Wrong setup architecture for $rid." } } finally { $stream.Dispose() }
     $setupHash=(Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash
-    $pattern='(?ms)^- Architecture: '+$architecture+'\r?\n  InstallerUrl: [^\r\n]+/NabyScape-'+$rid+'-Setup\.exe\r?\n  InstallerSha256: '+$setupHash+'\r?$'
+    $pattern='(?ms)^- Architecture: '+$architecture+'\r?\n  InstallerUrl: [^\r\n]+/SentoBar-'+$rid+'-Setup\.exe\r?\n  InstallerSha256: '+$setupHash+'\r?$'
     if ($manifest -notmatch $pattern) { throw "WinGet architecture, URL or hash differs for $rid." }
-    $zip=[IO.Compression.ZipFile]::OpenRead((Join-Path $root "NabyScape-$rid-Portable.zip"))
+    $zip=[IO.Compression.ZipFile]::OpenRead((Join-Path $root "SentoBar-$rid-Portable.zip"))
     try {
-        $entry=$zip.GetEntry('NabyScape.exe')
+        $entry=$zip.GetEntry('SentoBar.exe')
         if (!$entry) { throw "Portable archive has no executable: $rid." }
         $memory=[IO.MemoryStream]::new()
         $content=$entry.Open()
@@ -50,7 +50,7 @@ foreach($architecture in @('x64','arm64')) {
     } finally { $zip.Dispose() }
     Write-Output "PASS $rid setup/portable PE architecture, executable identity and WinGet metadata"
 }
-foreach($name in @('NabyScape-win-x64-Portable.zip','NabyScape-win-arm64-Portable.zip','NabyScape-Notices.zip')) {
+foreach($name in @('SentoBar-win-x64-Portable.zip','SentoBar-win-arm64-Portable.zip','SentoBar-Notices.zip')) {
     $zip=[IO.Compression.ZipFile]::OpenRead((Join-Path $root $name))
     try {
         foreach($notice in @('LICENSE','LUCIDE-LICENSE.txt','MANROPE-OFL.txt','NAudio-LICENSE.txt','System.Speech-LICENSE.txt','DOTNET-LICENSE.txt','DOTNET-ThirdPartyNotices.txt','ROMAJI-ThirdPartyNotices.txt','LYRICS-LANGUAGE-LICENSE.txt')) { if (!$zip.GetEntry($notice)) { throw "Missing $notice in $name" } }

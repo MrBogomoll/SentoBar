@@ -1,4 +1,4 @@
-"""Read-only catalog inventory. Does not execute NabyScape or request translations.
+"""Read-only catalog inventory. Does not execute SentoBar or request translations.
 
 Run: python tools/list-ui-captions.py
 Lists explicit literal captions absent from the central English base catalog.
@@ -8,7 +8,7 @@ import json
 import re
 from pathlib import Path
 
-root = Path(__file__).resolve().parents[1] / "src" / "NabyScape"
+root = Path(__file__).resolve().parents[1] / "src" / "SentoBar"
 literal = r'"(?:[^"\\]|\\.)*"'
 catalog = (root / "UI" / "Shared" / "LocalizationCatalog.cs").read_text(encoding="utf-8")
 keys = set(re.findall(r'\[(' + literal + r')\]\s*=', catalog))

@@ -1,0 +1,432 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading.Tasks;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using Microsoft.Win32;
+using NAudio.CoreAudioApi;
+using Windows.Media.Control;
+
+namespace SentoBar;
+
+// Selection is local to this running instance. None never issues a transport command.
+internal sealed class MediaSourceSelection
+{
+    internal const string NoneId="@none",AutoId="@auto";
+    internal string Id {get;private set;}=AutoId;
+    internal bool IsNone=>Id==NoneId;
+    internal void Select(string? id)=>Id=id??NoneId;
+    internal string? Resolve(IReadOnlyList<string> sessions,string? current,string? previous=null)
+    {
+        if(IsNone)return null;
+        if(Id!=AutoId){if(sessions.Contains(Id))return Id;Id=AutoId;}
+        return previous!=null && sessions.Contains(previous)?previous:current!=null && sessions.Contains(current)?current:sessions.FirstOrDefault();
+    }
+}
+
+public sealed class MediaService : IDisposable
+{
+    private GlobalSystemMediaTransportControlsSessionManager? manager;
+    private GlobalSystemMediaTransportControlsSession? selected;
+    private readonly System.Windows.Threading.Dispatcher dispatcher;
+    private readonly Action<Exception> log;
+    private bool disposed;
+    private int generation,managerGeneration;
+    private bool enabled=true,managerInitializing;
+    private string artworkKey="";
+    private long timelineStamp;
+    private (double elapsed,double duration) timelineSample;
+    private readonly MediaTimelineClock timelineClock=new();
+    private readonly System.Threading.SemaphoreSlim seekGate=new(1,1);
+    private long seekSequence;
+    internal long SeekRevision {get;private set;}
+    internal bool SeekRejected {get;private set;}
+    private readonly MediaSourceSelection sourceSelection=new();
+    internal string SourceSelectionId=>sourceSelection.Id;
+    internal bool SourceDisabled=>sourceSelection.IsNone;
+    public event Action? Changed;
+    public List<GlobalSystemMediaTransportControlsSession> Sessions { get; private set; }=new();
+    public GlobalSystemMediaTransportControlsSession? Selected=>selected;
+    public static string SessionName(GlobalSystemMediaTransportControlsSession session)
+    {
+        try {return Windows.ApplicationModel.AppInfo.GetFromAppUserModelId(session.SourceAppUserModelId).DisplayInfo.DisplayName;}
+        catch {var id=session.SourceAppUserModelId;if(id.Contains("Chrome",StringComparison.OrdinalIgnoreCase))return "Google Chrome";return Path.GetFileNameWithoutExtension(id);}
+    }
+    public string Title { get; private set; }=Localization.Text("Nothing playing");
+    public string Artist { get; private set; }=Localization.Text("Play something in your favorite app");
+    public ImageSource? Artwork { get; private set; }
+    public bool Playing { get; private set; }
+    internal bool DiagnosticFixture {get;set;}
+    internal void DiagnosticPlayback(bool playing){if(!DiagnosticFixture)throw new InvalidOperationException();Playing=playing;Title="Performance fixture";Artist="Deterministic local signal";CanToggle=CanSeek=true;Changed?.Invoke();}
+    public bool Available=>!SourceDisabled && (DiagnosticFixture || selected!=null);
+    public bool CanToggle { get; private set; }
+    public bool CanNext { get; private set; }
+    public bool CanPrevious { get; private set; }
+    public bool CanSeek { get; private set; }
+    public MediaService(Action<Exception> log)
+    { dispatcher=System.Windows.Threading.Dispatcher.CurrentDispatcher; this.log=log; }
+    internal void SetEnabled(bool value)
+    {
+        // Deterministic diagnostic playback must not be overwritten by the user's
+        // real Windows media session after an asynchronous Settings update.
+        if(DiagnosticFixture && value)return;
+        if(disposed || !value && !enabled)return;enabled=value;
+        if(value){if(manager==null)_=Initialize();return;}
+        managerGeneration++;
+        if(manager!=null){manager.SessionsChanged-=SessionsChanged;manager.CurrentSessionChanged-=CurrentChanged;manager=null;}
+        Sessions.Clear();Select(null,false);
+    }
+    public async Task Initialize()
+    {
+        if(disposed || !enabled || manager!=null || managerInitializing)return;managerInitializing=true;int version=++managerGeneration;
+        try
+        {
+            var discovered=await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+            if(disposed || !enabled || version!=managerGeneration)return;manager=discovered;
+            manager.SessionsChanged+=SessionsChanged; manager.CurrentSessionChanged+=CurrentChanged;
+            Reload();
+        }
+        catch(Exception ex) { if(!disposed && enabled && version==managerGeneration){log(ex);Artist=Localization.Text("Media controls unavailable");Changed?.Invoke();} }
+        finally{managerInitializing=false;if(!disposed && enabled && version!=managerGeneration && manager==null)_=Initialize();}
+    }
+    private void SessionsChanged(GlobalSystemMediaTransportControlsSessionManager sender,SessionsChangedEventArgs args)=>dispatcher.BeginInvoke(Reload);
+    private void CurrentChanged(GlobalSystemMediaTransportControlsSessionManager sender,CurrentSessionChangedEventArgs args)=>dispatcher.BeginInvoke(()=>ApplySelection());
+    private void Reload()
+    {
+        if(disposed || !enabled || manager==null) return;
+        Sessions=manager.GetSessions().ToList();
+        ApplySelection(selected?.SourceAppUserModelId);
+    }
+    private void ApplySelection(string? previous=null)
+    {
+        if(disposed || !enabled)return;
+        string? id=sourceSelection.Resolve(Sessions.Select(s=>s.SourceAppUserModelId).ToArray(),manager?.GetCurrentSession()?.SourceAppUserModelId,previous);
+        Select(Sessions.FirstOrDefault(s=>s.SourceAppUserModelId==id),false);
+    }
+    public void SelectNone()=>Select(null);
+    public void SelectAutomatic()
+    {
+        sourceSelection.Select(MediaSourceSelection.AutoId);ApplySelection();
+    }
+    public void Select(GlobalSystemMediaTransportControlsSession? session,bool manual=true)
+    {
+        if(disposed) return;
+        if(manual)sourceSelection.Select(session?.SourceAppUserModelId);
+        if(ReferenceEquals(selected,session)){if(session==null)_=Refresh();else Changed?.Invoke();return;}
+        if(selected!=null) { selected.MediaPropertiesChanged-=PropertiesChanged; selected.PlaybackInfoChanged-=PlaybackChanged;selected.TimelinePropertiesChanged-=TimelineChanged; }
+        selected=session;ResetSeekTarget();timelineStamp=0;timelineClock.Reset();
+        if(selected!=null) { selected.MediaPropertiesChanged+=PropertiesChanged; selected.PlaybackInfoChanged+=PlaybackChanged;selected.TimelinePropertiesChanged+=TimelineChanged; }
+        _=Refresh();
+    }
+    private void PropertiesChanged(GlobalSystemMediaTransportControlsSession sender,MediaPropertiesChangedEventArgs args)=>dispatcher.BeginInvoke(()=>
+    {
+        if(disposed || selected==null || sender.SourceAppUserModelId!=selected.SourceAppUserModelId)return;
+        ResetSeekTarget();
+        _=Refresh();
+    });
+    private void ResetSeekTarget(){SeekRevision++;SeekRejected=false;}
+    private void PlaybackChanged(GlobalSystemMediaTransportControlsSession sender,PlaybackInfoChangedEventArgs args)=>dispatcher.BeginInvoke(()=>{if(!disposed && selected!=null && sender.SourceAppUserModelId==selected.SourceAppUserModelId){ReadPlayback(selected);timelineStamp=0;Changed?.Invoke();}});
+    private void TimelineChanged(GlobalSystemMediaTransportControlsSession sender,TimelinePropertiesChangedEventArgs args)=>dispatcher.BeginInvoke(()=>{if(!disposed && selected!=null && selected.SourceAppUserModelId==sender.SourceAppUserModelId)timelineStamp=0;});
+    private void ReadPlayback(GlobalSystemMediaTransportControlsSession session)
+    {
+        timelineStamp=0;
+        try{var playback=session.GetPlaybackInfo();var controls=playback?.Controls;
+        Playing=playback?.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+        CanToggle=controls?.IsPlayPauseToggleEnabled==true;CanNext=controls?.IsNextEnabled==true;CanPrevious=controls?.IsPreviousEnabled==true;CanSeek=controls?.IsPlaybackPositionEnabled==true;}
+        catch(Exception ex){log(ex);Playing=false;CanToggle=CanNext=CanPrevious=CanSeek=false;}
+    }
+    public async Task Refresh()
+    {
+        var version=++generation; var session=selected;
+        try
+        {
+            if(session==null) { artworkKey="";timelineStamp=0;timelineSample=(0,0);Title=Localization.Text("Nothing playing");Artist=SourceDisabled?Localization.Text("Media source is set to None"):Localization.Text("Play something in your favorite app");Playing=false;Artwork=null;CanToggle=CanNext=CanPrevious=CanSeek=false;Changed?.Invoke();return; }
+            var p=await session.TryGetMediaPropertiesAsync();
+            if(disposed || version!=generation)return;
+            if(p==null){Playing=false;CanToggle=CanNext=CanPrevious=CanSeek=false;Changed?.Invoke();return;}
+            string key=session.SourceAppUserModelId+"\n"+p.Title+"\n"+p.Artist+"\n"+p.AlbumTitle;
+            ImageSource? artwork=key==artworkKey?Artwork:null;
+            if(p.Thumbnail!=null && artwork==null)
+            {
+                try
+                {
+                    using var stream=await p.Thumbnail.OpenReadAsync();
+                    if(stream.Size>0 && stream.Size<=10*1024*1024)
+                    {
+                        using var managed=stream.AsStreamForRead();
+                        var bitmap=new BitmapImage();bitmap.BeginInit();bitmap.CacheOption=BitmapCacheOption.OnLoad;bitmap.DecodePixelWidth=160;
+                        bitmap.StreamSource=managed;bitmap.EndInit();bitmap.Freeze();artwork=bitmap;
+                    }
+                }
+                catch(Exception ex) when(ex is System.Runtime.InteropServices.COMException or IOException or NotSupportedException or ArgumentException) { /* Artwork is optional; playback metadata and commands remain usable. */ }
+            }
+            if(disposed || version!=generation) return;
+            Title=string.IsNullOrWhiteSpace(p.Title) ? Localization.Text("Untitled media") : p.Title;
+            Artist=string.IsNullOrWhiteSpace(p.Artist) ? session.SourceAppUserModelId : p.Artist;
+            ReadPlayback(session);
+            if(artworkKey!=key){ResetSeekTarget();timelineClock.Reset();timelineStamp=0;}
+            artworkKey=key;Artwork=artwork;Changed?.Invoke();
+        }
+        catch(Exception ex) { if(disposed || version!=generation)return;log(ex);Artist=Localization.Text("Media session unavailable");CanToggle=CanNext=CanPrevious=CanSeek=false;Changed?.Invoke(); }
+    }
+    public async Task Command(string command)
+    {
+        try
+        {
+            if(selected==null) return;
+            if(command=="next" && CanNext || command=="previous" && CanPrevious)ResetSeekTarget();
+            bool ok=command switch { "next" when CanNext=>await selected.TrySkipNextAsync(), "previous" when CanPrevious=>await selected.TrySkipPreviousAsync(), "toggle" when CanToggle=>await selected.TryTogglePlayPauseAsync(), _=>false };
+            if(!ok) Artist=Localization.Text("This media app does not support this control");
+            Changed?.Invoke();
+        }
+        catch(Exception ex) { log(ex); Artist=Localization.Text("Media control failed; try selecting the session again");Changed?.Invoke(); }
+    }
+    public (double elapsed,double duration) Timeline()
+    {
+        long now=Stopwatch.GetTimestamp();
+        if(timelineStamp==0 || Stopwatch.GetElapsedTime(timelineStamp,now).TotalSeconds>=1){timelineSample=ReadTimeline();timelineStamp=now;}
+        double elapsed=timelineSample.elapsed+(Playing?Stopwatch.GetElapsedTime(timelineStamp,now).TotalSeconds:0);
+        return(Math.Clamp(elapsed,0,Math.Max(0,timelineSample.duration)),timelineSample.duration);
+    }
+    private (double elapsed,double duration) ReadTimeline()
+    {
+        if(SourceDisabled)return(0,0);
+        if(DiagnosticFixture)return(Playing?Environment.TickCount64/1000d%240:40,240);
+        try
+        {
+            if(selected==null)return(0,0);var timeline=selected.GetTimelineProperties();
+            if(timeline==null)return(0,0);
+            return timelineClock.Sample(timeline.StartTime,timeline.EndTime,timeline.Position,timeline.LastUpdatedTime,Playing,DateTimeOffset.UtcNow);
+        }
+        catch{return(0,0);}
+    }
+    internal MediaTimelineState TimelineState=>Available?MediaTimelinePolicy.State(Timeline().duration,CanSeek):MediaTimelineState.None;
+    public Task Seek(double fraction)=>Seek(fraction,SeekRevision);
+
+    internal async Task Seek(double fraction,long revision)
+    {
+        if(disposed || selected==null || !CanSeek || revision!=SeekRevision || !double.IsFinite(fraction))return;
+        long request=++seekSequence;
+        await seekGate.WaitAsync();
+        try
+        {
+            var session=selected;
+            if(disposed || session==null || !CanSeek || revision!=SeekRevision || request!=seekSequence)return;
+
+            bool accepted=false;
+            try
+            {
+                var timeline=session.GetTimelineProperties();
+                if(timeline!=null && MediaTimelinePolicy.SeekPosition(timeline.StartTime,timeline.EndTime,
+                    timeline.MinSeekTime,timeline.MaxSeekTime,fraction) is TimeSpan target)
+                {
+                    accepted=await session.TryChangePlaybackPositionAsync(target.Ticks);
+                    if(accepted && !disposed && revision==SeekRevision && request==seekSequence)
+                        timelineClock.AcceptSeek(timeline.StartTime,timeline.Position,timeline.LastUpdatedTime,target,Playing,DateTimeOffset.UtcNow);
+                }
+            }
+            catch(Exception ex){log(ex);}
+
+            if(disposed || revision!=SeekRevision || request!=seekSequence)return;
+            SeekRejected=!accepted;
+            timelineStamp=0;
+            Changed?.Invoke();
+        }
+        finally{seekGate.Release();}
+    }
+    public void Dispose()
+    {
+        disposed=true;generation++;managerGeneration++;
+        if(manager!=null) { manager.SessionsChanged-=SessionsChanged;manager.CurrentSessionChanged-=CurrentChanged; }
+        if(selected!=null) { selected.MediaPropertiesChanged-=PropertiesChanged;selected.PlaybackInfoChanged-=PlaybackChanged;selected.TimelinePropertiesChanged-=TimelineChanged; }
+    }
+}
+
+public sealed partial class AudioService : IDisposable
+{
+    private MMDeviceEnumerator? enumerator;
+    private MMDeviceEnumerator EndpointEnumerator=>enumerator??=new MMDeviceEnumerator();
+    private MMDevice? meterDevice;
+    private PeakCache<MMDevice>? peakCache;
+    private readonly System.Windows.Threading.Dispatcher dispatcher=System.Windows.Threading.Dispatcher.CurrentDispatcher;
+    private bool disposed;
+    private int endpointGeneration;
+    private readonly Action<Exception>? log;
+    private string? lastLoggedError;
+    public string? LastError { get; private set; }
+    public AudioService(Action<Exception>? log=null) { this.log=log; }
+    internal void AudioError(Exception error,AudioOperation operation=AudioOperation.ReadOutput)
+    {
+        LastError=error is ObjectDisposedException
+            ? Localization.Text("The audio service has closed. Reopen SentoBar to use audio controls.")
+            : operation switch
+            {
+                AudioOperation.ListOutputs=>Localization.Text("Could not read audio outputs. Reconnect your device, then open Windows Sound Settings."),
+                AudioOperation.SetOutput=>Localization.Text("Could not switch audio output. Choose an active device or change the output in Windows Sound Settings."),
+                AudioOperation.SetVolume=>Localization.Text("Could not change volume. Reconnect your output device or adjust volume in Windows Sound Settings."),
+                AudioOperation.ToggleMute=>Localization.Text("Could not mute the output. Choose an active device and try again in Windows Sound Settings."),
+                AudioOperation.ReadMicrophone=>Localization.Text("Could not read the microphone. Reconnect it and choose an input in Windows Sound Settings."),
+                AudioOperation.ToggleMicrophoneMute=>Localization.Text("Could not mute the microphone. Reconnect it or choose an input in Windows Sound Settings."),
+                _=>Localization.Text("Could not read the audio device. Reconnect it and choose an output in Windows Sound Settings.")
+            };
+        if(lastLoggedError==error.Message)return;
+        lastLoggedError=error.Message;
+        try { if(log!=null)log(error);else Trace.TraceError(error.ToString()); } catch { /* A logger must not break audio controls. */ }
+    }
+    private bool CheckAudioActive(AudioOperation operation=AudioOperation.ReadOutput)
+    {
+        if(!disposed)return true;
+        AudioError(new ObjectDisposedException(nameof(AudioService),Localization.Text("The audio service has closed.")),operation);return false;
+    }
+    public event Action? Changed;
+    private void ReleaseMeter()
+    {
+        endpointGeneration++;
+        var old=meterDevice;meterDevice=null;
+        if(old!=null)
+        {
+            try{old.AudioEndpointVolume.OnVolumeNotification-=VolumeChanged;}catch(Exception ex){AudioError(ex);}
+            try{old.Dispose();}catch(Exception ex){AudioError(ex);}
+        }
+    }
+    private void VolumeChanged(AudioVolumeNotificationData data)
+    {
+        int version=endpointGeneration;
+        if(disposed || dispatcher.HasShutdownStarted)return;
+        try{dispatcher.BeginInvoke(()=>{if(disposed || version!=endpointGeneration)return;if(Math.Abs(Volume-data.MasterVolume)<.0005f && Muted==data.Muted)return;Volume=data.MasterVolume;Muted=data.Muted;Changed?.Invoke();});}
+        catch(Exception ex){AudioError(ex);}
+    }
+    internal float Peak()
+    {
+        if(disposed)return 0;
+        peakCache??=new PeakCache<MMDevice>(()=>EndpointEnumerator.EnumerateAudioEndPoints(DataFlow.Render,DeviceState.Active).ToArray(),
+            d=>d.AudioEndpointVolume.Mute?0:d.AudioMeterInformation.MasterPeakValue,d=>d.Dispose(),ex=>AudioError(ex));
+        return peakCache.Read(DateTimeOffset.UtcNow);
+    }
+    public bool Available { get; private set; }
+    public float Volume { get; private set; }
+    public bool Muted { get; private set; }
+    public string Device { get; private set; }=Localization.Text("No audio device");
+    // Acquire the current default endpoint every time: unplugging or changing devices cannot leave a stale COM endpoint.
+    public void Read()
+    {
+        if(!CheckAudioActive())return;
+        LastError=null;EnsureDeviceNotifications();
+        MMDevice? current=null;
+        try
+        {
+            current=EndpointEnumerator.GetDefaultAudioEndpoint(DataFlow.Render,Role.Multimedia);
+            if(meterDevice==null || meterDevice.ID!=current.ID)
+            {
+                ReleaseMeter();meterDevice=current;current=null;
+                meterDevice.AudioEndpointVolume.OnVolumeNotification+=VolumeChanged;
+            }
+            Volume=meterDevice!.AudioEndpointVolume.MasterVolumeLevelScalar;Muted=meterDevice.AudioEndpointVolume.Mute;
+            Device=meterDevice.FriendlyName;DefaultOutputId=meterDevice.ID;Available=true;
+        }
+        catch(Exception ex){AudioError(ex);ReleaseMeter();Available=false;Volume=0;Muted=false;DefaultOutputId="";Device=Localization.Text("No audio device");}
+        finally{try{current?.Dispose();}catch(Exception ex){AudioError(ex);}}
+        ReadMicrophone();nextAudioAudit=Environment.TickCount64+(notifications!=null && Available?60000:2000);
+    }
+    public void SetVolume(double value)
+    {
+        if(!CheckAudioActive(AudioOperation.SetVolume))return;
+        try {
+            if(!double.IsFinite(value))return;
+            if(meterDevice==null)Read();
+            if(meterDevice==null)return;
+            float target=(float)Math.Clamp(value,0,1);
+            if(Math.Abs(Volume-target)<.001f)return;
+            meterDevice.AudioEndpointVolume.MasterVolumeLevelScalar=target;Volume=target;LastError=null;
+        }
+        catch(Exception ex){AudioError(ex,AudioOperation.SetVolume);Available=false;}
+    }
+    public void ToggleMute()
+    {
+        if(!CheckAudioActive(AudioOperation.ToggleMute))return;
+        try { using var d=EndpointEnumerator.GetDefaultAudioEndpoint(DataFlow.Render,Role.Multimedia);d.AudioEndpointVolume.Mute=!d.AudioEndpointVolume.Mute;Read(); }
+        catch(Exception ex){AudioError(ex,AudioOperation.ToggleMute);Available=false;}
+    }
+    public void Dispose()
+    {
+        if(disposed)return;
+        disposed=true;outputSpectrum?.Dispose();outputSpectrum=null;MediaSpectrum=null;DisposeNotifications();ReleaseMeter();mediaPeaks?.Dispose();mediaPeaks=null;peakCache?.Dispose();peakCache=null;
+        try{enumerator?.Dispose();}catch(Exception ex){AudioError(ex);}
+        enumerator=null;Available=MicrophoneAvailable=false;Volume=0;Muted=MicrophoneMuted=false;DefaultOutputId="";
+    }
+}
+
+public static class StartupService
+{
+    private const string Key=@"Software\Microsoft\Windows\CurrentVersion\Run";
+    public static bool Enabled()
+    { using var key=Registry.CurrentUser.OpenSubKey(Key); return key?.GetValue("SentoBar")!=null; }
+    public static void Set(bool enabled)
+    {
+        using var key=Registry.CurrentUser.CreateSubKey(Key);
+        if(enabled) key.SetValue("SentoBar","\""+Environment.ProcessPath+"\" --background");
+        else key.DeleteValue("SentoBar",false);
+    }
+}
+public static class ShortcutService
+{
+    internal const int MaximumShortcuts=40;
+
+    internal static Shortcut[] FromDroppedPaths(IEnumerable<string> paths,IReadOnlyCollection<Shortcut> existing)
+    {
+        int remaining=MaximumShortcuts-existing.Count;
+        if(remaining<=0)return Array.Empty<Shortcut>();
+        var targets=new HashSet<string>(existing.Select(shortcut=>shortcut.Target),StringComparer.OrdinalIgnoreCase);
+        var additions=new List<Shortcut>();
+        foreach(var path in paths)
+        {
+            if(string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))continue;
+            bool folder=Directory.Exists(path);
+            if(!folder && !File.Exists(path))continue;
+            string target=Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+            if(!targets.Add(target))continue;
+            string name=folder?Path.GetFileName(target):Path.GetFileNameWithoutExtension(target);
+            additions.Add(new Shortcut{Name=name.Length==0?target:name,Target=target});
+            if(additions.Count==remaining)break;
+        }
+        return additions.ToArray();
+    }
+
+    internal static ProcessStartInfo InstalledAppStartInfo(string appId)
+    {
+        if(!WindowsAppCatalog.ValidAppId(appId))throw new ArgumentException(Localization.Text("This installed app shortcut is invalid. Remove it and add the app again in Settings."));
+        var info=new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe")){UseShellExecute=false};
+        info.ArgumentList.Add("shell:AppsFolder\\"+appId);return info;
+    }
+    private static void OpenInstalledApp(string appId)
+    {
+        var info=InstalledAppStartInfo(appId);object? shell=null,folder=null,item=null;
+        try
+        {
+            shell=Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application")!);folder=((dynamic)shell!).NameSpace("shell:AppsFolder");
+            item=folder==null?null:((dynamic)folder).ParseName(appId);
+            if(item==null)throw new FileNotFoundException(Localization.Text("This app is no longer installed. Remove the shortcut and choose an installed app in Settings."));
+        }
+        finally{ShellWorker.Release(item);ShellWorker.Release(folder);ShellWorker.Release(shell);}
+        Process.Start(info);
+    }
+
+    public static void Open(Shortcut shortcut)
+    {
+        if(shortcut.AppId!=null){OpenInstalledApp(shortcut.AppId);return;}
+        var target=Environment.ExpandEnvironmentVariables(shortcut.Target.Trim());
+        if(string.IsNullOrWhiteSpace(target)) throw new ArgumentException(Localization.Text("The shortcut destination is empty."));
+        if(Uri.TryCreate(target,UriKind.Absolute,out var uri) && !uri.IsFile)
+        {
+            if(uri.Scheme is not ("http" or "https" or "ms-settings" or "spotify" or "mailto"))
+                throw new ArgumentException(Localization.Text("Use a file, folder, application, or http/https URL."));
+        }
+        else if((Path.IsPathRooted(target) || target.Contains('\\')) && !File.Exists(target) && !Directory.Exists(target))
+            throw new FileNotFoundException(Localization.Text("The shortcut file or folder could not be found."));
+        Process.Start(new ProcessStartInfo(target){UseShellExecute=true});
+    }
+}

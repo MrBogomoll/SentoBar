@@ -1,4 +1,4 @@
-"""Optional local ASR bridge. Never started or installed automatically by NabyScape.
+"""Optional local ASR bridge. Never started or installed automatically by SentoBar.
 
 In an isolated Python environment:
   python -m pip install faster-whisper fastapi python-multipart uvicorn
@@ -43,7 +43,7 @@ def models():
 def transcribe(file: UploadFile = File(...), model: str = Form(""), response_format: str = Form("json")):
     global engine
     if model and model != options.model:
-        raise HTTPException(400, "Model differs from this server. Restart it with --model or update Naby's ASR model ID.")
+        raise HTTPException(400, "Model differs from this server. Restart it with --model or update Sento's ASR model ID.")
     audio = file.file.read(2 * 1024 * 1024 + 1)
     if len(audio) > 2 * 1024 * 1024:
         raise HTTPException(413, "Audio upload exceeds 2 MiB.")
