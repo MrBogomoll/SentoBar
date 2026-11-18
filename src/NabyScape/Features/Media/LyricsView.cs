@@ -9,8 +9,12 @@ namespace NabyScape;
 
 internal sealed class LyricsView : Grid
 {
+    internal const double StackedHeight=158;
+    private const double ActiveLineSize=20;
+    private const double AdjacentLineSize=ActiveLineSize*.9;
     private readonly App app;
-    private readonly TextBlock previous=UI.Text("",11,UI.Muted),current=UI.Text("",20),next=UI.Text("",12,UI.Muted),credit=UI.Text("",9,UI.Muted),highlight=UI.Text("",20);
+    private readonly TextBlock previous=UI.Text("",AdjacentLineSize),next=UI.Text("",AdjacentLineSize);
+    private readonly TextBlock current=UI.Text("",ActiveLineSize),highlight=UI.Text("",ActiveLineSize),credit=UI.Text("",9,UI.Muted);
     private readonly Grid line=new(){ClipToBounds=true};
     private readonly RectangleGeometry sweep=new();
     private readonly DispatcherTimer tick=new(){Interval=TimeSpan.FromMilliseconds(100)};
@@ -25,9 +29,16 @@ internal sealed class LyricsView : Grid
     internal void SetFixture(LyricResult result,double seconds,double duration){fixture=(result,seconds,duration);tick.Stop();Paint();}
     internal LyricsView(App app)
     {
-        this.app=app;Height=158;Margin=new(0,6,0,12);ClipToBounds=true;
+        this.app=app;Height=StackedHeight;Margin=new(0,6,0,12);ClipToBounds=true;
         RowDefinitions.Add(new());RowDefinitions.Add(new(){Height=GridLength.Auto});
-        previous.TextTrimming=next.TextTrimming=TextTrimming.CharacterEllipsis;previous.TextWrapping=next.TextWrapping=TextWrapping.NoWrap;previous.Opacity=.72;next.Opacity=.72;previous.Margin=new(0,0,0,6);next.Margin=new(0,6,0,0);
+        foreach(var text in new[]{previous,next})
+        {
+            text.FontWeight=FontWeights.SemiBold;
+            text.TextTrimming=TextTrimming.CharacterEllipsis;
+            text.TextWrapping=TextWrapping.NoWrap;
+            text.Opacity=Accessibility.HighContrast?1:.78;
+        }
+        previous.Margin=new(0,0,0,6);next.Margin=new(0,6,0,0);
         foreach(var text in new[]{current,highlight}){text.FontWeight=FontWeights.SemiBold;text.VerticalAlignment=VerticalAlignment.Center;text.TextWrapping=TextWrapping.Wrap;}
         highlight.IsHitTestVisible=false;highlight.Clip=sweep;line.Children.Add(current);line.Children.Add(highlight);
         var verse=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
@@ -68,7 +79,8 @@ internal sealed class LyricsView : Grid
             previous.Text=now>0?lines[now-1].Text:""; current.Text=highlight.Text=result.Plain.Length>0?result.Plain:now>=0?lines[now].Text:lines.Length>0?"♪":Localization.Text("No lyrics yet");next.Text=now+1<lines.Length?lines[now+1].Text:"";
             previous.Visibility=previous.Text.Length>0?Visibility.Visible:Visibility.Collapsed;
             next.Visibility=next.Text.Length>0?Visibility.Visible:Visibility.Collapsed;
-            current.SetResourceReference(TextBlock.ForegroundProperty,style=="Karaoke"?"MutedText":"BodyText");highlight.Visibility=style=="Karaoke" && now>=0?Visibility.Visible:Visibility.Collapsed;
+            current.Opacity=style=="Karaoke" && !Accessibility.HighContrast?.9:1;
+            highlight.Visibility=style=="Karaoke" && now>=0?Visibility.Visible:Visibility.Collapsed;
             if(Motion.Enabled && !app.Settings.ReduceMotion)
             {
                 if(style=="Slide"){var move=new TranslateTransform(0,5);line.RenderTransform=move;Motion.To(move,TranslateTransform.YProperty,0,260);Motion.Fade(line,1,200);}

@@ -34,7 +34,7 @@ public sealed partial class OverlayWindow
         lyricsAside.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
         Grid.SetColumn(lyricsAside,side?1:0);Grid.SetRow(lyricsAside,side?0:1);
         lyricsAside.Width=side?258:double.NaN;lyricsAside.Margin=side?new Thickness(18,0,0,0):new Thickness(0,8,0,0);lyricsAside.Padding=new(13,10,13,10);lyricsAside.BorderThickness=new(1);
-        mediaLyrics.Height=side?240:140;
+        mediaLyrics.Height=side?240:LyricsView.StackedHeight;
         mediaLyrics.Margin=new(0);mediaLyrics.VerticalAlignment=VerticalAlignment.Stretch;
     }
 }

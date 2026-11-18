@@ -76,9 +76,10 @@ internal static class LyricsPopoverDiagnostics
             await Task.Delay(310);view.UpdateLayout();
             check("Playing lyrics hide provider status from the reading area",credit.Visibility==Visibility.Collapsed &&
                 Diagnostics.Descendants(view).OfType<TextBlock>().Any(t=>t.IsVisible && t.Text=="Current line"));
+            TextBlock Block(string text)=>Diagnostics.Descendants(view).OfType<TextBlock>().First(t=>t.IsVisible && t.Text==text);
             Rect Bounds(string text)
             {
-                var block=Diagnostics.Descendants(view).OfType<TextBlock>().First(t=>t.IsVisible && t.Text==text);
+                var block=Block(text);
                 return block.TransformToAncestor(view).TransformBounds(new Rect(block.RenderSize));
             }
             var previous=Bounds("Previous line");var current=Bounds("Current line");var next=Bounds("Next line");
@@ -87,6 +88,26 @@ internal static class LyricsPopoverDiagnostics
                 previousGap is >=4 and <=8 && nextGap is >=4 and <=8 &&
                 current.Height>previous.Height && current.Height>next.Height);
             Capture(view,"lyrics-reading-area");
+            var active=Block("Current line");
+            check("Both neighboring lines have the same weight and 90 percent of the active line size",
+                new[]{Block("Previous line"),Block("Next line")}.All(text=>
+                    Math.Abs(text.FontSize/active.FontSize-.9)<.01 && text.FontWeight==active.FontWeight &&
+                    text.Opacity<active.Opacity && Equals(text.Foreground,active.Foreground)));
+
+            host.Width=220;view.Height=LyricsView.StackedHeight;
+            const string before="The streets keep changing after the lights come on";
+            const string now="We follow the light to the station";
+            const string after="The river carries every reflection past the window";
+            view.SetFixture(new LyricResult(new[]{new LyricLine(0,before),new LyricLine(6,now),new LyricLine(12,after)},""),8,180);
+            await Task.Delay(310);view.UpdateLayout();
+            var reader=Diagnostics.Descendants(view).OfType<ScrollContentPresenter>().First(p=>p.IsVisible);
+            var currentBounds=Bounds(now);
+            var viewportBounds=reader.TransformToAncestor(view).TransformBounds(new Rect(reader.RenderSize));
+            check("Narrow lyrics keep a wrapped active line visible with long neighbors and the menu below",
+                Block(now).ActualHeight>Block(before).ActualHeight*1.5 && currentBounds.Top>=viewportBounds.Top &&
+                Bounds(after).Bottom<=viewportBounds.Bottom+.5 && Block(after).TextTrimming==TextTrimming.CharacterEllipsis &&
+                trigger.TransformToAncestor(view).Transform(new Point()).Y>=currentBounds.Bottom);
+            Capture(view,"lyrics-reading-narrow");
         }
         finally{host.Close();}
     }
