@@ -40,7 +40,7 @@
     </ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style x:Key="GlassPanelButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-    <Setter Property="Background" Value="{DynamicResource GlassControlFill}"/>
+    <Setter Property="Background" Value="Transparent"/>
     <Setter Property="BorderBrush" Value="{DynamicResource GlassControlBorder}"/>
     <Setter Property="Foreground" Value="{DynamicResource GlassControlText}"/>
     <Setter Property="BorderThickness" Value="1"/>

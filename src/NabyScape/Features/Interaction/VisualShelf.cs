@@ -36,7 +36,7 @@ public sealed partial class OverlayWindow
         var add=UI.Button(Localization.Text("Add files…"),()=>{var dialog=new Microsoft.Win32.OpenFileDialog{Multiselect=true,Title=Localization.Text("Add to file shelf")};if(dialog.ShowDialog(this)==true)MutateUtility(()=>p.AddFiles(dialog.FileNames));});
         add.MinHeight=30;add.Padding=new(10,5,10,5);add.Margin=new(0);add.IsEnabled=p.Shelf.Count<40;
         var more=MinimalWidgets.More(Localization.Text("File shelf actions"),(Localization.Text("Select all"),()=>{foreach(var file in p.Shelf.Where(x=>x.Exists))shelfSelection.Add(file.Path);RefreshTools();}),(Localization.Text("Clear selection"),()=>{shelfSelection.Clear();RefreshTools();}));
-        toolsContent.Children.Add(MinimalWidgets.Header(heading,UI.Row(add,more)));
+        toolsContent.Children.Add(MinimalWidgets.Header(heading,GlassDockAppearance.ActionRow(add,more)));
         var gallery=new TileFlow{MinimumTileWidth=150,Gap=18};var viewport=UI.Scroll(gallery);viewport.Tag="panel-content-scroll";viewport.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;viewport.HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled;viewport.PanningMode=PanningMode.VerticalOnly;viewport.MaxHeight=Math.Clamp((app.Settings.PanelMaxHeight-160)/app.Settings.PanelScale,84,380);UI.Named(viewport,Localization.Text("Shelf files"));toolsContent.Children.Add(viewport);
         shelfViewportThumbnails=new(viewport);
         var count=UI.Text("",10,UI.Muted);void Count()=>count.Text=shelfSelection.Count>0?Localization.Format("{0} selected",shelfSelection.Count):"";Count();

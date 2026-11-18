@@ -181,7 +181,7 @@ public sealed partial class OverlayWindow : Window
         if(ApplyIncrementalSettings(OverlaySettingsState.Capture(app.Settings))){RestoreEditorState(editorState);return;}
         classicMixerOpen=false;if(activePage=="mixer")activePage="media";
         FlushNotes();ConfigureHotkey();var s=app.Settings;refreshHz=Native.RefreshRate(Native.ChooseScreen(s));Motion.Configure(s);var backdrop=app.PanelBackground.Get(s,app.Store.DirectoryPath);surface.SetPanelBackdrop(backdrop);
-        ApplyDockOpacity(!expanded && !peeking);surface.Fill=UI.Brush(s.Background);surface.GlassStyle=s.GlassStyle;surface.SetMaterial(s.Background,s.GlassStrength);surface.Notch=s.Preset=="Mac" && s.DockEdge=="Top";surface.Radius=s.Radius;
+        ApplyDockOpacity(!expanded && !peeking);surface.Fill=UI.Brush(s.Background);surface.GlassStyle=s.GlassStyle;surface.SetMaterial(s.Background,s.GlassStrength);surface.Notch=s.UsesTopNotch;surface.Radius=s.Radius;
         hoverDelay.Interval=TimeSpan.FromMilliseconds(app.Settings.HoverDelayMs);detailDelay.Interval=TimeSpan.FromMilliseconds(app.Settings.HoverDetailDelayMs);
         HideNotice();ClearPeekClockEditor();EndPeekGesture();peeking=false;peekPanel.BeginAnimation(OpacityProperty,null);peekPanel.Opacity=0;peekPanel.Visibility=Visibility.Collapsed;compact.BeginAnimation(OpacityProperty,null);compact.Opacity=1;compact.IsHitTestVisible=true;StopHoverTimers();
         compact.Width=Math.Max(120,Math.Min(s.Width,expandedWidth)-(surface.Notch?32:12));compact.Height=s.Height;compact.MinHeight=s.Height;Dimensions();if(expanded)EnsureBody();Dimensions();motion.Dispose();Width=WindowHostWidth;Height=Math.Max(HostHeight,s.Height);
@@ -205,7 +205,7 @@ public sealed partial class OverlayWindow : Window
         if(app.Settings.CompactLayout){BuildCompactBody();return;}
         if(classicMixerOpen){var mixer=BuildMixerPage();body.Children.Add(mixer);return;}
         if(hoverPanelWidget!=null){if(Settings.ToolNames.ContainsKey(hoverPanelWidget)){toolsMode=hoverPanelWidget;body.Children.Add(UI.Button(Localization.Text("Back to widgets"),()=>{hoverPanelWidget=null;BuildBody();ResizeToolPanel();}));body.Children.Add(BuildToolsPage());}else body.Children.Add(BuildCompactPage(PageFor(hoverPanelWidget)));return;}
-        var heading=new DockPanel{Margin=new(2,0,4,12)};var settings=Icons.Button("settings",Localization.Text("Settings"),app.ShowSettings,false,32);settings.Margin=new(0);settings.Background=UI.Brush("#1C1C1E");
+        var heading=new DockPanel{Margin=new(2,0,4,12)};var settings=Icons.Button("settings",Localization.Text("Settings"),app.ShowSettings,false,32);settings.Margin=new(0);
         DockPanel.SetDock(settings,Dock.Right);heading.Children.Add(settings);var bell=NotificationBell(32);bell.Margin=new(0,0,6,0);DockPanel.SetDock(bell,Dock.Right);heading.Children.Add(bell);var name=UI.Heading(Localization.Text("Activity"),18);name.FontWeight=FontWeights.SemiBold;heading.Children.Add(name);body.Children.Add(heading);body.Children.Add(widgets);
         double full=bodyWidth,half=(full-10)/2;widgets.Width=full+10;
         foreach(var widget in app.Settings.Widgets.Where(w=>w.Enabled))
@@ -218,7 +218,7 @@ public sealed partial class OverlayWindow : Window
                     var art=new Border{CornerRadius=new(13),Child=WrapArtwork(artwork),ClipToBounds=true,Margin=new(0,0,14,0)};art.SizeChanged+=(_,_)=>art.Clip=new RectangleGeometry(new Rect(0,0,art.ActualWidth,art.ActualHeight),13,13);
                     var mediaGrid=new Grid();mediaGrid.ColumnDefinitions.Add(new(){Width=GridLength.Auto});mediaGrid.ColumnDefinitions.Add(new());mediaGrid.Children.Add(art);Grid.SetColumn(info,1);mediaGrid.Children.Add(info);
                     previous=Icons.Button("previous",Localization.Text("Previous track"),()=>_=app.Media.Command("previous"),false,42);play=Icons.Button("play",Localization.Text("Play or pause"),()=>_=app.Media.Command("toggle"),true,50);playIcon="";next=Icons.Button("next",Localization.Text("Next track"),()=>_=app.Media.Command("next"),false,42);previous.Background=next.Background=Brushes.Transparent;
-                    var transport=UI.Row(previous,play,next);transport.HorizontalAlignment=HorizontalAlignment.Center;transport.Margin=new(0,10,0,2);UI.Named(sessions,Localization.Text("Media session"));sessions.ToolTip=Localization.Text("Choose a media app");sessions.Margin=new(0,6,0,0);
+                    var transport=GlassDockAppearance.ActionRow(previous,play,next);transport.HorizontalAlignment=HorizontalAlignment.Center;transport.Margin=new(0,10,0,2);UI.Named(sessions,Localization.Text("Media session"));sessions.ToolTip=Localization.Text("Choose a media app");sessions.Margin=new(0,6,0,0);
                     card=UI.Card(Localization.Text("Now playing"),mediaGrid,transport,sessions);break;
                 case "volume":
                     UI.Named(volume,Localization.Text("Windows volume"));volume.Margin=new(12,0,10,0);mute=Icons.Button("volume",Localization.Text("Mute or unmute"),()=> {app.Audio.ToggleMute();Update();},false,30);mute.Background=Brushes.Transparent;mute.Padding=new(4);mute.Margin=new(0);muteIcon="";

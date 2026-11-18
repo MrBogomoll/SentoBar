@@ -285,10 +285,12 @@ internal static class PanelPolishDiagnostics
         var plans=Named<ComboBox>("Available Windows power plans");
         for(int i=0;i<80 && plans.Items.Count==0;i++)await Task.Delay(100);
         check("Power plans display an active Windows name",plans.Items.OfType<PowerPlan>().Any(p=>p.Active && !string.IsNullOrWhiteSpace(p.Name) && !p.Name.Contains('�')));
-        check("Power plan choices and action buttons share the dock glass styles",
+        var applyPlan=Named<Button>("Apply power plan");
+        check("Power plan choices keep their fill and the action uses the outlined glass button style",
             plans.Style==island.FindResource("GlassPanelChoice") &&
-            Named<Button>("Apply power plan").Style==island.FindResource("GlassPanelButton") &&
-            Equals(plans.Background,Named<Button>("Apply power plan").Background));
+            applyPlan.Style==island.FindResource("GlassPanelButton") &&
+            applyPlan.Background==Brushes.Transparent &&
+            Equals(plans.BorderBrush,applyPlan.BorderBrush));
         capture("power-plan");
 
         s.ClipboardHistory=true;
@@ -320,8 +322,8 @@ internal static class PanelPolishDiagnostics
 
         island.SelectPage("access");await Settle();
         var commandLauncher=Named<Button>("Search commands  ·  Ctrl+K");
-        check("The command search launcher has the common glass fill and border",
-            Equals(commandLauncher.Background,glassFill) && Equals(commandLauncher.BorderBrush,island.FindResource("GlassControlBorder")));
+        check("The command search launcher has the common transparent background and glass border",
+            commandLauncher.Background==Brushes.Transparent && Equals(commandLauncher.BorderBrush,island.FindResource("GlassControlBorder")));
         capture("glass-command-launcher");
         commandLauncher.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();
         check("Command search opens with the glass input",Equals(Field<TextBox>("commandInput").Background,glassFill) &&

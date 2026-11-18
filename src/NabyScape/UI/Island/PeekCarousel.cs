@@ -342,7 +342,7 @@ public sealed partial class OverlayWindow
         reset.Height=28;
         reset.Padding=new(0);
         reset.ToolTip=Localization.Text(timer?"Reset timer":"Reset focus");
-        var transport=UI.Row(reset,toggle);
+        var transport=GlassDockAppearance.ActionRow(reset,toggle);
         transport.HorizontalAlignment=HorizontalAlignment.Right;
         transport.VerticalAlignment=VerticalAlignment.Center;
         Grid.SetRowSpan(transport,2);
@@ -360,7 +360,7 @@ public sealed partial class OverlayWindow
         void Step(string name,string text,int unit,int step)
         {
             var button=GlassPeekButton(name,text,()=>AdjustPeekTimerPart(unit,step));
-            button.Margin=new(0,0,3,0);
+            button.Margin=new(0,0,4,0);
             buttons.Children.Add(button);
         }
         if(timer)
@@ -373,7 +373,7 @@ public sealed partial class OverlayWindow
         else
         {
             var more=GlassPeekButton("Add five minutes to preview focus","+5 min",ExtendPeekFocus);
-            more.Margin=new(0,0,3,0);
+            more.Margin=new(0,0,GlassDockAppearance.ActionGap,0);
             buttons.Children.Add(more);
         }
         buttons.Children.Add(edit);
@@ -555,7 +555,12 @@ public sealed partial class OverlayWindow
         void TitleHint()=>titleHint.Visibility=peekNoteTitle.Text.Length==0?Visibility.Visible:Visibility.Collapsed;TitleHint();
         peekNoteTitle.TextChanged+=(_,_)=>{TitleHint();if(syncingNote)return;app.Productivity.NoteTitle=peekNoteTitle.Text;noteSave.Stop();noteSave.Start();if(peekNoteSave!=null)peekNoteSave.Content=Localization.Text("Save note");};peekNoteTitle.PreviewMouseLeftButtonDown+=(_,_)=>{Activate();PromotePeek();};
         peekNote=UI.Input(Localization.Text("Preview note draft"),app.Productivity.Note);peekNote.TextChanged+=(_,_)=>{if(syncingNote)return;app.Productivity.Note=peekNote.Text;noteSave.Stop();noteSave.Start();if(peekNoteSave!=null){peekNoteSave.Content=Localization.Text("Save note");peekNoteSave.IsEnabled=!string.IsNullOrWhiteSpace(peekNote.Text);}};peekNote.Height=53;peekNote.MaxLength=50000;peekNote.Padding=new(9,7,9,7);peekNote.Margin=new(0);peekNote.AcceptsReturn=true;peekNote.TextWrapping=TextWrapping.Wrap;peekNote.VerticalContentAlignment=VerticalAlignment.Top;peekNote.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;peekNote.PreviewMouseLeftButtonDown+=(_,_)=>{Activate();PromotePeek();};page.Children.Add(peekNote);
-        var actions=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,9,0,0)};var save=GlassPeekButton("Save preview note","Save note",SavePeekNote);save.FontSize=12;peekNoteSave=save;save.IsEnabled=!string.IsNullOrWhiteSpace(peekNote.Text);actions.Children.Add(save);var open=GlassPeekButton("Open all notes","All notes",()=>{FlushNotes();app.ShowSettings("Notes");});open.FontSize=12;open.Margin=new(20,0,0,0);actions.Children.Add(open);page.Children.Add(actions);return page;
+        var save=GlassPeekButton("Save preview note","Save note",SavePeekNote);save.FontSize=12;peekNoteSave=save;save.IsEnabled=!string.IsNullOrWhiteSpace(peekNote.Text);
+        var open=GlassPeekButton("Open all notes","All notes",()=>{FlushNotes();app.ShowSettings("Notes");});open.FontSize=12;
+        var actions=GlassDockAppearance.ActionRow(save,open);
+        actions.Margin=new(0,9,0,0);
+        page.Children.Add(actions);
+        return page;
     }
     private void SavePeekNote()
     {

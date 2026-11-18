@@ -28,7 +28,7 @@ public sealed partial class OverlayWindow
             bool selected=pair.Key==id;
             if(selected)
             {
-                button.ClearValue(Control.BackgroundProperty);
+                button.SetResourceReference(Control.BackgroundProperty,Accessibility.HighContrast?"ControlFill":"GlassControlFill");
                 button.ClearValue(Control.ForegroundProperty);
             }
             else
@@ -70,7 +70,7 @@ public sealed partial class OverlayWindow
         foreach(var (id,label) in new[]{("overview",Localization.Text("Overview")),("hardware",Localization.Text("Hardware")),("network",Localization.Text("Network")),("storage",Localization.Text("Storage")),("processes",Localization.Text("Processes"))})
         {
             if(id=="network" && !app.Settings.MonitorNetwork || id=="storage" && !app.Settings.MonitorStorage || id=="processes" && !app.Settings.MonitorProcesses)continue;
-            var button=UI.Button(label,()=>SelectMonitorTab(id));button.FontSize=10;button.Padding=new(7,5,7,5);button.MinHeight=28;button.Margin=new(0,0,3,3);UI.Named(button,Localization.Text("Monitor ")+label);monitorTabs[id]=button;tabs.Children.Add(button);
+            var button=UI.Button(label,()=>SelectMonitorTab(id));button.FontSize=10;button.Padding=new(7,5,7,5);button.MinHeight=28;button.Margin=new(0,0,GlassDockAppearance.ActionGap,3);UI.Named(button,Localization.Text("Monitor ")+label);monitorTabs[id]=button;tabs.Children.Add(button);
         }
         panel.Children.Add(tabs);
         monitorDetailScroll=UI.Scroll(monitorRows);

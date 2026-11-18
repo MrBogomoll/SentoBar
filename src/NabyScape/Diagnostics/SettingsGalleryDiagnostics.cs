@@ -59,6 +59,24 @@ internal static class SettingsGalleryDiagnostics
                 Nav("Motion").IsVisible && Nav("ClosedDock").IsVisible && Nav("Controls").IsVisible && Nav("Appearance").IsVisible && Nav("WindowAppearance").IsVisible);
             check("The old visibility control is absent from the whole window",
                 !Diagnostics.LogicalDescendants(window).OfType<Control>().Any(c=>UI.Identity(c) is "Show all settings" or "Show essentials only"));
+            var settings=app.Settings;
+            settings.Preset="iPhone";
+            settings.DockEdge="Floating";
+            settings.Top=24;
+            island.Show();
+            island.Collapse();
+            app.ChangeSettings();
+            var surface=(IslandSurface)typeof(OverlayWindow).GetField("surface",flags)!.GetValue(island)!;
+            Diagnostics.LogicalDescendants(settingsPage).OfType<Button>().Single(b=>UI.Identity(b)=="Use notch shape")
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await Task.Delay(380);
+            var persisted=app.Store.Load<Settings>("settings");
+            var painted=surface.Contour.Bounds;
+            check("Choosing the notch from a floating dock attaches it to the top and paints real shoulders",
+                persisted.Preset=="Mac" && persisted.DockEdge=="Top" && persisted.Top==0 && surface.Notch &&
+                surface.Contour.FillContains(new Point(painted.Left+2,.1)) &&
+                !surface.Contour.FillContains(new Point(painted.Left+2,painted.Height/2)));
+            island.Hide();
             var livePreview=Diagnostics.LogicalDescendants(window).OfType<Expander>().Single(e=>UI.Identity(e)=="Settings live preview");
             check("The live preview has a rounded, accented header",livePreview.Header is Border {Background:not null});
             navigate.Invoke(window,new object[]{"Home"});window.UpdateLayout();

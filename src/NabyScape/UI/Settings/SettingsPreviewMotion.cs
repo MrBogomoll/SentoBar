@@ -60,7 +60,7 @@ public sealed partial class SettingsWindow
     private void RefreshPreviewClip()
     {
         double width=preview.ActualWidth>0?preview.ActualWidth:preview.Width,height=preview.ActualHeight>0?preview.ActualHeight:preview.Height;
-        if(double.IsFinite(width) && double.IsFinite(height))preview.Clip=IslandGeometry.Create(Math.Max(1,width),Math.Max(1,height),GlassDockAppearance.Radius(app.Settings.Radius),app.Settings.Preset=="Mac" && app.Settings.DockEdge=="Top");
+        if(double.IsFinite(width) && double.IsFinite(height))preview.Clip=IslandGeometry.Create(Math.Max(1,width),Math.Max(1,height),GlassDockAppearance.Radius(app.Settings.Radius),app.Settings.UsesTopNotch);
     }
     private void AnimatePreviewSize(double width,double height)
     {

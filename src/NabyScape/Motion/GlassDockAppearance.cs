@@ -16,6 +16,18 @@ internal static class GlassDockAppearance
     internal static readonly SolidColorBrush AccentText=UI.Brush("#111827");
     internal static readonly Pen Edge=CreateEdge();
 
+    internal const double ActionGap=6;
+
+    internal static StackPanel ActionRow(params Button[] actions)
+    {
+        for(int index=0;index<actions.Length;index++)
+        {
+            var margin=actions[index].Margin;
+            actions[index].Margin=new Thickness(0,margin.Top,index+1<actions.Length?ActionGap:0,margin.Bottom);
+        }
+        return UI.Row(actions);
+    }
+
     internal static void ApplyControls(FrameworkElement host)
     {
         if(Accessibility.HighContrast)return;

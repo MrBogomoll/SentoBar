@@ -221,7 +221,18 @@ public sealed partial class SettingsWindow : Window
     {
         var s=app.Settings;
         var colors=new StackPanel();ColorControl(colors,"Island color",s.Background,v=>s.Background=v,new[]{"#000000","#101114","#182028","#25221E"});ColorControl(colors,"Accent color",s.Accent,v=>s.Accent=v,new[]{"#FFFFFF","#E3D2AF","#A8C6F2","#B7D6BC"});AddSlider(colors,"Opacity",s.Opacity*100,65,100,v=>s.Opacity=v/100,"%",1);page.Children.Add(Section("Color & material",colors,Check("Dock reflections",s.GlassStyle,v=>s.GlassStyle=v),Check("Tint with album artwork",s.AlbumAccent,v=>s.AlbumAccent=v)));
-        void Preset(string name){s.Preset=name;s.Top=name=="Mac"?0:Math.Max(8,s.Top);Save();Navigate(current);}
+        void Preset(string name)
+        {
+            s.Preset=name;
+            if(name=="Mac")
+            {
+                s.DockEdge="Top";
+                s.Top=0;
+            }
+            else s.Top=Math.Max(8,s.Top);
+            Save();
+            Navigate(current);
+        }
         page.Children.Add(Section("Shape",ShapeChoices(Preset)));
         var material=new StackPanel();AddSlider(material,"Reflection strength",s.GlassStrength*100,0,100,v=>s.GlassStrength=v/100,"%");page.Children.Add(Section("Surface",PanelBackdropEditor(),material));
         ControlColorSettings();

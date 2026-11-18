@@ -9,7 +9,7 @@ public sealed partial class OverlayWindow
 {
     private FrameworkElement CalendarToolbar()
     {
-        var month=UI.Button(Localization.Text("Toggle calendar month"),()=>{calendarMonthExpanded=!calendarMonthExpanded;RefreshTools();});var monthLabel=UI.Row(UI.Heading(calendarMonth.ToString("MMMM yyyy",Localization.Culture),17),Icons.Create("chevron",8,UI.Muted));((FrameworkElement)monthLabel.Children[1]).Margin=new(8,0,0,0);month.Content=monthLabel;month.Padding=new(0);month.Margin=new(0);month.Background=Brushes.Transparent;month.MinHeight=30;
+        var month=UI.Button(Localization.Text("Toggle calendar month"),()=>{calendarMonthExpanded=!calendarMonthExpanded;RefreshTools();});var monthLabel=UI.Row(UI.Heading(calendarMonth.ToString("MMMM yyyy",Localization.Culture),17),Icons.Create("chevron",8,UI.Muted));((FrameworkElement)monthLabel.Children[1]).Margin=new(8,0,0,0);month.Content=monthLabel;month.Padding=new(0);month.Margin=new(0,0,GlassDockAppearance.ActionGap,0);month.Background=Brushes.Transparent;month.MinHeight=30;
         Button Arrow(bool forward)
         {
             var button=UI.Button(forward?Localization.Text("Next calendar month"):Localization.Text("Previous calendar month"),()=>{if(forward && calendarMonth.Year==9999 && calendarMonth.Month==12 || !forward && calendarMonth==DateTime.MinValue)return;calendarMonth=calendarMonth.AddMonths(forward?1:-1);calendarMonthExpanded=true;RefreshTools();});
@@ -17,7 +17,7 @@ public sealed partial class OverlayWindow
         }
         var today=UI.Button(Localization.Text("Today"),()=>{calendarDay=DateTime.Today;calendarMonth=new(calendarDay.Year,calendarDay.Month,1);calendarMonthExpanded=false;RefreshTools();});today.Padding=new(8,4,8,4);today.Margin=new(2,0,6,0);today.Background=Brushes.Transparent;today.MinHeight=30;today.FontSize=11;
         var add=UI.Button(Localization.Text("Add local event"),()=>{calendarEditing=true;RefreshTools();});add.Content=Localization.Text("Add event");add.MinHeight=30;add.Padding=new(10,4,10,4);add.Margin=new(0);add.FontSize=11;
-        return MinimalWidgets.Header(month,UI.Row(Arrow(false),Arrow(true),today,add));
+        return MinimalWidgets.Header(month,GlassDockAppearance.ActionRow(Arrow(false),Arrow(true),today,add));
     }
     private FrameworkElement CalendarWeek()
     {

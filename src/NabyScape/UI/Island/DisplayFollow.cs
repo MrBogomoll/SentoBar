@@ -19,7 +19,7 @@ internal sealed class MonitorFollowPolicy
         double compact=s.Width*scale;int painted=paintedWidth>0?paintedWidth:width;
         int inset=Math.Max(0,(width-painted)/2),gap=(int)Math.Round(s.DockInset*scale);
         int x=bounds.Left+(int)((bounds.Width-compact)*s.Horizontal/100+compact/2-width/2d);
-        int y=bounds.Top+(int)((tucked || s.Preset=="Mac" && s.DockEdge=="Top"?0:s.Top)*scale);
+        int y=bounds.Top+(int)((tucked || s.UsesTopNotch?0:s.Top)*scale);
         if(s.DockEdge=="Bottom")y=bounds.Bottom-height-(tucked?0:gap);
         else if(s.DockEdge is "Left" or "Right")
         {

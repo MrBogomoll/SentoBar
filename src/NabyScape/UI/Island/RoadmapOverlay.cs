@@ -153,6 +153,6 @@ public sealed partial class OverlayWindow
         void DateRow(string label,TextBox date,TextBox time){panel.Children.Add(UI.Text(label+Localization.Text(" · YYYY-MM-DD / HH:mm"),11,UI.Muted));var row=new Grid();row.ColumnDefinitions.Add(new());row.ColumnDefinitions.Add(new(){Width=new GridLength(83)});date.Margin=new(0,4,10,8);time.Margin=new(0,4,0,8);Grid.SetColumn(time,1);row.Children.Add(date);row.Children.Add(time);panel.Children.Add(row);}
         DateRow(Localization.Text("Start"),startDate,startTime);DateRow(Localization.Text("End"),endDate,endTime);panel.Children.Add(UI.Text(Localization.Text("Meeting URL · optional http(s)"),11,UI.Muted));var url=UI.Input(Localization.Text("Meeting URL"),"");url.MaxLength=2048;panel.Children.Add(url);var status=UI.Text("",11,UI.Muted);panel.Children.Add(status);
         var save=UI.Button(Localization.Text("Save event"),()=>{try{var start=EventTime(startDate.Text,startTime.Text,TimeZoneInfo.Local);var end=EventTime(endDate.Text,endTime.Text,TimeZoneInfo.Local);app.Calendar.Add(title.Text,start,end,url.Text);calendarEditing=false;calendarDay=start.LocalDateTime.Date;calendarMonth=new(calendarDay.Year,calendarDay.Month,1);RefreshTools();}catch(Exception ex){app.Store.Log(ex);status.Text=ex.Message;}},true);
-        panel.Children.Add(UI.Row(save,UI.Button(Localization.Text("Cancel"),()=>{calendarEditing=false;RefreshTools();})));
+        panel.Children.Add(GlassDockAppearance.ActionRow(save,UI.Button(Localization.Text("Cancel"),()=>{calendarEditing=false;RefreshTools();})));
     }
 }

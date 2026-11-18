@@ -23,11 +23,24 @@ public sealed partial class SettingsWindow
     private FrameworkElement ShapeChoices(Action<string> choose)
     {
         var grid=new Grid();grid.ColumnDefinitions.Add(new());grid.ColumnDefinitions.Add(new());int index=0;
+        void RefreshSelection()
+        {
+            int selected=app.Settings.UsesTopNotch?0:1;
+            foreach(Button button in grid.Children)
+            {
+                bool active=Grid.GetColumn(button)==selected;
+                button.SetResourceReference(Control.BackgroundProperty,active?"SelectionFill":"ControlFill");
+                button.SetResourceReference(Control.BorderBrushProperty,active?"Accent":"ControlBorder");
+            }
+        }
         foreach(var shape in new[]{"Mac","iPhone"})
         {
             var content=new StackPanel();var silhouette=new Border{Width=110,Height=27,Background=Brushes.Black,Margin=new(0,2,0,10)};silhouette.Clip=IslandGeometry.Create(110,27,12,shape=="Mac");content.Children.Add(silhouette);var label=UI.Caption(shape=="Mac"?"Notch":"Pill",12);label.HorizontalAlignment=HorizontalAlignment.Center;content.Children.Add(label);
-            var button=UI.CaptionButton(shape=="Mac"?"Use notch shape":"Use pill shape",()=>choose(shape));button.Content=content;button.SetResourceReference(Control.BackgroundProperty,app.Settings.Preset==shape?"SelectionFill":"ControlFill");button.BorderThickness=new(1);button.SetResourceReference(Control.BorderBrushProperty,app.Settings.Preset==shape?"Accent":"ControlBorder");button.Padding=new(12);button.Margin=new(index==0?0:6,0,index==0?6:0,0);button.Tag=new CornerRadius(10);Grid.SetColumn(button,index++);grid.Children.Add(button);
+            var button=UI.CaptionButton(shape=="Mac"?"Use notch shape":"Use pill shape",()=>choose(shape));button.Content=content;button.BorderThickness=new(1);button.Padding=new(12);button.Margin=new(index==0?0:6,0,index==0?6:0,0);button.Tag=new CornerRadius(10);Grid.SetColumn(button,index++);grid.Children.Add(button);
         }
+        grid.Loaded+=(_,_)=>{app.SettingsChanged+=RefreshSelection;RefreshSelection();};
+        grid.Unloaded+=(_,_)=>app.SettingsChanged-=RefreshSelection;
+        RefreshSelection();
         return grid;
     }
     private void ColorControl(StackPanel parent,string name,string value,Action<string> changed,string[] palette)
@@ -94,11 +107,11 @@ public sealed partial class SettingsWindow
             if(custom==null)material.Background=IslandSurface.Material(s.Background);
             material.Opacity=(closed?.45:1)*s.GlassStrength;
         }
-        RefreshPreviewClip();preview.Margin=new(0,s.Preset=="Mac"?0:Math.Clamp(s.Top,0,12),0,0);
+        RefreshPreviewClip();preview.Margin=new(0,s.UsesTopNotch?0:Math.Clamp(s.Top,0,12),0,0);
         var inset=new Thickness(closed?(previewIdle?14:18):hover?32:s.PanelPadding,closed?0:15,closed?(previewIdle?14:18):hover?32:s.PanelPadding,0);
-        previewDimensions.Text=detailExample?Localization.Text("Detail preview · your current appearance"):Localization.Format("{0:0} × {1:0} px · {2}",width,height,Localization.Text(s.Preset=="Mac"?"Notch":"Pill"));
+        previewDimensions.Text=detailExample?Localization.Text("Detail preview · your current appearance"):Localization.Format("{0:0} × {1:0} px · {2}",width,height,Localization.Text(s.UsesTopNotch?"Notch":"Pill"));
         int settingsKey=previewContent is "Music" or "Timer" or "Focus" or "System"?HashCode.Combine(HashCode.Combine(s.ClosedMediaContent,s.ClosedIdleContent),s.ClosedMediaIcon,s.LiveActivity,s.BoldMediaTitle,s.BoldHeadings,s.FocusSeconds,s.BreakSeconds,s.TimerDurationSeconds):previewRevision;
-        int template=HashCode.Combine(HashCode.Combine(current,previewMode,previewContent,settingsKey,app.Media.Title,app.Media.Artist,app.Media.Artwork),app.Media.Playing,timedKind,clockEnabled,s.ShowDate,app.Assistant.Options.IslandCharacter);
+        int template=HashCode.Combine(HashCode.Combine(current,previewMode,previewContent,settingsKey,app.Media.Title,app.Media.Artist,app.Media.Artwork,s.UsesTopNotch),app.Media.Playing,timedKind,clockEnabled,s.ShowDate,app.Assistant.Options.IslandCharacter);
         if(previewTemplateKey==template && previewLayout!=null && previewMaterial!=null)
         {previewLayout.Margin=previewIdle?new Thickness(0):inset;PreviewSurface(previewMaterial);return;}
         previewTemplateKey=template;previewFrames.Clear();previewRealtimeFrames.Clear();hasPreviewWave=false;
@@ -110,7 +123,7 @@ public sealed partial class SettingsWindow
             if(previewIdle)
             {
                 appName.Text=previewAskNaby?Localization.Text("Ask Naby"):"";time.FontWeight=FontWeights.Medium;time.FontFamily=new FontFamily("Segoe UI Variable Text, Segoe UI");
-                double innerWidth=CompactDockPresentation.ContentWidth(width,s.PanelWidth,s.Preset=="Mac" && s.DockEdge=="Top");
+                double innerWidth=CompactDockPresentation.ContentWidth(width,s.PanelWidth,s.UsesTopNotch);
                 bool companionVisible=previewAssistantExample || app.Assistant.Options.IslandCharacter || app.Assistant.WakeListening;
                 double size=Math.Clamp(s.Height-4,24,32);double companionSpace=companionVisible?size+9:0;
                 content.Children.Remove(header);content.Margin=new Thickness(0);
@@ -206,7 +219,7 @@ public sealed partial class SettingsWindow
             else{var cpu=UI.Text(Localization.Format("CPU   {0:0}%",app.Usage.cpu),14);var memory=UI.Text(Localization.Format("Memory   {0:0.0} / {1:0.0} GB",app.Usage.used,app.Usage.total),12);var bar=new ProgressBar{Value=app.Usage.cpu,Maximum=100,Height=3,Margin=new(0,10,0,18),Foreground=Brushes.White,Background=UI.Brush("#40434B")};detail.Children.Add(cpu);detail.Children.Add(bar);detail.Children.Add(memory);previewFrames.Add(_=>{cpu.Text=Localization.Format("CPU   {0:0}%",app.Usage.cpu);bar.Value=app.Usage.cpu;memory.Text=Localization.Format("Memory   {0:0.0} / {1:0.0} GB",app.Usage.used,app.Usage.total);});}
             content.Children.Add(detail);
         }
-        content.ClipToBounds=true;var layers=new Grid{ClipToBounds=true};previewMaterial=new Border();PreviewSurface(previewMaterial);layers.Children.Add(previewMaterial);if(ambientPreview.Parent is Panel previousAmbientHost)previousAmbientHost.Children.Remove(ambientPreview);layers.Children.Add(ambientPreview);layers.Children.Add(content);preview.Child=layers;previewDimensions.Text=detailExample?Localization.Text("Detail preview · your current appearance"):Localization.Format("{0:0} × {1:0} px · {2}",width,height,Localization.Text(s.Preset=="Mac"?"Notch":"Pill"));foreach(var entry in previewModeButtons){if(entry.Key==previewMode)entry.Value.SetResourceReference(Control.BackgroundProperty,"Accent");else entry.Value.Background=Brushes.Transparent;entry.Value.SetResourceReference(Control.ForegroundProperty,entry.Key==previewMode?"AccentText":"SettingsQuiet");}
+        content.ClipToBounds=true;var layers=new Grid{ClipToBounds=true};previewMaterial=new Border();PreviewSurface(previewMaterial);layers.Children.Add(previewMaterial);if(ambientPreview.Parent is Panel previousAmbientHost)previousAmbientHost.Children.Remove(ambientPreview);layers.Children.Add(ambientPreview);layers.Children.Add(content);preview.Child=layers;previewDimensions.Text=detailExample?Localization.Text("Detail preview · your current appearance"):Localization.Format("{0:0} × {1:0} px · {2}",width,height,Localization.Text(s.UsesTopNotch?"Notch":"Pill"));foreach(var entry in previewModeButtons){if(entry.Key==previewMode)entry.Value.SetResourceReference(Control.BackgroundProperty,"Accent");else entry.Value.Background=Brushes.Transparent;entry.Value.SetResourceReference(Control.ForegroundProperty,entry.Key==previewMode?"AccentText":"SettingsQuiet");}
     }
     private void ExportCustomization()
     {var dialog=new Microsoft.Win32.SaveFileDialog{Title=Localization.Text("Export NabyScape layout"),Filter=Localization.Text("NabyScape layout|*.json"),FileName="NabyScape-layout.json"};if(dialog.ShowDialog(this)!=true)return;try{File.WriteAllText(dialog.FileName,CustomizationProfile.Export(app.Settings));status.Text=Localization.Text("Layout exported");}catch(Exception ex){status.Text=Localization.Text("Could not export layout");app.Store.Log(ex);}}

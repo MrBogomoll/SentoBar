@@ -83,7 +83,7 @@ public sealed partial class OverlayWindow
         var s=app.Settings;
         if(previous.Hotkeys!=next.Hotkeys)ConfigureHotkey();
         Motion.Configure(s);var backdrop=app.PanelBackground.Get(s,app.Store.DirectoryPath);surface.SetPanelBackdrop(backdrop);
-        ApplyDockOpacity(!expanded && !peeking);surface.Fill=UI.Brush(s.Background);surface.GlassStyle=s.GlassStyle;surface.SetMaterial(s.Background,s.GlassStrength);surface.Notch=s.Preset=="Mac" && s.DockEdge=="Top";surface.Radius=s.Radius;
+        ApplyDockOpacity(!expanded && !peeking);surface.Fill=UI.Brush(s.Background);surface.GlassStyle=s.GlassStyle;surface.SetMaterial(s.Background,s.GlassStrength);surface.Notch=s.UsesTopNotch;surface.Radius=s.Radius;
         hoverDelay.Interval=TimeSpan.FromMilliseconds(s.HoverDelayMs);detailDelay.Interval=TimeSpan.FromMilliseconds(s.HoverDetailDelayMs);
         ApplyHeadingTypography(body);ApplyMediaTypography(title,s.BoldMediaTitle);
         foreach(var tab in compactTabs)StyleCategory(tab.Value,tab.Key,tab.Key==(activePage=="mixer"?"media":activePage));

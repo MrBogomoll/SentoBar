@@ -71,6 +71,17 @@ internal static class PanelBackdropDiagnostics
         check("Hover restores the shared background opacity",Math.Abs(MidAlpha()-options.Opacity*255)<3);
         island.Reveal(false);island.SelectPage("calendar",false);await Settle();
         check("Expanded restores the shared background opacity",Math.Abs(MidAlpha()-options.Opacity*255)<3);
+        Button CalendarButton(string name)=>Diagnostics.Descendants(island).OfType<Button>()
+            .Single(button=>button.IsVisible && UI.Identity(button)==Localization.Text(name));
+        var todayAction=CalendarButton("Today");
+        var addEvent=CalendarButton("Add local event");
+        check("Add event matches Today's transparent fill, border and height",
+            addEvent.Background==Brushes.Transparent && addEvent.BorderThickness==todayAction.BorderThickness &&
+                addEvent.BorderBrush==todayAction.BorderBrush && Math.Abs(addEvent.ActualHeight-todayAction.ActualHeight)<.5);
+        var actions=new[]{"Toggle calendar month","Previous calendar month","Next calendar month","Today","Add local event"}.Select(CalendarButton).ToArray();
+        Rect ButtonBounds(Button button)=>button.TransformToAncestor(island).TransformBounds(new Rect(button.RenderSize));
+        check("Calendar toolbar leaves six pixels between every adjoining button",
+            actions.Zip(actions.Skip(1),(left,right)=>Math.Abs(ButtonBounds(right).Left-ButtonBounds(left).Right-6)<.6).All(gap=>gap));
         var header=Diagnostics.Descendants(island).OfType<Grid>().Single(g=>Equals(g.Tag,"panel-navigation"));
         var scroller=Diagnostics.Descendants(header).OfType<ScrollViewer>().Single();
         var row=(StackPanel)scroller.Content;

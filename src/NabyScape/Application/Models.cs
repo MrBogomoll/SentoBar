@@ -35,6 +35,7 @@ public sealed partial class Settings
     public bool DownloadsEnabled {get;set;}
     public string DownloadsFolder {get;set;}="";
     public string Preset { get; set; } = "Mac";
+    internal bool UsesTopNotch=>Preset=="Mac" && DockEdge=="Top";
     public double Width { get; set; } = 228;
     public double Height { get; set; } = 32;
     public double Radius { get; set; } = 16;
