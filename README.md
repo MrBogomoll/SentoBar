@@ -6,12 +6,12 @@
 
 SentoBar — форк NabyScape. Автор оригинального проекта — **BillyNabil**. [Оригинальный репозиторий](https://github.com/BillyNabil/nabyscape)
 
-**В SentoBar 2.1.0** появились история чатов, диктовка, голосовой вызов «Сенто» и графики нагрузки для выбранных устройств. [Что изменилось](https://github.com/MrBogomoll/SentoBar/releases/tag/v2.1.0)
+**В SentoBar 2.1.1** фоновый вызов «Сенто» использует лёгкую модель, а фраза «Завершить разговор» закрывает голосовой сеанс и возвращает ожидание вызова. [Что изменилось](https://github.com/MrBogomoll/SentoBar/releases/tag/v2.1.1)
 
 | Windows | Установщик | Без установки |
 | --- | --- | --- |
-| x64 | [Скачать EXE](https://github.com/MrBogomoll/SentoBar/releases/download/v2.1.0/SentoBar-win-x64-Setup.exe) | [Portable ZIP](https://github.com/MrBogomoll/SentoBar/releases/download/v2.1.0/SentoBar-win-x64-Portable.zip) |
-| ARM64 | [Скачать EXE](https://github.com/MrBogomoll/SentoBar/releases/download/v2.1.0/SentoBar-win-arm64-Setup.exe) | [Portable ZIP](https://github.com/MrBogomoll/SentoBar/releases/download/v2.1.0/SentoBar-win-arm64-Portable.zip) |
+| x64 | [Скачать EXE](https://github.com/MrBogomoll/SentoBar/releases/download/v2.1.1/SentoBar-win-x64-Setup.exe) | [Portable ZIP](https://github.com/MrBogomoll/SentoBar/releases/download/v2.1.1/SentoBar-win-x64-Portable.zip) |
+| ARM64 | [Скачать EXE](https://github.com/MrBogomoll/SentoBar/releases/download/v2.1.1/SentoBar-win-arm64-Setup.exe) | [Portable ZIP](https://github.com/MrBogomoll/SentoBar/releases/download/v2.1.1/SentoBar-win-arm64-Portable.zip) |
 
 ## Сама панель
 
@@ -82,7 +82,7 @@ SentoBar — форк NabyScape. Автор оригинального прое�
 
 Поддерживаются Windows 10 версии 2004 и новее и Windows 11. Среда .NET входит в комплект.
 
-1. Выберите установщик для архитектуры своего ПК. [Файлы релиза и контрольные суммы](https://github.com/MrBogomoll/SentoBar/releases/tag/v2.1.0)
+1. Выберите установщик для архитектуры своего ПК. [Файлы релиза и контрольные суммы](https://github.com/MrBogomoll/SentoBar/releases/tag/v2.1.1)
 2. Если панель уже запущена, завершите её через значок в области уведомлений.
 3. Запустите установщик и откройте SentoBar через меню «Пуск». Для запуска без установки распакуйте Portable ZIP и откройте `SentoBar.exe`.
 

@@ -164,12 +164,41 @@ internal sealed partial class AssistantSpeechInstall : IDisposable
         catch(System.ComponentModel.Win32Exception ex) when(ex.NativeErrorCode==1223){throw new IOException(Localization.Text("Windows runtime installation was cancelled. Choose Install & use when you are ready to approve it."));}
         finally{installingPrerequisite=false;}
     }
-    private async Task Download(SpeechAsset asset,string target,string title,CancellationToken token)
+    private bool wakeModelDownloadFailed;
+
+    internal async Task<SpeechAsrModel?> PrepareSentoWakeModel(Action<string> status,CancellationToken token)
+    {
+        var model=SpeechCatalog.AsrById("small-q5_1");
+        if(HasAsrWeights(model))return model;
+
+        // Keep the wake download separate from the model picker, which can install the same weights concurrently.
+        var wakeModel=model with {SourcePath=Path.Combine(root,"wake",Path.GetFileName(AsrPath(model)))};
+        if(HasAsrWeights(wakeModel))return wakeModel;
+        if(wakeModelDownloadFailed)return null;
+
+        status(Localization.Format("Downloading the lightweight wake model ({0} MB)…",model.DownloadBytes/1024/1024));
+        using var deadline=CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(TimeSpan.FromMinutes(2));
+        try
+        {
+            await Download(wakeModel.Asset,wakeModel.SourcePath,wakeModel.Name,deadline.Token,showProgress:false);
+            return wakeModel;
+        }
+        catch(Exception ex) when(!token.IsCancellationRequested &&
+            (ex is OperationCanceledException or HttpRequestException or IOException or UnauthorizedAccessException))
+        {
+            // Keep the installed recognizer available offline. Retry the optional download next launch.
+            wakeModelDownloadFailed=true;
+            return null;
+        }
+    }
+
+    private async Task Download(SpeechAsset asset,string target,string title,CancellationToken token,bool showProgress=true)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         if(HasFile(target,asset.Bytes))
         {
-            Report(Localization.Text("Verifying ")+title+"…");await using var existing=File.OpenRead(target);var hash=await SHA256.HashDataAsync(existing,token);if(Convert.ToHexString(hash).Equals(asset.Sha256,StringComparison.OrdinalIgnoreCase))return;
+            if(showProgress)Report(Localization.Text("Verifying ")+title+"…");await using var existing=File.OpenRead(target);var hash=await SHA256.HashDataAsync(existing,token);if(Convert.ToHexString(hash).Equals(asset.Sha256,StringComparison.OrdinalIgnoreCase))return;
         }
         string partial=target+".partial";
         try
@@ -186,7 +215,7 @@ internal sealed partial class AssistantSpeechInstall : IDisposable
                 int count;while((count=await source.ReadAsync(buffer,deadline.Token))>0)
                 {
                     total+=count;if(total>cap)throw new IOException(Localization.Text("Download exceeds its expected size."));await output.WriteAsync(buffer.AsMemory(0,count),deadline.Token);checksum.AppendData(buffer,0,count);
-                    long now=Environment.TickCount64;if(now-lastProgress>150){lastProgress=now;Report(Localization.Format("Downloading {0} · {1}",title,(total/1024d/1024).ToString("0.0"))+(asset.Bytes>0?Localization.Format(" / {0} MB",(asset.Bytes/1024d/1024).ToString("0.0")):Localization.Text(" MB")),asset.Bytes>0?total*100d/asset.Bytes:0);}
+                    long now=Environment.TickCount64;if(showProgress && now-lastProgress>150){lastProgress=now;Report(Localization.Format("Downloading {0} · {1}",title,(total/1024d/1024).ToString("0.0"))+(asset.Bytes>0?Localization.Format(" / {0} MB",(asset.Bytes/1024d/1024).ToString("0.0")):Localization.Text(" MB")),asset.Bytes>0?total*100d/asset.Bytes:0);}
                 }
                 if(asset.Bytes>0 && total!=asset.Bytes || !Convert.ToHexString(checksum.GetHashAndReset()).Equals(asset.Sha256,StringComparison.OrdinalIgnoreCase))throw new IOException(Localization.Text("Checksum verification failed. Retry the download."));
             }

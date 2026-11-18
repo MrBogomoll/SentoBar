@@ -153,8 +153,8 @@ internal sealed partial class LocalAssistantVoice
         await PrepareCheck(true,status,token);
         return await TranscribePcm(pcm,token);
     }
-    private async Task PrepareCheck(bool listening,Action<string> status,CancellationToken token)
+    private async Task PrepareCheck(bool listening,Action<string> status,CancellationToken token,bool wakeOnly=false,SpeechAsrModel? wakeModel=null)
     {
-        if(!options.Managed || !listening && AssistantOwnSpeech.Tts(options).Id=="windows")return;managed=new AssistantManagedSpeech(assets!,options);await managed.StartCheck(listening,status,token);if(managed.AsrUrl!=null){options.AsrProtocol="WhisperCpp";options.AsrUrl=managed.AsrUrl.AbsoluteUri;}
+        if(!options.Managed || !listening && AssistantOwnSpeech.Tts(options).Id=="windows")return;managed=new AssistantManagedSpeech(assets!,options);await managed.StartCheck(listening,status,token,wakeOnly,wakeModel);if(managed.AsrUrl!=null){options.AsrProtocol="WhisperCpp";options.AsrUrl=managed.AsrUrl.AbsoluteUri;}
     }
 }

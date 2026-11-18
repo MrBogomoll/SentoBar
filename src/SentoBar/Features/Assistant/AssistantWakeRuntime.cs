@@ -98,10 +98,17 @@ internal sealed partial class AssistantRuntime
                         try
                         {
                             await using(speech)
-                                await speech.ListenForWake(options.Phrase,language,()=>Dispatch(()=>
+                                await speech.ListenForWake(options.Phrase,language,lightweight=>Dispatch(()=>
                                 {
                                     if(version!=wakeVersion)return;
-                                    localWakeListening=true;WakeStatus=Localization.Format("Listening on CPU · say “{0}”.",options.Phrase);Notify();
+                                    localWakeListening=true;
+                                    WakeStatus=Localization.Format(lightweight?"Lightweight wake model · say “{0}”.":"Listening on CPU · say “{0}”.",options.Phrase);
+                                    Notify();
+                                }),message=>Dispatch(()=>
+                                {
+                                    if(version!=wakeVersion)return;
+                                    WakeStatus=message;
+                                    Notify();
                                 }),stop.Token);
                             Dispatch(()=>_=WakeDetected(version));
                         }
@@ -121,9 +128,33 @@ internal sealed partial class AssistantRuntime
     private async Task WakeDetected(int version)
     {
         if(disposed || version!=wakeVersion || !wakeWanted || !Options.Enabled || SpeechCheckBusy || Speech.Busy || Busy || VoiceConnected)return;
-        wakeTriggering=true;int activation=++wakeVersion;StopWakeEngines();
-        try{await wakeClosing;if(disposed || !wakeWanted || activation!=wakeVersion)return;app.OpenVoice();await StartVoice();if(wakeWanted && !VoiceConnected){wakeWanted=false;wakeFailed=true;WakeStatus=Localization.Text("Voice did not start. Check Voice settings, then resume wake listening.");}}
-        catch{wakeWanted=false;wakeFailed=true;WakeStatus=Localization.Text("Wake activation failed. Check the microphone and Voice settings.");}
+        wakeTriggering=true;
+        int activation=++wakeVersion;
+        int startingSession=sessionVersion;
+        StopWakeEngines();
+        try
+        {
+            await wakeClosing;
+            if(disposed || !wakeWanted || activation!=wakeVersion)return;
+            app.OpenVoice();
+            await StartVoice();
+            // EndVoice can finish while the cancelled startup is still unwinding.
+            if(startingSession==sessionVersion && wakeWanted && !VoiceConnected)
+            {
+                wakeWanted=false;
+                wakeFailed=true;
+                WakeStatus=Localization.Text("Voice did not start. Check Voice settings, then resume wake listening.");
+            }
+        }
+        catch
+        {
+            if(startingSession==sessionVersion)
+            {
+                wakeWanted=false;
+                wakeFailed=true;
+                WakeStatus=Localization.Text("Wake activation failed. Check the microphone and Voice settings.");
+            }
+        }
         finally{wakeTriggering=false;Notify();}
     }
     internal async Task EndVoice()
@@ -132,6 +163,10 @@ internal sealed partial class AssistantRuntime
         // provider/setup change paused it before this manually started session.
         bool resume=Options.Enabled && Options.WakeWord.Enabled;StopSession();int version=wakeVersion;await voiceClosing;
         if(disposed || version!=wakeVersion || !resume || !Options.Enabled || !Options.WakeWord.Enabled)return;
-        wakeWanted=true;wakeNotBefore=Environment.TickCount64+1200;WakeStatus=Localization.Text("Conversation ended · wake word will resume.");Notify();
+        wakeWanted=true;
+        wakeFailed=false;
+        wakeNotBefore=Environment.TickCount64+1200;
+        WakeStatus=Localization.Text("Conversation ended · wake word will resume.");
+        Notify();
     }
 }

@@ -1,4 +1,6 @@
 {
+  "Downloading the lightweight wake model ({0} MB)…": "Загружается лёгкая модель для фразы активации ({0} МБ)…",
+  "Lightweight wake model · say “{0}”.": "Лёгкая модель ждёт фразу «{0}».",
   "Say the phrase on its own to start a voice conversation.": "Чтобы начать голосовой разговор, произнесите фразу отдельно.",
   "Your installed Whisper model listens on the CPU while wake listening is on.": "Во время ожидания фразы установленная модель Whisper использует процессор и оперативную память.",
   "Windows listens locally for this phrase.": "Эту фразу распознаёт Windows на вашем ПК.",

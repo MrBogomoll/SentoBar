@@ -44,15 +44,15 @@ internal sealed partial class AssistantManagedSpeech : IDisposable
         await StartSpeakingModel(status,tts,token);
     }
     // Independent checks never load the other half of a speech pack.
-    internal async Task StartCheck(bool listening,Action<string> status,CancellationToken token)
+    internal async Task StartCheck(bool listening,Action<string> status,CancellationToken token,bool wakeOnly=false,SpeechAsrModel? wakeModel=null)
     {
         if(!AssistantSpeechInstall.CppRuntimePresent())throw new IOException(Localization.Text("Prepare speech engines in Voice setup first."));
         var hardware=await assets.Scan(token);
         if(listening)
         {
-            var model=AssistantOwnSpeech.Asr(options);
+            var model=wakeModel??AssistantOwnSpeech.Asr(options);
             if(!assets.HasAsrWeights(model) || !hardware.Fits(model))throw new IOException(Localization.Text("Install or locate the listening model and check available memory."));
-            await StartListeningModel(status,model,hardware,token);
+            await StartListeningModel(status,model,hardware,token,wakeOnly);
         }
         else
         {
@@ -70,10 +70,10 @@ internal sealed partial class AssistantManagedSpeech : IDisposable
             await ttsWorker.Start(new(library,assets.VoiceDirectory(tts),tts.Engine,options.SpeechLanguage,tts.Speaker,options.SpeechPreference=="Quality"?12:options.SpeechPreference=="Light"?4:8),Launch,token);
         }
     }
-    private async Task StartListeningModel(Action<string> status,SpeechAsrModel model,SpeechHardware hardware,CancellationToken token)
+    private async Task StartListeningModel(Action<string> status,SpeechAsrModel model,SpeechHardware hardware,CancellationToken token,bool wakeOnly=false)
     {
         if(model.Native){status(model.Name+Localization.Text(" selected · the native model loads when you speak."));return;}
-        bool gpu=options.ManagedGpu && hardware.UseGpu(model) && File.Exists(assets.WhisperExe(true));
+        bool gpu=!wakeOnly && options.ManagedGpu && hardware.UseGpu(model) && File.Exists(assets.WhisperExe(true));
         if(gpu)
         {
             try{status(Localization.Text("Loading the local listening model on NVIDIA GPU…"));await StartServer(true,model,token);return;}
@@ -81,14 +81,26 @@ internal sealed partial class AssistantManagedSpeech : IDisposable
             catch(Exception){StopServer();status(Localization.Text("GPU runtime unavailable. Loading the CPU fallback…"));}
         }
         else status(Localization.Text("Loading the local listening model on CPU…"));
-        await StartServer(false,model,token);
+        await StartServer(false,model,token,wakeOnly);
     }
-    private async Task StartServer(bool gpu,SpeechAsrModel model,CancellationToken token)
+    private async Task StartServer(bool gpu,SpeechAsrModel model,CancellationToken token,bool wakeOnly=false)
     {
         using var linked=CancellationTokenSource.CreateLinkedTokenSource(token,lifetime.Token);linked.CancelAfter(TimeSpan.FromSeconds(120));
         int port;using(var listener=new TcpListener(IPAddress.Loopback,0)){listener.Start();port=((IPEndPoint)listener.LocalEndpoint).Port;}
         string route="/"+Guid.NewGuid().ToString("N");
-        var info=NativeInfo(assets.WhisperExe(gpu));info.ArgumentList.Add("-m");info.ArgumentList.Add(assets.AsrPath(model));info.ArgumentList.Add("--host");info.ArgumentList.Add("127.0.0.1");info.ArgumentList.Add("--port");info.ArgumentList.Add(port.ToString(System.Globalization.CultureInfo.InvariantCulture));info.ArgumentList.Add("--request-path");info.ArgumentList.Add(route);info.ArgumentList.Add("-l");info.ArgumentList.Add("auto");info.ArgumentList.Add("-t");info.ArgumentList.Add(Math.Clamp(Environment.ProcessorCount/2,1,8).ToString());if(!gpu)info.ArgumentList.Add("-ng");
+        var info=NativeInfo(assets.WhisperExe(gpu));info.ArgumentList.Add("-m");info.ArgumentList.Add(assets.AsrPath(model));info.ArgumentList.Add("--host");info.ArgumentList.Add("127.0.0.1");info.ArgumentList.Add("--port");info.ArgumentList.Add(port.ToString(System.Globalization.CultureInfo.InvariantCulture));info.ArgumentList.Add("--request-path");info.ArgumentList.Add(route);info.ArgumentList.Add("-l");info.ArgumentList.Add("auto");info.ArgumentList.Add("-t");
+        bool compactWake=wakeOnly && model.Id=="small-q5_1";
+        int wakeThreads=compactWake?1:2;
+        int threads=wakeOnly?Math.Min(Environment.ProcessorCount,wakeThreads):Math.Clamp(Environment.ProcessorCount/2,1,8);
+        info.ArgumentList.Add(threads.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if(!gpu)info.ArgumentList.Add("-ng");
+        if(wakeOnly)
+        {
+            info.Environment["OMP_WAIT_POLICY"]="PASSIVE";
+            info.Environment["KMP_BLOCKTIME"]="0";
+            foreach(string argument in new[]{"-nf","-bo","1","-bs","1"})info.ArgumentList.Add(argument);
+            if(compactWake)info.ArgumentList.Add("-nt");
+        }
         server=Launch(info);server.OutputDataReceived+=(_,_)=>{};server.ErrorDataReceived+=(_,e)=>{if(!string.IsNullOrWhiteSpace(e.Data))lastError=e.Data.Length>300?e.Data[..300]:e.Data;};server.BeginOutputReadLine();server.BeginErrorReadLine();
         using var http=new HttpClient(new HttpClientHandler{UseProxy=false,AllowAutoRedirect=false}){Timeout=TimeSpan.FromSeconds(1)};var url=new Uri($"http://127.0.0.1:{port}{route}/");
         try

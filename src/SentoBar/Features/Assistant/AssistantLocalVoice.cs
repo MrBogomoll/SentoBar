@@ -62,6 +62,16 @@ internal sealed partial class LocalAssistantVoice : IAssistantVoice
     public bool Connected=>connected;
     internal bool Processing=>Volatile.Read(ref processing)!=0;
     internal event Action<AssistantState>? Phase;
+    internal event Action? EndRequested;
+
+    internal static bool IsEndConversation(string text)
+    {
+        const string address="сенто ";
+        string command=NormalizeVoicePhrase(text);
+        if(command.StartsWith(address,StringComparison.Ordinal))command=command[address.Length..];
+        return command is "завершить разговор" or "заверши разговор" or "закончить разговор" or
+            "закончи разговор" or "end conversation" or "end the conversation";
+    }
     internal event Action<string>? Caption;
     public event Action<string>? Status;
     public event Action<float,bool>? Level;
@@ -115,6 +125,12 @@ internal sealed partial class LocalAssistantVoice : IAssistantVoice
             Phase?.Invoke(AssistantState.Thinking);Status?.Invoke(Localization.Text("Transcribing speech…"));var recognitionClock=System.Diagnostics.Stopwatch.StartNew();
             string text=await TranscribePcm(pcm,token);
             if(text.Length==0){Status?.Invoke(Localization.Text("No speech recognized. Try the microphone check in Voice settings."));return;}
+            token.ThrowIfCancellationRequested();
+            if(IsEndConversation(text))
+            {
+                EndRequested?.Invoke();
+                return;
+            }
             await Turn(text[..Math.Min(8000,text.Length)],token,recognitionClock.ElapsedMilliseconds);
         }
         catch(OperationCanceledException) when(!token.IsCancellationRequested && connected){failed=true;Fail(Localization.Text("Speech recognition timed out. Choose a lighter listening model or check your local service, then start voice again."));}
@@ -122,7 +138,7 @@ internal sealed partial class LocalAssistantVoice : IAssistantVoice
         catch(Exception ex){failed=true;if(connected)Fail(ex is HttpRequestException?Localization.Text("The speech service is not responding. Check that it is running."):ex.Message);}
         finally{Interlocked.Exchange(ref processing,0);if(connected){Level?.Invoke(0,false);Phase?.Invoke(failed?AssistantState.Error:AssistantState.Listening);}}
     }
-    private async Task<string> TranscribePcm(byte[] pcm,CancellationToken token,string whisperLanguage="auto")
+    private async Task<string> TranscribePcm(byte[] pcm,CancellationToken token,string whisperLanguage="auto",int whisperAudioContext=0)
     {
         using var wav=new MemoryStream();
         using(var writer=new WaveFileWriter(new IgnoreDisposeStream(wav),AssistantAudioCheck.MicrophoneFormat))writer.Write(pcm,0,pcm.Length);
@@ -135,6 +151,8 @@ internal sealed partial class LocalAssistantVoice : IAssistantVoice
         form.Add(new StringContent("json"),"response_format");
         bool cpp=options.AsrProtocol=="WhisperCpp";
         form.Add(new StringContent(cpp?whisperLanguage:options.AsrModel),cpp?"language":"model");
+        if(cpp && whisperAudioContext>0)
+            form.Add(new StringContent(whisperAudioContext.ToString(System.Globalization.CultureInfo.InvariantCulture)),"audio_ctx");
         using var request=new HttpRequestMessage(HttpMethod.Post,new Uri(Endpoint(options.AsrUrl),cpp?"inference":"audio/transcriptions")){Content=form};
         using var deadline=CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(TimeSpan.FromMinutes(2));

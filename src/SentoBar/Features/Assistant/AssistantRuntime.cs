@@ -188,13 +188,25 @@ internal sealed partial class AssistantRuntime : IDisposable
         VoiceTiming=null;VoiceCaption="";voiceActivity.Reset();IAssistantVoice session=Options.LocalVoice.Enabled?new LocalAssistantVoice(Options.LocalVoice,(text,delta,progress,ct)=>app.Dispatcher.InvokeAsync(()=>LocalReply(text,delta,progress,ct)).Task.Unwrap(),Speech,Options.MicrophoneId):new AssistantVoiceSession(Options.MicrophoneId,!Options.VoiceBargeIn);voice=session;
         if(session is LocalAssistantVoice local)
         {
+            local.EndRequested+=()=>Dispatch(()=>{if(ReferenceEquals(voice,session))_=EndVoice();});
             local.Phase+=phase=>Dispatch(()=>{if(ReferenceEquals(voice,session)){state=phase;Notify();}});
             local.Caption+=caption=>Dispatch(()=>{if(ReferenceEquals(voice,session)){VoiceCaption=caption;Notify();}});
             local.TurnStarted+=()=>Dispatch(()=>{if(ReferenceEquals(voice,session)){VoiceCaption="";VoiceTiming=null;VoiceReplySerial++;Notify();}});
             local.Timing+=timing=>Dispatch(()=>{if(ReferenceEquals(voice,session)){VoiceTiming=timing;Notify();}});
         }
         session.Transcript+=(role,text)=>Dispatch(()=>
-        {if(!ReferenceEquals(voice,session))return;Conversation.Record(role,text);voiceActivity.Transcript(role);state=voiceActivity.State(Environment.TickCount64);Notify();});
+        {
+            if(!ReferenceEquals(voice,session))return;
+            if(role=="user" && LocalAssistantVoice.IsEndConversation(text))
+            {
+                _=EndVoice();
+                return;
+            }
+            Conversation.Record(role,text);
+            voiceActivity.Transcript(role);
+            state=voiceActivity.State(Environment.TickCount64);
+            Notify();
+        });
         session.Status+=message=>Dispatch(()=>{if(ReferenceEquals(voice,session)){Status=message;if(!session.Connected && !connecting){state=AssistantState.Error;voice=null;voiceClosing=CloseVoice(session);wakeNotBefore=Environment.TickCount64+1200;}Notify();}});
         session.Level+=(peak,speaking)=>Dispatch(()=>{if(ReferenceEquals(voice,session)){long now=Environment.TickCount64;if(session is LocalAssistantVoice){Level=peak;VisualChanged?.Invoke();return;}voiceActivity.Level(peak,speaking,now);Level=voiceActivity.Energy(now);state=voiceActivity.State(now);VisualChanged?.Invoke();}});
 

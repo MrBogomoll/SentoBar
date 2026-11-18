@@ -76,6 +76,12 @@ internal static class InstallationInputTests
             Check(LocalAssistantVoice.MatchesWakePhrase("Привет, Сенто!","привет сенто"));
             Check(LocalAssistantVoice.MatchesWakePhrase("Привет, Сента!", "Привет Сенто"));
             Check(LocalAssistantVoice.MatchesWakePhrase("Сента.", "Sento"));
+            Check(LocalAssistantVoice.IsEndConversation("Завершить разговор."));
+            Check(LocalAssistantVoice.IsEndConversation("Сента, заверши разговор!"));
+            Check(LocalAssistantVoice.IsEndConversation("Sento, end the conversation."));
+            Check(!LocalAssistantVoice.IsEndConversation("Как завершить разговор?"));
+            Check(!LocalAssistantVoice.IsEndConversation("Не завершить разговор"));
+            Check(!LocalAssistantVoice.IsEndConversation("Сенто"));
             Check(!LocalAssistantVoice.MatchesWakePhrase("Не говори привет Сенто","Привет Сенто"));
             Check(RussianSpeechNumbers.Speak("1/60 часа, −0,05 и 22%.")=="одна шестидесятая часа, минус ноль целых пять сотых и двадцать два процента.");
             Check(RussianSpeechNumbers.Speak("2 минуты и 1 003 секунды")=="две минуты и одна тысяча три секунды");
