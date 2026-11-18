@@ -95,10 +95,16 @@ internal static class LyricsPopoverDiagnostics
                     text.Opacity<active.Opacity && Equals(text.Foreground,active.Foreground)));
 
             host.Width=220;view.Height=LyricsView.StackedHeight;
+            const string earlier="The evening settles over town";
             const string before="The streets keep changing after the lights come on";
             const string now="We follow the light to the station";
             const string after="The river carries every reflection past the window";
-            view.SetFixture(new LyricResult(new[]{new LyricLine(0,before),new LyricLine(6,now),new LyricLine(12,after)},""),8,180);
+            const string later="The last train turns the corner";
+            LyricResult Context(string activeText)=>new(new[]{
+                new LyricLine(0,earlier),new LyricLine(6,before),new LyricLine(12,activeText),
+                new LyricLine(18,after),new LyricLine(24,later)},"");
+            var narrow=Context(now);
+            view.SetFixture(narrow,14,180);
             await Task.Delay(310);view.UpdateLayout();
             var reader=Diagnostics.Descendants(view).OfType<ScrollContentPresenter>().First(p=>p.IsVisible);
             var currentBounds=Bounds(now);
@@ -107,7 +113,27 @@ internal static class LyricsPopoverDiagnostics
                 Block(now).ActualHeight>Block(before).ActualHeight*1.5 && currentBounds.Top>=viewportBounds.Top &&
                 Bounds(after).Bottom<=viewportBounds.Bottom+.5 && Block(after).TextTrimming==TextTrimming.CharacterEllipsis &&
                 trigger.TransformToAncestor(view).Transform(new Point()).Y>=currentBounds.Bottom);
+            bool Visible(string text)=>Diagnostics.Descendants(view).OfType<TextBlock>().Any(t=>t.IsVisible && t.Text==text);
+            check("A narrow lyric pane keeps just the closest lines",!Visible(earlier) && !Visible(later));
             Capture(view,"lyrics-reading-narrow");
+
+            host.Width=300;host.Height=320;view.Height=240;
+            const string wrapped="We follow the light\ndown the quiet road\nand back to the station";
+            var expanded=Context(wrapped);
+            view.SetFixture(expanded,14,180);
+            await Task.Delay(310);view.UpdateLayout();
+            var expandedViewport=reader.TransformToAncestor(view).TransformBounds(new Rect(reader.RenderSize));
+            check("The tall lyrics pane shows two lines on each side of the active three-line lyric",
+                Visible(earlier) && Visible(later) && Bounds(earlier).Top>=expandedViewport.Top &&
+                Bounds(earlier).Bottom<=Bounds(before).Top && Bounds(before).Bottom<=Bounds(wrapped).Top &&
+                Bounds(wrapped).Bottom<=Bounds(after).Top && Bounds(after).Bottom<=Bounds(later).Top &&
+                Bounds(later).Bottom<=expandedViewport.Bottom+.5 &&
+                trigger.TransformToAncestor(view).Transform(new Point()).Y>Bounds(later).Bottom);
+            Capture(view,"lyrics-reading-five-lines");
+
+            view.SetFixture(expanded,26,180);await Task.Delay(310);
+            check("After advancing to the last line, only existing context is shown",
+                Visible(wrapped) && Visible(after) && Visible(later) && !Visible(earlier) && !Visible(before));
         }
         finally{host.Close();}
     }
