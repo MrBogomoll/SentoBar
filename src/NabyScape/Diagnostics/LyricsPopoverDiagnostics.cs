@@ -98,7 +98,7 @@ internal static class LyricsPopoverDiagnostics
             const string earlier="The evening settles over town";
             const string before="The streets keep changing after the lights come on";
             const string now="We follow the light to the station";
-            const string after="The river carries every reflection past the window";
+            const string after="The river carries every reflection past the window until everything fades away";
             const string later="The last train turns the corner";
             LyricResult Context(string activeText)=>new(new[]{
                 new LyricLine(0,earlier),new LyricLine(6,before),new LyricLine(12,activeText),
@@ -109,9 +109,15 @@ internal static class LyricsPopoverDiagnostics
             var reader=Diagnostics.Descendants(view).OfType<ScrollContentPresenter>().First(p=>p.IsVisible);
             var currentBounds=Bounds(now);
             var viewportBounds=reader.TransformToAncestor(view).TransformBounds(new Rect(reader.RenderSize));
-            check("Narrow lyrics keep a wrapped active line visible with long neighbors and the menu below",
-                Block(now).ActualHeight>Block(before).ActualHeight*1.5 && currentBounds.Top>=viewportBounds.Top &&
-                Bounds(after).Bottom<=viewportBounds.Bottom+.5 && Block(after).TextTrimming==TextTrimming.CharacterEllipsis &&
+            bool TwoRows(string text)
+            {
+                var block=Block(text);
+                return block.TextWrapping==TextWrapping.Wrap && block.TextTrimming==TextTrimming.CharacterEllipsis &&
+                    block.ActualHeight>block.FontSize*1.8 && block.ActualHeight<block.FontSize*3;
+            }
+            check("Narrow lyrics fit two rows per adjacent lyric and keep the active lyric and menu visible",
+                TwoRows(before) && TwoRows(after) && Bounds(before).Top>=viewportBounds.Top &&
+                Bounds(after).Bottom<=viewportBounds.Bottom+.5 &&
                 trigger.TransformToAncestor(view).Transform(new Point()).Y>=currentBounds.Bottom);
             bool Visible(string text)=>Diagnostics.Descendants(view).OfType<TextBlock>().Any(t=>t.IsVisible && t.Text==text);
             check("A narrow lyric pane keeps just the closest lines",!Visible(earlier) && !Visible(later));
@@ -123,17 +129,16 @@ internal static class LyricsPopoverDiagnostics
             view.SetFixture(expanded,14,180);
             await Task.Delay(310);view.UpdateLayout();
             var expandedViewport=reader.TransformToAncestor(view).TransformBounds(new Rect(reader.RenderSize));
-            check("The tall lyrics pane shows two lines on each side of the active three-line lyric",
-                Visible(earlier) && Visible(later) && Bounds(earlier).Top>=expandedViewport.Top &&
-                Bounds(earlier).Bottom<=Bounds(before).Top && Bounds(before).Bottom<=Bounds(wrapped).Top &&
-                Bounds(wrapped).Bottom<=Bounds(after).Top && Bounds(after).Bottom<=Bounds(later).Top &&
-                Bounds(later).Bottom<=expandedViewport.Bottom+.5 &&
-                trigger.TransformToAncestor(view).Transform(new Point()).Y>Bounds(later).Bottom);
-            Capture(view,"lyrics-reading-five-lines");
+            check("The closest lyrics each wrap to two rows around the active three-row lyric",
+                !Visible(earlier) && !Visible(later) && TwoRows(before) && TwoRows(after) &&
+                Bounds(before).Top>=expandedViewport.Top && Bounds(before).Bottom<=Bounds(wrapped).Top &&
+                Bounds(wrapped).Bottom<=Bounds(after).Top && Bounds(after).Bottom<=expandedViewport.Bottom+.5 &&
+                trigger.TransformToAncestor(view).Transform(new Point()).Y>Bounds(after).Bottom);
+            Capture(view,"lyrics-reading-two-rows");
 
             view.SetFixture(expanded,26,180);await Task.Delay(310);
             check("After advancing to the last line, only existing context is shown",
-                Visible(wrapped) && Visible(after) && Visible(later) && !Visible(earlier) && !Visible(before));
+                Visible(after) && Visible(later) && !Visible(wrapped) && !Visible(earlier) && !Visible(before));
         }
         finally{host.Close();}
     }
