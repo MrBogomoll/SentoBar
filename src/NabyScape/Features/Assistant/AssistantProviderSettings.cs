@@ -19,6 +19,7 @@ internal sealed partial class AssistantProviderSettings : UserControl
     private readonly TextBlock status=UI.Text("",11,UI.Muted),keyStatus=UI.Text("",11,UI.Muted);
     private readonly TextBlock hermesHelp=UI.Text(Localization.Text("Connect your own Hermes API server. Its tools, skills and memory stay in Hermes. Naby handles chat, voice and the sharing source you select. Use Connect Hermes for the setup guide."),11,UI.Muted);
     private readonly Button enable;
+    private readonly Button editConnection;
     private readonly CheckBox vision,imageReplies;
     private readonly TextBlock capabilityStatus=UI.Text("",11,UI.Muted);
     internal event Action<string,bool>? FeedbackChanged;
@@ -36,12 +37,13 @@ internal sealed partial class AssistantProviderSettings : UserControl
         character.Click+=(_,_)=>{try{ai.SetIslandCharacter(!ai.Options.IslandCharacter);character.Content=ai.Options.IslandCharacter?Localization.Text("Idle character visible"):Localization.Text("Idle character hidden");Feedback(Localization.Text("Idle character saved · ")+(ai.Options.IslandCharacter?Localization.Text("On"):Localization.Text("Off"))+".");}catch{Feedback(Localization.Text("Could not save the island character preference."),true);}};
         advancedPage.Children.Add(character);setupPages["Hermes"].Children.Add(HermesSetup());
         chatPage.Children.Add(UI.Heading(Localization.Text("Your chat connection"),20));chatPage.Children.Add(UI.Text(Localization.Text("Choose who answers your messages. Your connection stays saved on this PC."),13,UI.Muted));
-        Label(chatPage,"Use for chat",chatProvider);UI.LocalizedName(chatProvider,"Chat provider");chatProvider.SelectionChanged+=async(_,_)=>{if(!syncing && chatProvider.SelectedItem is AssistantProvider selected && selected.Id!=ai.Options.SelectedProvider){try{if(!await ConfirmProviderChanges()){syncing=true;chatProvider.SelectedItem=ai.Provider;syncing=false;return;}ai.SelectProvider(selected.Id);Reload(selected.Id);Feedback(Localization.Text("Chat provider saved · ")+selected.Name+".");}catch(Exception){Feedback(Localization.Text("Could not save the chat provider."),true);}}};
+        Label(chatPage,"Use for chat",chatProvider);UI.LocalizedName(chatProvider,"Chat provider");chatProvider.SelectionChanged+=async(_,_)=>{if(!syncing && chatProvider.SelectedItem is AssistantProvider selected && selected.Id!=ai.Options.SelectedProvider){try{if(!await ConfirmProviderChanges()){syncing=true;chatProvider.SelectedItem=ai.Provider;syncing=false;return;}ai.SelectProvider(selected.Id);Reload(selected.Id);Feedback(Localization.Text("Chat provider saved · ")+selected.Name+".");if(selected.UsesChatGptPlan && ai.ChatGptPlan.IsSignedIn(selected.Id))await LoadPlanModels();}catch(Exception){Feedback(Localization.Text("Could not save the chat provider."),true);}}};
         voiceProvider.SelectionChanged+=(_,_)=>{if(!syncing && voiceProvider.SelectedItem is AssistantProvider selected){ai.Options.SelectedVoiceProvider=selected.Id;SaveConfiguration(Localization.Text("Voice provider"));}};
         var add=new Grid();add.ColumnDefinitions.Add(new());add.ColumnDefinitions.Add(new(){Width=GridLength.Auto});add.Children.Add(preset);var addButton=AssistantWindow.Pill("Add provider",AddProvider);addButton.Margin=new(8,0,0,0);Grid.SetColumn(addButton,1);add.Children.Add(addButton);var providerLibrary=new StackPanel();providerLibrary.Children.Add(UI.Text(Localization.Text("Add another provider, or choose which saved connection to edit."),12,UI.Muted));providerLibrary.Children.Add(add);
 Label(providerLibrary,"Saved connection to edit",list);chatPage.Children.Add(new Expander{Header=Localization.Text("Add or manage connections"),Content=providerLibrary,Margin=new(0,16,0,16)});UI.LocalizedName(list,"Saved AI providers");list.SelectionChanged+=async(_,_)=>{if(!syncing)await ChangeEditedProvider();};
         var chatStatus=new StackPanel();chatStatus.Children.Add(connectionStatus);chatStatus.Margin=new(0,14,0,14);chatPage.Children.Insert(4,chatStatus);
-        var quick=new WrapPanel{Margin=new(0,0,0,12)};quick.Children.Add(AssistantWindow.Pill("Edit connection",()=>{connectionEditor.IsExpanded=true;connectionEditor.BringIntoView();}));quick.Children.Add(AssistantWindow.Pill("Check connection",()=>_=TestConnection()));quick.Children.Add(AssistantWindow.Pill("Open chat",app.ShowAssistant,true));chatPage.Children.Add(quick);
+        var quick=new WrapPanel{Margin=new(0,0,0,12)};editConnection=AssistantWindow.Pill("Edit connection",()=>{connectionEditor.IsExpanded=true;connectionEditor.BringIntoView();});quick.Children.Add(editConnection);quick.Children.Add(AssistantWindow.Pill("Check connection",()=>_=TestConnection()));quick.Children.Add(AssistantWindow.Pill("Open chat",app.ShowAssistant,true));chatPage.Children.Add(quick);
+        BuildChatGptPlanControls(chatPage);
         var connection=new StackPanel();
         var saveActions=new WrapPanel{Margin=new(0,4,0,14)};saveActions.Children.Add(AssistantWindow.Pill("Save provider",()=>_=SaveProvider(),true));saveActions.Children.Add(AssistantWindow.Pill("Test connection",()=>_=TestConnection()));connection.Children.Add(saveActions);
         name.MaxLength=60;var technical=new StackPanel();Label(technical,"Connection name",name);Label(technical,"Chat API protocol",protocol);connection.Children.Add(new Expander{Header=Localization.Text("Advanced · API protocol"),Content=technical,Margin=new(0,8,0,4)});Label(connection,"API base URL",url);url.MaxLength=2048;Label(connection,"Model · choose one or paste its name",model);UI.LocalizedName(model,"Chat model");InitializeModelPicker(connection);
@@ -79,13 +81,15 @@ Label(providerLibrary,"Saved connection to edit",list);chatPage.Children.Add(new
         bool pending=Selected is {} saved && (imageInput!=saved.Vision || (supported && imageOutput!=saved.ImageOutput));
         capabilityStatus.Text=pending?Localization.Text("Not saved yet · choose Save provider to apply these image preferences."):Localization.Text("Saved image input: ")+(Selected?.Vision==true?Localization.Text("On"):Localization.Text("Off"))+Localization.Text(". Your selected model must support images.");
     }
-    private void Reload(string? selectedId=null)
+    private void Reload(string? selectedId=null,bool keepRequest=false)
     {
-        syncing=true;chatProvider.ItemsSource=ai.Options.Providers.ToArray();chatProvider.SelectedItem=ai.Provider;list.ItemsSource=ai.Options.Providers.ToArray();list.SelectedItem=ai.Options.Providers.FirstOrDefault(p=>p.Id==(selectedId??ai.Options.SelectedProvider))??ai.Options.Providers.FirstOrDefault();voiceProvider.ItemsSource=ai.Options.Providers.ToArray();voiceProvider.SelectedItem=ai.VoiceProvider;syncing=false;LoadSelected();
+        syncing=true;chatProvider.ItemsSource=ai.Options.Providers.ToArray();chatProvider.SelectedItem=ai.Provider;list.ItemsSource=ai.Options.Providers.ToArray();list.SelectedItem=ai.Options.Providers.FirstOrDefault(p=>p.Id==(selectedId??ai.Options.SelectedProvider))??ai.Options.Providers.FirstOrDefault();voiceProvider.ItemsSource=ai.Options.Providers.Where(p=>!p.UsesChatGptPlan).ToArray();voiceProvider.SelectedItem=ai.VoiceProvider;syncing=false;LoadSelected(keepRequest);
     }
-    private void LoadSelected()
+    private void LoadSelected(bool keepRequest=false)
     {
-        CancelProviderRequest();imageCheckStatus.Text=Localization.Text("Image support: not tested for this selected connection.");loadingProvider=true;editorProvider=list.SelectedItem as AssistantProvider;draftPending=false;connectionStatus.Text=Localization.Text("Not tested yet.");model.ItemsSource=null;realtimeModel.ItemsSource=null;var selected=Selected;key.Clear();connectionEditor.Visibility=selected==null?Visibility.Collapsed:Visibility.Visible;
+        if(!keepRequest)CancelProviderRequest();imageCheckStatus.Text=Localization.Text("Image support: not tested for this selected connection.");loadingProvider=true;editorProvider=list.SelectedItem as AssistantProvider;draftPending=false;connectionStatus.Text=Localization.Text("Not tested yet.");model.ItemsSource=null;realtimeModel.ItemsSource=null;var selected=Selected;key.Clear();connectionEditor.Visibility=selected==null || selected.UsesChatGptPlan?Visibility.Collapsed:Visibility.Visible;
+        editConnection.Visibility=connectionEditor.Visibility;
+        ResetChatGptPlanPicker(selected);
         list.IsEnabled=chatProvider.IsEnabled=voiceProvider.IsEnabled=ai.Options.Providers.Count>0;
         hermesHelp.Visibility=selected?.Backend=="Hermes"?Visibility.Visible:Visibility.Collapsed;
         if(selected==null){loadingProvider=false;status.Text=Localization.Text("Choose a preset and Add provider to get started.");keyStatus.Text="";RefreshCapabilities();return;}
@@ -95,7 +99,7 @@ Label(providerLibrary,"Saved connection to edit",list);chatPage.Children.Add(new
     }
     private async void AddProvider()
     {
-        if(!await ConfirmProviderChanges())return;
+        if(providerBusy || !await ConfirmProviderChanges())return;
         if(ai.Options.Providers.Count>=12){status.Text=Localization.Text("Keep up to 12 providers. Remove one before adding another.");return;}
         var selected=AssistantProviderCatalog.Create(preset.SelectedItem?.ToString()??"OpenAI");
         if(selected.Name is "OpenAI" or "Google Gemini")
@@ -105,6 +109,7 @@ Label(providerLibrary,"Saved connection to edit",list);chatPage.Children.Add(new
     private AssistantProvider ReadFields(bool allowEmptyModel=false)
     {
         var original=Selected??throw new InvalidOperationException(Localization.Text("Add a provider first."));
+        if(original.UsesChatGptPlan)throw new InvalidOperationException(Localization.Text("Use the ChatGPT plan controls for this connection."));
         var candidate=JsonSerializer.Deserialize<AssistantProvider>(JsonSerializer.Serialize(original))!;
         candidate.Name=name.Text.Trim();candidate.BaseUrl=url.Text.Trim();candidate.Model=model.Text.Trim();candidate.Protocol=protocol.SelectedItem?.ToString()??"ChatCompletions";candidate.Vision=imageInput;candidate.Tools=false;candidate.RealtimeUrl=realtimeUrl.Text.Trim();candidate.RealtimeModel=realtimeModel.Text.Trim();candidate.RealtimeProtocol=realtimeProtocol.SelectedItem?.ToString()??"OpenAIRealtime";candidate.Voice=voiceName.Text.Trim();
         candidate.ImageOutput=imageOutput && candidate.Backend!="Hermes" && candidate.Protocol!="Anthropic";

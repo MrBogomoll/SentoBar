@@ -185,6 +185,8 @@ internal sealed partial class AssistantView : UserControl,IDisposable
             Accessibility.Announce(status,!ai.Options.Enabled?Localization.Text("Enable your companion in Settings → AI."):Localization.Text(ai.Status.Replace("Configure a realtime endpoint and model in Providers.",Localization.Text("Set up voice in Settings → AI.")).Replace("in provider settings","in Settings → AI")));
             welcomeDescription.Text=Localization.Text(!ai.Options.Enabled?Localization.Text("Enable your companion in AI setup to begin."):!ai.Setup.Chat.Configured?Localization.Text("Connect your provider or Hermes to start chatting."):Localization.Text("Ask a question, attach a file, or switch to voice."));
             stop.Visibility=ai.Busy || ai.ImportingFiles || ai.VoiceConnected || ai.WakeArmed || ai.Desktop.Sharing?Visibility.Visible:Visibility.Collapsed;clear.Visibility=ai.Conversation.Messages.Count>0 || ai.DraftFiles.Count>0?Visibility.Visible:Visibility.Collapsed;
+            bool plan=ai.Provider?.UsesChatGptPlan==true;
+            attach.Visibility=share.Visibility=plan?Visibility.Collapsed:Visibility.Visible;
             RefreshSendState();share.IsEnabled=ai.Options.Enabled && (!ai.Busy || ai.Desktop.Sharing);
             if(!shownFiles.SequenceEqual(ai.DraftFiles)){draftFiles.Children.Clear();shownFiles=ai.DraftFiles.ToArray();foreach(var file in shownFiles)draftFiles.Children.Add(new AssistantAttachmentView(ai,file,true));}
             draftFiles.IsEnabled=!ai.Busy && !ai.ImportingFiles;

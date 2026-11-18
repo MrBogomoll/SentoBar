@@ -102,6 +102,7 @@ internal sealed partial class AssistantTransport : IAssistantTransport, IDisposa
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(provider);
+        if(provider.UsesChatGptPlan)return await CompleteWithChatGptPlan(provider,apiKey,messages,cancellationToken).ConfigureAwait(false);
         var endpoint = ValidateEndpoint(provider.BaseUrl);
         ValidateInput(provider, messages, tools);
         if (apiKey is { Length: > 4096 } || apiKey?.Any(char.IsControl) == true) throw new InvalidOperationException(Localization.Text("The API key is invalid."));

@@ -21,7 +21,7 @@ internal sealed partial class AssistantProviderSettings
     private void RefreshDraftFeedback()
     {
         if(loadingProvider || providerBusy || Selected is not {} saved)return;
-        var draft=ReadDraftIdentity();bool changed=key.Password.Length>0 || draft!=ReadSavedIdentity(saved);
+        bool changed=HasProviderDraft;
         if(changed)imageCheckStatus.Text=Localization.Text("Image support: connection changed. Save and test again.");
         if(changed){draftPending=true;connectionStatus.Text=Localization.Text("Not saved yet · choose Save provider to apply your connection changes. Test connection checks this draft only.");connectionStatus.Foreground=UI.Muted;Feedback(connectionStatus.Text);return;}
         if(draftPending){draftPending=false;Feedback(Localization.Text("No unsaved connection changes · image input ")+(saved.Vision?Localization.Text("On"):Localization.Text("Off"))+".");}
@@ -48,7 +48,7 @@ internal sealed partial class AssistantProviderSettings
         foreach(var control in new Control[]{name,url,model,key,protocol,realtimeModel,realtimeUrl,realtimeProtocol,voiceName,list,preset,chatProvider,voiceProvider})control.IsEnabled=!busy;
         list.IsEnabled=chatProvider.IsEnabled=voiceProvider.IsEnabled=!busy && ai.Options.Providers.Count>0;
         if(cancelConnection!=null)cancelConnection.Visibility=busy?Visibility.Visible:Visibility.Collapsed;
-        RefreshSetupOverview();
+        RefreshChatGptPlanControls();RefreshSetupOverview();
     }
     private void CancelProviderRequest()
     {
@@ -89,6 +89,7 @@ internal sealed partial class AssistantProviderSettings
     private async Task TestConnection()
     {
         if(providerBusy)return;
+        if(Selected is {UsesChatGptPlan:true} plan){await TestPlanConnection(plan);return;}
         CancellationTokenSource? request=null;
         AssistantProvider? candidate=null;bool savedConnection=false;
         try

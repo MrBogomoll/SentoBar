@@ -55,7 +55,7 @@ internal static class SelfTests
             var keys=reader.Cast<System.Collections.DictionaryEntry>().Select(entry=>entry.Key.ToString()).ToArray();
             Assert(keys.Contains("theme.baml") && keys.Contains("assets/island.ico"),"WPF resource paths changed");
         });
-        MinimalWidgetTests.Run(Test);ReactiveAmbientTests.Run(Test);PremiumExperienceTests.Run(Test);AssistantProviderTests.Run(Test);
+        MinimalWidgetTests.Run(Test);ReactiveAmbientTests.Run(Test);PremiumExperienceTests.Run(Test);AssistantProviderTests.Run(Test);ChatGptPlanTests.Run(Test);
         AssistantVoiceTests.Run(Test);
         AssistantSpeechRemovalTests.Run(Test);
         UxCompletionTests.Run(Test);

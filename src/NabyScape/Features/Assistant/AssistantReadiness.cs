@@ -23,6 +23,10 @@ internal sealed partial class AssistantRuntime
     internal void ForgetConnectionCheck(string id){connectionChecks.Remove(id);setupCache=null;}
     internal AssistantSetupState ChatSetupFor(AssistantProvider? chat)
     {
+        if(chat?.UsesChatGptPlan==true && !ChatGptPlan.IsSignedIn(chat.Id))
+            return new(false,false,Localization.Text("Sign in to ChatGPT"),Localization.Text("Continue with ChatGPT in Naby settings."));
+        if(chat?.UsesChatGptPlan==true && string.IsNullOrWhiteSpace(chat.Model))
+            return new(false,false,Localization.Text("Choose a ChatGPT model"),Localization.Text("Load the model list for the signed-in ChatGPT account."));
         if(chat==null || string.IsNullOrWhiteSpace(chat.BaseUrl) || string.IsNullOrWhiteSpace(chat.Model))
             return new(false,false,Localization.Text("Choose a chat connection"),Localization.Text("Add an API provider or connect Hermes, then save a chat model."));
         else if(connectionChecks.TryGetValue(chat.Id,out var check) && check.Configuration==ConnectionIdentity(chat))
@@ -41,6 +45,7 @@ internal sealed partial class AssistantRuntime
             bool configured=provider!=null && !string.IsNullOrWhiteSpace(provider.RealtimeUrl) && !string.IsNullOrWhiteSpace(provider.RealtimeModel);
             speech=new(configured,false,configured?Localization.Text("Saved · voice not tested"):Localization.Text("Choose a voice connection"),configured?Localization.Text("The saved realtime model is ")+provider!.RealtimeModel+Localization.Text(". Start a conversation to connect; the microphone is off until then."):Localization.Text("Choose automatic local speech, your own models, or a realtime provider. Voice is optional."));
         }
+        else if(Provider?.UsesChatGptPlan==true)speech=new(false,false,Localization.Text("ChatGPT plan chat"),Localization.Text("The ChatGPT plan connection is for text chat. Choose an API provider for local voice."));
         else if(!text.Configured)speech=new(false,false,Localization.Text("A chat model is still needed"),Localization.Text("Local speech listens and speaks on this PC. An API provider or Hermes generates the reply."));
         else if(local.Managed)
         {

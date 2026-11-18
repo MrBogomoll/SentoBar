@@ -16,7 +16,7 @@ internal sealed partial class AssistantTransport
 {
     public async Task<AssistantReply> CompleteStreaming(AssistantProvider provider,string? apiKey,IReadOnlyList<AssistantMessage> messages,IReadOnlyList<AssistantTool> tools,Func<string,CancellationToken,Task> text,Action<string>? progress,CancellationToken cancellationToken)
     {
-        if(provider.Protocol!="ChatCompletions" || provider.ImageOutput)
+        if(provider.UsesChatGptPlan || provider.Protocol!="ChatCompletions" || provider.ImageOutput)
         {
             var reply=await Complete(provider,apiKey,messages,tools,cancellationToken);
             if(reply.Calls.Count==0 && reply.Text.Length>0)await text(reply.Text,cancellationToken);

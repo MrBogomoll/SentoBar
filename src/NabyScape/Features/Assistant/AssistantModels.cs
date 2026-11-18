@@ -25,6 +25,7 @@ internal sealed class AssistantProvider
     public string RealtimeModel {get;set;}="";
     public string RealtimeProtocol {get;set;}="OpenAIRealtime";
     public string Voice {get;set;}="marin";
+    internal bool UsesChatGptPlan=>Backend==ChatGptPlanSession.Backend;
     public override string ToString()=>Name;
 }
 

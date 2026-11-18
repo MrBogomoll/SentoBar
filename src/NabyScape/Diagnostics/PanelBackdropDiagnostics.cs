@@ -215,6 +215,11 @@ internal static class PanelBackdropDiagnostics
             check("Settings exposes independent background opacity, palette and picture controls",
                 new[]{"Panel background opacity","Separate opacity for closed dock","Closed dock background opacity","Panel gradient type","First gradient position","Second gradient position","Panel background image"}
                     .All(name=>controls.Any(c=>UI.Identity(c)==name)));
+            Diagnostics.NavigateSettings(settingsWindow,"AI");
+            var editor=(AssistantProviderSettings)typeof(SettingsWindow).GetField("aiSettings",Fields)!.GetValue(settingsWindow)!;
+            editor.OpenChatSetup();await Task.Delay(160);
+            var signIn=Diagnostics.Descendants(editor).OfType<Button>().SingleOrDefault(b=>UI.Identity(b)=="Continue with ChatGPT");
+            check("AI chat settings shows the ChatGPT plan sign-in",signIn is {IsVisible:true,IsEnabled:true});
         }
         finally{settingsWindow.Close();}
         s.Background="#212339";s.Preset="Mac";s.PanelWidth=526;s.PanelPadding=32;

@@ -6,7 +6,7 @@ namespace NabyScape;
 internal sealed partial class AssistantProviderSettings
 {
     private bool switchingProvider;
-    internal bool HasProviderDraft=>Selected is {} saved && !loadingProvider && (key.Password.Length>0 || ReadDraftIdentity()!=ReadSavedIdentity(saved));
+    internal bool HasProviderDraft=>Selected is {UsesChatGptPlan:false} saved && !loadingProvider && (key.Password.Length>0 || ReadDraftIdentity()!=ReadSavedIdentity(saved));
     internal async Task<bool> ConfirmProviderChanges()
     {
         if(!HasProviderDraft)return true;
@@ -21,7 +21,7 @@ internal sealed partial class AssistantProviderSettings
     private async Task ChangeEditedProvider()
     {
         if(switchingProvider)return;switchingProvider=true;var requested=list.SelectedItem as AssistantProvider;
-        try{syncing=true;list.SelectedItem=editorProvider;syncing=false;if(!await ConfirmProviderChanges())return;syncing=true;list.SelectedItem=ai.Options.Providers.Find(p=>p.Id==requested?.Id);syncing=false;LoadSelected();connectionEditor.IsExpanded=true;}
+        try{syncing=true;list.SelectedItem=editorProvider;syncing=false;if(!await ConfirmProviderChanges())return;syncing=true;list.SelectedItem=ai.Options.Providers.Find(p=>p.Id==requested?.Id);syncing=false;LoadSelected();connectionEditor.IsExpanded=true;if(Selected is {UsesChatGptPlan:true} plan && ai.ChatGptPlan.IsSignedIn(plan.Id))await LoadPlanModels();}
         finally{syncing=false;switchingProvider=false;}
     }
 }
