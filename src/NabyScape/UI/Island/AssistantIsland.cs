@@ -59,6 +59,8 @@ public sealed partial class OverlayWindow
         header.ColumnDefinitions.Add(new(){Width=GridLength.Auto});Grid.SetColumn(assistantHeaderSpace,5);header.Children.Add(assistantHeaderSpace);
         assistantCharacterHost.HorizontalAlignment=HorizontalAlignment.Center;assistantCharacterHost.VerticalAlignment=VerticalAlignment.Top;
         assistantCharacterButton=AssistantOrb.Launcher(Localization.Text("AI character on island"),()=>OpenAssistant(),closedAssistant);assistantCharacterButton.MinHeight=24;assistantCharacterButton.Margin=new(0,0,9,0);assistantCharacterButton.HorizontalAlignment=HorizontalAlignment.Right;assistantCharacterButton.VerticalAlignment=VerticalAlignment.Center;assistantCharacterButton.ToolTip=Localization.Text("AI companion · hover to meet · click to chat");
+        // The orb draws its own outline. Keep the button's layout and focus visual.
+        assistantCharacterButton.BorderBrush=Brushes.Transparent;
         assistantCharacterButton.MouseEnter+=(_,_)=>{hoverDelay.Stop();assistantHover.Interval=TimeSpan.FromMilliseconds(app.Settings.HoverDelayMs);assistantHover.Start();};
         assistantCharacterButton.MouseLeave+=(_,_)=>assistantHover.Stop();
         assistantCharacterButton.PreviewMouseLeftButtonDown+=(_,_)=>assistantHover.Stop();

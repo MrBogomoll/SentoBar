@@ -30,6 +30,12 @@ internal static class QuietAmbientDiagnostics
             BitmapSource result=bitmap;if(view==island){int width=(int)Math.Ceiling(island.PaintedWidth),height=(int)Math.Ceiling(island.PaintedHeight);result=new CroppedBitmap(bitmap,new Int32Rect(Math.Max(0,(bitmap.PixelWidth-width)/2),0,Math.Min(width,bitmap.PixelWidth),Math.Min(height,bitmap.PixelHeight)));}
             var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(result));using var file=File.Create(Path.Combine(directory,name+".png"));png.Save(file);
         }
+        var launcher=(Button)typeof(OverlayWindow).GetField("assistantCharacterButton",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(island)!;
+        launcher.ApplyTemplate();
+        var frame=(Border)launcher.Template.FindName("Frame",launcher);
+        check("Closed Naby has no extra button outline and retains keyboard focus feedback",
+            launcher.IsVisible && launcher.FocusVisualStyle!=null &&
+            (frame.BorderThickness==new Thickness(0) || frame.BorderBrush is null or SolidColorBrush {Color.A:0}));
         Capture(island,"idle-styled");
         string closedContent=s.ClosedMediaContent;s.ClosedMediaContent="None";app.Media.DiagnosticPlayback(true);app.ChangeSettings();await Task.Delay(100);
         check("Idle keeps static light when music is excluded from the compact display",surface.AmbientVisible && !surface.AmbientAnimating && !app.AmbientAudio.Running);
