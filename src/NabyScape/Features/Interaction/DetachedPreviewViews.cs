@@ -77,9 +77,9 @@ internal sealed class DetachedPreviewView : IDisposable
     private void BuildClock()=>Add(new CountdownView(app,kind=="focus"));
     private void BuildNotes()
     {
-        Add(UI.Caption("Note title (optional)",11,UI.Muted));noteTitle=UI.CaptionInput("Note title",app.Productivity.NoteTitle,"Leave blank to use the first phrase.");noteTitle.MaxLength=ProductivityService.MaxNoteTitleLength;noteTitle.SetResourceReference(Control.BackgroundProperty,"ControlFill");noteTitle.SetResourceReference(Control.BorderBrushProperty,"ControlBorder");Add(noteTitle);
+        Add(UI.Caption("Note title (optional)",11,UI.Muted));noteTitle=UI.CaptionInput("Note title",app.Productivity.NoteTitle,"Leave blank to use the first phrase.");noteTitle.MaxLength=ProductivityService.MaxNoteTitleLength;Add(noteTitle);
         noteTitle.TextChanged+=(_,_)=>{if(updating)return;app.Productivity.NoteTitle=noteTitle.Text;dirty=true;status!.Text=Localization.Text("Saving…");noteSave.Stop();noteSave.Start();};
-        notes=UI.Input(Localization.Text("Shared notes document"),app.Productivity.Note);notes.SetResourceReference(Control.BackgroundProperty,"ControlFill");notes.SetResourceReference(Control.BorderBrushProperty,"ControlBorder");notes.AcceptsReturn=true;notes.TextWrapping=TextWrapping.Wrap;notes.VerticalContentAlignment=VerticalAlignment.Top;notes.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;notes.MaxLength=50000;notes.MinHeight=138;Add(notes);
+        notes=UI.Input(Localization.Text("Shared notes document"),app.Productivity.Note);notes.AcceptsReturn=true;notes.TextWrapping=TextWrapping.Wrap;notes.VerticalContentAlignment=VerticalAlignment.Top;notes.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;notes.MaxLength=50000;notes.MinHeight=138;Add(notes);
         notes.TextChanged+=(_,_)=>{if(updating)return;app.Productivity.Note=notes.Text;dirty=true;status!.Text=Localization.Text("Saving…");noteSave.Stop();noteSave.Start();};
         status=UI.Text(Localization.Text("Saved locally"),11,UI.Muted);Add(status);Add(Action(Localization.Text("Save"),Flush));
     }

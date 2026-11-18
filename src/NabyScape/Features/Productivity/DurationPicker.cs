@@ -32,7 +32,6 @@ internal sealed class DurationPicker : Grid
             var input=UI.CaptionInput(prefix+" "+labels[part],"00");inputs[part]=input;
             input.MaxLength=2;input.Width=40;input.FontSize=compact?18:22;input.FontWeight=FontWeights.Medium;input.Padding=new(0,2,0,2);input.Margin=new(0);input.MinHeight=compact?26:32;input.HorizontalContentAlignment=HorizontalAlignment.Center;
             Typography.SetNumeralAlignment(input,System.Windows.FontNumeralAlignment.Tabular);
-            input.SetResourceReference(Control.ForegroundProperty,"BodyText");input.Background=Brushes.Transparent;input.BorderThickness=new(0);
             input.GotKeyboardFocus+=(_,_)=>input.SelectAll();
             input.PreviewTextInput+=(_,e)=>e.Handled=e.Text.Any(c=>c<'0' || c>'9');
             DataObject.AddPastingHandler(input,(_,e)=>{if(!e.DataObject.GetDataPresent(DataFormats.UnicodeText) || e.DataObject.GetData(DataFormats.UnicodeText) is not string text || text.Length>2 || text.Any(c=>c<'0' || c>'9'))e.CancelCommand();});

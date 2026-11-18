@@ -72,7 +72,7 @@ internal sealed class MediaControls : Grid
     {
         if(IsOpen && kind==next){Close();return;}
         Close(false);kind=next;anchor=next=="source"?source:level;
-        anchor.Background=UI.Brush("#25272B");AutomationProperties.SetItemStatus(anchor,Localization.Text("Expanded"));
+        anchor.SetResourceReference(Control.BackgroundProperty,"SelectionFill");AutomationProperties.SetItemStatus(anchor,Localization.Text("Expanded"));
         if(next=="volume")popover.Child=volumeContent();
         else
         {
@@ -81,10 +81,17 @@ internal sealed class MediaControls : Grid
             if(!choices.Any(choice=>choice.Id!=MediaSourceSelection.NoneId && choice.Id!=MediaSourceSelection.AutoId)){var empty=UI.Text(Localization.Text("No active media sessions.\nPlay something in Spotify or your browser."),11,UI.Muted);empty.Margin=new(3,6,3,6);list.Children.Add(empty);}
             foreach(var item in choices)
             {
-                var button=UI.Button(Localization.Text("Use media source ")+item.Name,()=>{Close(false);item.Select();source.Focus();});button.Padding=new(6);button.Margin=new(0);button.Background=item.Id==selected()?UI.Brush("#24262B"):Brushes.Transparent;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;
+                var button=UI.Button(Localization.Text("Use media source ")+item.Name,()=>{Close(false);item.Select();source.Focus();});button.Padding=new(6);button.Margin=new(0);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.BorderThickness=new(0);
+                bool isSelected=item.Id==selected();
+                if(isSelected)button.SetResourceReference(Control.BackgroundProperty,"SelectionFill");
+                else button.Background=Brushes.Transparent;
+                string ink=isSelected?"SelectionText":"PopupText";
                 if(item.Id==MediaSourceSelection.NoneId)button.ToolTip=Localization.Text("Show idle, focus or timer activity. Playback in other apps continues.");else if(item.Id==MediaSourceSelection.AutoId)button.ToolTip=Localization.Text("Automatically follow the current Windows media app.");
-                var row=new DockPanel{LastChildFill=true};var check=UI.Text(item.Id==selected()?"✓":"",14);check.Width=22;check.HorizontalAlignment=HorizontalAlignment.Right;DockPanel.SetDock(check,Dock.Right);row.Children.Add(check);
-                var glyph=SourceGlyph(item.Id);glyph.Margin=new(0,0,10,0);DockPanel.SetDock(glyph,Dock.Left);row.Children.Add(glyph);var name=UI.Text(item.Name,12);name.TextTrimming=TextTrimming.CharacterEllipsis;name.TextWrapping=TextWrapping.NoWrap;row.Children.Add(name);button.Content=row;AutomationProperties.SetItemStatus(button,item.Id==selected()?Localization.Text("Selected"):Localization.Text("Available"));list.Children.Add(button);
+                var row=new DockPanel{LastChildFill=true};var check=UI.Text(isSelected?"✓":"",14);check.Width=22;check.HorizontalAlignment=HorizontalAlignment.Right;DockPanel.SetDock(check,Dock.Right);row.Children.Add(check);
+                var glyph=SourceGlyph(item.Id);glyph.Margin=new(0,0,10,0);DockPanel.SetDock(glyph,Dock.Left);row.Children.Add(glyph);
+                var name=UI.Text(item.Name,12);name.TextTrimming=TextTrimming.CharacterEllipsis;name.TextWrapping=TextWrapping.NoWrap;
+                name.SetResourceReference(TextBlock.ForegroundProperty,ink);check.SetResourceReference(TextBlock.ForegroundProperty,ink);
+                row.Children.Add(name);button.Content=row;AutomationProperties.SetItemStatus(button,isSelected?Localization.Text("Selected"):Localization.Text("Available"));list.Children.Add(button);
             }
             popover.Child=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
         }

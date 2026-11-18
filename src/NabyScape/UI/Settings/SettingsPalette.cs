@@ -113,6 +113,7 @@ internal static class SettingsPalette
             d["AccentText"]=d["CheckedText"]=d["SettingsSelectedText"]=d["SelectionText"]=SystemColors.HighlightTextBrush;
             d["PopupFill"]=SystemColors.WindowBrush;d["MenuBorder"]=SystemColors.WindowTextBrush;
         }
+        d["PopupText"]=d["ControlText"];
         return d;
     }
 }

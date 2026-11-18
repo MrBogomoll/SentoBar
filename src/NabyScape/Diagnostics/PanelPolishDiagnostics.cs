@@ -326,7 +326,7 @@ internal static class PanelPolishDiagnostics
             commandLauncher.Background==Brushes.Transparent && Equals(commandLauncher.BorderBrush,island.FindResource("GlassControlBorder")));
         capture("glass-command-launcher");
         commandLauncher.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();
-        check("Command search opens with the glass input",Equals(Field<TextBox>("commandInput").Background,glassFill) &&
+        check("Command search opens with the glass input",Equals(Field<TextBox>("commandInput").Background,island.FindResource("GlassFieldFill")) &&
             Field<TextBox>("commandInput").Style==island.FindResource("GlassPanelInput"));
         Visible<Button>().First(b=>UI.Identity(b)==Localization.Text("Back")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 

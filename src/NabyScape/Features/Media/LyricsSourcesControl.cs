@@ -33,7 +33,7 @@ internal sealed class LyricsSourcesControl : StackPanel
         trigger.MinHeight=28;trigger.Padding=new(8,4,8,4);trigger.Margin=new(0);trigger.Tag=new CornerRadius(10);trigger.HorizontalAlignment=HorizontalAlignment.Left;
         Children.Add(trigger);
         viewport=new ScrollViewer{Content=menu,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,MaxHeight=326};
-        popupFrame=new Border{Child=viewport,BorderThickness=new(1),CornerRadius=new(16),Padding=new(10),Width=272};
+        popupFrame=new Border{Child=viewport,BorderThickness=new(1),CornerRadius=new(12),Padding=new(10),Width=272};
         UI.LocalizedName(popupFrame,"Lyrics source popover");popup.Child=popupFrame;popup.PlacementTarget=trigger;popup.VerticalOffset=6;
         popup.Opened+=(_,_)=>{System.Threading.Interlocked.Increment(ref openPopups);popupFrame.Opacity=Motion.Enabled?0:1;Motion.Fade(popupFrame,1,160);popupFrame.MoveFocus(new System.Windows.Input.TraversalRequest(System.Windows.Input.FocusNavigationDirection.First));};
         System.Windows.Input.KeyboardNavigation.SetTabNavigation(popupFrame,System.Windows.Input.KeyboardNavigationMode.Cycle);
@@ -54,9 +54,8 @@ internal sealed class LyricsSourcesControl : StackPanel
         else
         {
             GlassDockAppearance.ApplyControls(popupFrame);
-            popupFrame.Background=Accessibility.HighContrast?SystemColors.WindowBrush:
-                GlassDockAppearance.Material(UI.Brush(app.Settings.Background).Color,GlassDockAppearance.Accent.Color);
-            popupFrame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
+            popupFrame.SetResourceReference(Border.BackgroundProperty,"PopupFill");
+            popupFrame.SetResourceReference(Border.BorderBrushProperty,"MenuBorder");
         }
     }
 
@@ -76,12 +75,19 @@ internal sealed class LyricsSourcesControl : StackPanel
         var row=new DockPanel();
         if(selected)
         {
-            if(InSettings || Accessibility.HighContrast)button.SetResourceReference(Control.BackgroundProperty,"SelectionFill");
-            else button.Background=GlassDockAppearance.Selected;
+            button.SetResourceReference(Control.BackgroundProperty,"SelectionFill");
             System.Windows.Automation.AutomationProperties.SetItemStatus(button,Localization.Text("Selected"));
-            var check=UI.Text("✓",13);check.Width=20;DockPanel.SetDock(check,Dock.Right);row.Children.Add(check);
+            var check=UI.Text("✓",13);check.SetResourceReference(TextBlock.ForegroundProperty,"SelectionText");
+            check.Width=20;DockPanel.SetDock(check,Dock.Right);row.Children.Add(check);
         }
-        var labels=new StackPanel();labels.Children.Add(UI.Text(name,12));if(detail.Length>0)labels.Children.Add(UI.Text(detail,10,UI.Muted));row.Children.Add(labels);button.Content=row;menu.Children.Add(button);return button;
+        var labels=new StackPanel();
+        string ink=selected?"SelectionText":"PopupText";
+        var title=UI.Text(name,12);title.SetResourceReference(TextBlock.ForegroundProperty,ink);labels.Children.Add(title);
+        if(detail.Length>0)
+        {
+            var caption=UI.Text(detail,10);caption.SetResourceReference(TextBlock.ForegroundProperty,ink);caption.Opacity=.76;labels.Children.Add(caption);
+        }
+        row.Children.Add(labels);button.Content=row;menu.Children.Add(button);return button;
     }
     private void ShowSources()
     {

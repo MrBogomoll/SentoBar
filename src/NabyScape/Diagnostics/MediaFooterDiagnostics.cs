@@ -26,6 +26,7 @@ internal static class MediaFooterDiagnostics
             int width=Math.Min(bitmap.PixelWidth,(int)Math.Ceiling(island.PaintedWidth)),height=Math.Min(bitmap.PixelHeight,(int)Math.Ceiling(island.PaintedHeight));var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(new CroppedBitmap(bitmap,new Int32Rect((bitmap.PixelWidth-width)/2,0,width,height))));using var file=File.Create(Path.Combine(directory,name+".png"));encoder.Save(file);
         }
         var s=app.Settings;s.CompactLayout=true;s.ReduceMotion=true;s.HideMaximized=s.HideFullscreen=s.AlwaysTucked=false;s.PanelWidth=526;s.PanelMaxHeight=417;s.PanelPadding=32;s.PanelScale=1;s.PanelAutoHeight=true;s.GlassStyle=false;s.SmartActivities=false;s.CategoryStyle="Dots";
+        s.UiLanguage="en";Localization.Configure(s);
         foreach(var widget in s.Widgets)if(widget.Id is "media" or "volume")widget.Enabled=true;
         app.ChangeSettings();app.Media.DiagnosticPlayback(true);app.Audio.DiagnosticPeak=()=>.25f;
         typeof(MediaService).GetProperty("Title")!.SetValue(app.Media,"Evening light");typeof(MediaService).GetProperty("Artist")!.SetValue(app.Media,"Original artwork · local demo");
@@ -111,9 +112,11 @@ internal static class MediaFooterDiagnostics
         app.ChangeSettings();island.Reveal(false);island.SelectPage("media",false);await Task.Delay(80);controls=Field<MediaControls>("mediaControls");
         check("Disabling volume hides its footer action",controls.SourceButton.IsVisible && !controls.VolumeButton.IsVisible);
         foreach(var widget in s.Widgets){if(widget.Id=="volume")widget.Enabled=true;if(widget.Id=="media")widget.Enabled=false;}
-        app.ChangeSettings();island.SelectPage("media",false);await Task.Delay(80);controls=Field<MediaControls>("mediaControls");Click(controls.VolumeButton);await Task.Delay(60);island.UpdateLayout();
-        var volumeBounds=controls.Popover.TransformToAncestor(controls).TransformBounds(new Rect(controls.Popover.RenderSize));
-        check("Volume-only mode keeps its popover within the surface",!controls.SourceButton.IsVisible && controls.VolumeButton.IsVisible && volumeBounds.Top>=0 && volumeBounds.Bottom<=controls.ActualHeight+.5);Capture("volume-only");controls.Close(false);
+        app.ChangeSettings();island.SelectPage("volume",false);await Task.Delay(80);island.UpdateLayout();
+        check("Volume-only mode exposes the dedicated volume page",island.ActivePage=="volume" &&
+            Diagnostics.Descendants(island).OfType<Slider>().Any(slider=>slider.IsVisible && UI.Identity(slider)=="Windows volume") &&
+            Diagnostics.Descendants(island).OfType<Button>().Any(button=>button.IsVisible && UI.Identity(button)=="Audio devices and microphone"));
+        Capture("volume-only");
         foreach(var widget in s.Widgets)if(widget.Id=="media")widget.Enabled=true;s.CompactLayout=false;app.ChangeSettings();island.Reveal(false);await Task.Delay(80);
         check("Classic layout retains its inline volume slider",Field<Slider>("volume").IsVisible && Field<MediaControls?>("mediaControls")==null);
         check("Fixture leaves voice and screen sharing off",!app.Assistant.VoiceConnected && !app.Assistant.Desktop.Sharing);

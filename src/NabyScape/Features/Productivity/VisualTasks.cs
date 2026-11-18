@@ -47,18 +47,12 @@ public sealed partial class OverlayWindow
             check.Click+=(_,_)=>{utilityMutating=true;try{if(!p.SetTaskDone(item.Id,check.IsChecked==true))check.IsChecked=item.Done;}finally{utilityMutating=false;}label.TextDecorations=item.Done?TextDecorations.Strikethrough:null;label.Foreground=item.Done?UI.Muted:Brushes.White;Summary();};list.Children.Add(frame);
         }
         if(p.Tasks.Count==0){var empty=UI.Caption("Add your first task below.",12,UI.Muted);empty.Margin=new(4,16,0,18);list.Children.Add(empty);}
-        var input=UI.Input(Localization.Text("New task"),taskDraft);input.MaxLength=240;input.BorderThickness=new(0);input.Background=Brushes.Transparent;input.Margin=new(0);input.Padding=new(10,8,0,8);input.MinHeight=36;input.TextChanged+=(_,_)=>taskDraft=input.Text;
+        var input=UI.Input(Localization.Text("New task"),taskDraft);input.MaxLength=240;input.BorderThickness=new(0);input.Background=Brushes.Transparent;input.FocusVisualStyle=null;input.Margin=new(0);input.Padding=new(10,8,0,8);input.MinHeight=36;input.TextChanged+=(_,_)=>taskDraft=input.Text;
         void Add(){if(string.IsNullOrWhiteSpace(input.Text))return;string text=input.Text;MutateUtility(()=>{if(p.AddTask(text))taskDraft="";else app.Notify(Localization.Text("Tasks"),Localization.Text(p.Tasks.Count>=100?"Remove a task before adding another. Your draft is still here.":"Could not save. Your text is still in the editor."));});}
         var composer=new Grid{Margin=new(0,18,0,0)};composer.ColumnDefinitions.Add(new());composer.ColumnDefinitions.Add(new(){Width=new GridLength(38)});composer.Children.Add(input);
         var placeholder=UI.Caption("Add a task…",12,UI.Muted);placeholder.IsHitTestVisible=false;placeholder.Margin=new(10,0,0,0);composer.Children.Add(placeholder);void Hint()=>placeholder.Visibility=input.Text.Length==0?Visibility.Visible:Visibility.Collapsed;Hint();input.TextChanged+=(_,_)=>Hint();
-        var add=UI.CaptionButton("Add task",Add);add.Content=Icons.Create("plus",15,UI.Muted);add.FontSize=22;add.Background=Brushes.Transparent;add.BorderThickness=new(0);add.Width=34;add.MinHeight=34;add.Padding=new(0);add.Margin=new(4,0,0,0);Grid.SetColumn(add,1);composer.Children.Add(add);var inputFrame=new Border{Child=composer,BorderThickness=new(1),CornerRadius=new(9),Margin=new(0,14,0,0)};
-        inputFrame.SetResourceReference(Border.BackgroundProperty,"GlassControlFill");
-        inputFrame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
-        input.IsKeyboardFocusWithinChanged+=(_,_) =>
-        {
-            if(!Accessibility.HighContrast && input.IsKeyboardFocusWithin)inputFrame.BorderBrush=GlassDockAppearance.Accent;
-            else inputFrame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
-        };
+        var add=UI.CaptionButton("Add task",Add);add.Content=Icons.Create("plus",15,UI.Muted);add.FontSize=22;add.Background=Brushes.Transparent;add.BorderThickness=new(0);add.Width=34;add.MinHeight=34;add.Padding=new(0);add.Margin=new(4,0,0,0);Grid.SetColumn(add,1);composer.Children.Add(add);var inputFrame=new Border{Child=composer,Margin=new(0,14,0,0)};
+        inputFrame.SetResourceReference(FrameworkElement.StyleProperty,"GlassFieldFrame");
         toolsContent.Children.Add(inputFrame);composer.Margin=new(0);add.IsEnabled=!string.IsNullOrWhiteSpace(input.Text);input.TextChanged+=(_,_)=>add.IsEnabled=!string.IsNullOrWhiteSpace(input.Text);
         input.KeyDown+=(_,e)=>{if(e.Key==Key.Enter){Add();e.Handled=true;}};
     }

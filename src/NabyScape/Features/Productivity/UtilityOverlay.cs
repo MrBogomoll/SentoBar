@@ -186,13 +186,13 @@ public sealed partial class OverlayWindow
     {
         audioMenu=new ContextMenu{HasDropShadow=false};
         if(mediaControls?.IsVisible==true){audioMenu.PlacementTarget=mediaControls.VolumeButton;audioMenu.Placement=System.Windows.Controls.Primitives.PlacementMode.Top;}
-        var mixerItem=new MenuItem{Header=Localization.Text("Volume mixer"),Foreground=Brushes.White};mixerItem.Click+=(_,_)=>OpenMixer();audioMenu.Items.Add(mixerItem);audioMenu.Items.Add(new Separator{Style=(Style)FindResource(typeof(Separator))});
+        var mixerItem=new MenuItem{Header=Localization.Text("Volume mixer")};mixerItem.Click+=(_,_)=>OpenMixer();audioMenu.Items.Add(mixerItem);audioMenu.Items.Add(new Separator{Style=(Style)FindResource(typeof(Separator))});
         foreach(var device in app.Audio.Outputs())
         {
-            var item=new MenuItem{Header=device.Name,IsCheckable=true,IsChecked=device.Id==app.Audio.DefaultOutputId,Foreground=Brushes.White};
+            var item=new MenuItem{Header=device.Name,IsCheckable=true,IsChecked=device.Id==app.Audio.DefaultOutputId};
             item.Click+=(_,_)=>{if(!app.Audio.SetOutput(device.Id))app.Notify(Localization.Text("Could not switch output"),app.Audio.LastError??Localization.Text("Device unavailable."));Update();};audioMenu.Items.Add(item);
         }
         if(audioMenu.Items.Count==0)audioMenu.Items.Add(new MenuItem{Header=Localization.Text("No active output devices"),IsEnabled=false});audioMenu.Items.Add(new Separator{Style=(Style)FindResource(typeof(Separator))});
-        var mic=new MenuItem{Header=(app.Audio.MicrophoneMuted?Localization.Text("Unmute"):Localization.Text("Mute"))+Localization.Text(" microphone · ")+app.Audio.MicrophoneName,IsEnabled=app.Audio.MicrophoneAvailable,Foreground=Brushes.White};mic.Click+=(_,_)=>{if(!app.Audio.ToggleMicrophoneMute())app.Notify(Localization.Text("Could not change microphone"),app.Audio.LastError??Localization.Text("Device unavailable."));};audioMenu.Items.Add(mic);audioMenu.Closed+=(_,_)=>{if(peeking && !DiagnosticRun && !PointerInside())leaveDelay.Start();};audioMenu.IsOpen=true;
+        var mic=new MenuItem{Header=(app.Audio.MicrophoneMuted?Localization.Text("Unmute"):Localization.Text("Mute"))+Localization.Text(" microphone · ")+app.Audio.MicrophoneName,IsEnabled=app.Audio.MicrophoneAvailable};mic.Click+=(_,_)=>{if(!app.Audio.ToggleMicrophoneMute())app.Notify(Localization.Text("Could not change microphone"),app.Audio.LastError??Localization.Text("Device unavailable."));};audioMenu.Items.Add(mic);audioMenu.Closed+=(_,_)=>{if(peeking && !DiagnosticRun && !PointerInside())leaveDelay.Start();};audioMenu.IsOpen=true;
     }
 }

@@ -44,6 +44,18 @@ internal static class GlassDockAppearance
         UI.ResourceBrush("GlassControlFill",Accessibility.HighContrast?SystemColors.WindowBrush:UI.Brush(fill));
         UI.ResourceBrush("GlassControlBorder",Accessibility.HighContrast?SystemColors.WindowTextBrush:UI.Brush(border));
         UI.ResourceBrush("GlassControlText",Accessibility.HighContrast?SystemColors.WindowTextBrush:fill=="#263244"?Foreground:UI.ContrastText(fill));
+
+        var panel=UI.Brush(settings.Background).Color;
+        var tint=UI.Brush(fill).Color;
+        if(settings.ControlFill.Equals("#16171B",StringComparison.OrdinalIgnoreCase))tint=Blend(tint,panel,.4);
+        var ink=(SolidColorBrush)UI.ContrastText(Blend(panel,tint,.83).ToString());
+        var outline=UI.Brush(border).Color;
+        var surface=new SolidColorBrush(Color.FromArgb(212,tint.R,tint.G,tint.B));
+        surface.Freeze();
+        UI.ResourceBrush("GlassFieldFill",Accessibility.HighContrast?SystemColors.WindowBrush:surface);
+        UI.ResourceBrush("GlassFieldText",Accessibility.HighContrast?SystemColors.WindowTextBrush:ink);
+        UI.ResourceBrush("GlassFieldHover",Accessibility.HighContrast?SystemColors.WindowTextBrush:UI.Brush(Blend(outline,ink.Color,.3).ToString()));
+        UI.ResourceBrush("GlassFieldFocus",Accessibility.HighContrast?SystemColors.HighlightBrush:UI.Brush(Blend(outline,ink.Color,.72).ToString()));
     }
 
     internal static double Radius(double radius)=>radius>0?radius+10:0;

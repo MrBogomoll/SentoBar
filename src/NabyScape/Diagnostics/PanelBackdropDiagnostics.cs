@@ -116,6 +116,27 @@ internal static class PanelBackdropDiagnostics
             box.IsDropDownOpen=false;
         }
 
+        bool SharedField(Control field)=>field.IsVisible && field.Background is SolidColorBrush {Color.A:>0 and <255} &&
+            field.BorderBrush==app.FindResource("GlassControlBorder") && field.BorderThickness==new Thickness(1);
+        TextBox[] Editors()=>Diagnostics.Descendants(island).OfType<TextBox>().Where(field=>field.IsVisible).ToArray();
+        island.Collapse();island.PreviewActivity();island.SelectPeek("notes");await Settle();
+        var miniEditors=Editors();
+        check("Mini Notes uses the shared translucent editor surface",miniEditors.Length==2 && miniEditors.All(SharedField));
+        island.SelectPeek("awake");await Settle();
+        var miniChoice=Diagnostics.Descendants(island).OfType<ComboBox>().Single(box=>box.IsVisible);
+        check("Mini drop-down uses the same translucent field and outline",SharedField(miniChoice) &&
+            miniEditors.All(editor=>editor.Background==miniChoice.Background));
+        miniChoice.IsDropDownOpen=true;await Settle();
+        var miniPopup=(Popup)miniChoice.Template.FindName("PART_Popup",miniChoice);
+        check("Mini drop-down opens on the shared menu material",miniPopup.IsOpen && miniPopup.Child is Border miniFrame &&
+            miniFrame.Background==app.FindResource("PopupFill") && miniFrame.BorderBrush==app.FindResource("MenuBorder") &&
+            miniChoice.BorderBrush==app.FindResource("GlassFieldFocus"));
+        miniChoice.IsDropDownOpen=false;
+        island.Reveal(false);island.SelectPage("notes",false);await Settle();
+        var expandedEditors=Editors();
+        check("Expanded Notes uses the same material and outline as the mini editor",expandedEditors.Length==2 &&
+            expandedEditors.All(editor=>SharedField(editor) && editor.Background==miniEditors[0].Background));
+
         island.OpenFeaturePage("voice");await Settle();
         var voiceOptions=Diagnostics.Descendants(island).OfType<Button>().Single(b=>b.IsVisible && UI.Identity(b)=="Options");
         voiceOptions.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();

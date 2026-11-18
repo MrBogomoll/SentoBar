@@ -70,13 +70,13 @@ internal sealed partial class AssistantView : UserControl,IDisposable
         AllowDrop=true;PreviewDragOver+=(_,e)=>{if(e.Data.GetDataPresent(DataFormats.FileDrop)){e.Effects=ai.Busy || ai.ImportingFiles?DragDropEffects.None:DragDropEffects.Copy;e.Handled=true;}};
         PreviewDrop+=(_,e)=>{if(e.Data.GetData(DataFormats.FileDrop) is string[] paths){e.Handled=true;_=ai.AttachFiles(paths);}};
         send=IconAction("Send","send",()=>_=Send(),true);share=IconAction("Share a window or display","screen",()=>_=ToggleScreen());attach=IconAction("Attach files","paperclip",PickFiles);attach.ToolTip=Localization.Text("Attach images, videos, PDFs and documents · or drop files / paste an image");
-        send.VerticalAlignment=VerticalAlignment.Center;input.BorderThickness=new(0);input.Background=Brushes.Transparent;
+        send.VerticalAlignment=VerticalAlignment.Center;input.BorderThickness=new(0);input.Background=Brushes.Transparent;input.FocusVisualStyle=null;
         var editorHost=new Grid();editorHost.Children.Add(input);var hint=UI.Caption("Message Naby…",13,UI.Muted);hint.Margin=new(1,7,0,0);hint.VerticalAlignment=VerticalAlignment.Top;hint.IsHitTestVisible=false;editorHost.Children.Add(hint);input.TextChanged+=(_,_)=>hint.Visibility=input.Text.Length==0?Visibility.Visible:Visibility.Collapsed;
         var composer=new Grid();for(int i=0;i<3;i++)composer.RowDefinitions.Add(new(){Height=GridLength.Auto});composer.ColumnDefinitions.Add(new());composer.ColumnDefinitions.Add(new(){Width=GridLength.Auto});Grid.SetColumnSpan(editorHost,2);Grid.SetRow(editorHost,1);composer.Children.Add(editorHost);
         var attachments=new ScrollViewer{Content=draftFiles,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,MaxHeight=106};Grid.SetColumnSpan(attachments,2);composer.Children.Add(attachments);
         var bar=new DockPanel{Margin=new(0,3,0,0)};DockPanel.SetDock(send,Dock.Right);bar.Children.Add(send);var tools=new StackPanel{Orientation=Orientation.Horizontal};tools.Children.Add(attach);tools.Children.Add(share);bar.Children.Add(tools);Grid.SetRow(bar,2);Grid.SetColumnSpan(bar,2);composer.Children.Add(bar);
-        var composerFrame=new Border{Child=composer,BorderThickness=new(1),CornerRadius=new(12),Padding=new(11,4,6,5),Margin=new(0,4,0,3)};
-        composerFrame.SetResourceReference(Border.BackgroundProperty,"GlassControlFill");composerFrame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");Row(composerFrame,4);
+        var composerFrame=new Border{Child=composer,Padding=new(11,4,6,5),Margin=new(0,4,0,3)};
+        composerFrame.SetResourceReference(FrameworkElement.StyleProperty,"GlassFieldFrame");Row(composerFrame,4);
         var session=new StackPanel();
         screenPreview.Content=screenImage;screenPreview.Margin=new(0,3,0,0);screenPreview.Expanded+=(_,_)=>RefreshScreen();session.Children.Add(screenPreview);session.Children.Add(AssistantControls.Connection(app,out connection));Row(session,5);
         input.TextChanged+=(_,_)=>RefreshSendState();
