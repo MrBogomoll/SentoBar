@@ -1,3 +1,16 @@
+# SentoBar releases
+
+The stable Windows builds are distributed through the [fork’s GitHub releases](https://github.com/MrBogomoll/nabyscape/releases). SentoBar receives manual updates. The inherited upstream updater is disabled in production.
+
+Local betas use the last stable version plus `_b.N` and stay local until explicitly approved for publication. Stable tags use `vX.Y.Z`. Agree on the stable version with the project owner and update the project version before packaging.
+
+For an approved stable version, run `.\tools\Build-Release.ps1 -Tag vX.Y.Z -OutputDirectory <new-directory>`. The script produces SentoBar installers, portable ZIPs, dependency notices, `SHA256SUMS` and WinGet manifests. An x64 check does not exercise the ARM64 binary on a physical ARM64 machine. A generated manifest is separate from publication to WinGet.
+
+The fork’s tag workflow creates a draft release for review. Keep previously published 1.2.0 downloads under their existing names.
+
+<details>
+<summary>Archived upstream release procedures for NabyScape 2.x</summary>
+
 # Official releases and updates
 
 The app checks only BillyNabil/nabyscape stable GitHub releases, at most once per 24 hours at normal startup; manual checks are explicit. Attempts are persisted separately in `update-state.json`. Diagnostics and self-tests never auto-check. Settings > Application > Updates shows installed/available versions, notes, cancellable download progress, and a separate Install and restart action. Network requests time out after 45 seconds, operations after ten minutes, with one two-second retry for rate limits/server errors. There is no polling timer.
@@ -23,3 +36,5 @@ It rejects tag/version mismatch and reused output paths, cleans and publishes Re
 [SignPath Foundation terms](https://signpath.org/terms.html) require an OSI license, active maintenance, distributable releases, documented functionality and no proprietary components except system libraries. NabyScape has MIT licensing, source, docs and an existing release; maintainers must review dependency eligibility, project control/reputation, MFA for repository/SignPath access, separated roles and per-release approval, verified build origin, metadata restrictions, signing policy and privacy information before applying. This young project's acceptance is discretionary. No account, application, credentials or approval exists from this work. Do not add sponsorship credit as though accepted. A human must apply, assess eligibility and set up a controlled signing workflow. Paid certificates/services remain a human decision.
 
 [Microsoft SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation) explains hash and publisher reputation. Signing, WinGet availability and CI do not guarantee absence of warnings; new signed files can still warn. Never instruct users to disable or bypass Windows safeguards.
+
+</details>

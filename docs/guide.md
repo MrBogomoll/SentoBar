@@ -1,3 +1,32 @@
+# SentoBar for Windows
+
+## Install and update
+
+Download the x64 or ARM64 installer or portable ZIP. Starting with 2.0.0, the executable is `SentoBar.exe`. [SentoBar releases](https://github.com/MrBogomoll/nabyscape/releases) Install updates manually. Close the app through its tray menu before replacing a running portable copy.
+
+## Use the panel
+
+Hover for the mini panel and click to expand. With wheel navigation enabled, scroll to change panels and hold **Ctrl** while scrolling to move through a list. Drag the scrollbar to move through longer lists. Choose text, dots or icons in the panel navigation settings. Timer duration fields have their own wheel controls.
+
+Music follows the selected Windows media session. For [Spotify favorites](spotify.md), connect your own Spotify application. For timed lyrics, the panel can use public sources or an imported LRC file.
+
+## Sento
+
+Open the assistant from the panel character. Set up a chat provider in Settings, or choose **Continue with ChatGPT** for plan-based text chat. Voice, local speech and Hermes have separate setup steps. [Assistant setup](assistant.md) · [Local voice](local-voice.md) · [Hermes](hermes.md).
+
+## Local data
+
+Preferences and saved content live in `%LOCALAPPDATA%\SentoBar`, including notes and tasks in `productivity.json`. On first migration from the Russian fork, the previous profile remains in `%LOCALAPPDATA%\NabyScape`. Quit SentoBar before copying its profile for backup. Provider credentials use Windows-protected storage.
+
+The Windows uninstall dialog offers removal of SentoBar data and downloaded models. Clear the data-removal option to keep them. The previous fork’s backup profile is kept separately.
+
+## Build from source
+
+On Windows, install the .NET 10 SDK. In the repository root run `.\build.ps1 -OutputDirectory artifacts -Runtime win-x64`. The built program is `artifacts\SentoBar.exe`. [Release packaging](RELEASING.md) · [Русская инструкция](../README.md).
+
+<details>
+<summary>Archived original NabyScape 2.x guide, release history and defaults</summary>
+
 # NabyScape user and developer guide
 
 [Website](https://nabyscape.sigma-bw-0740.chatgpt.site/) · [Searchable user guide](https://nabyscape.sigma-bw-0740.chatgpt.site/docs/) · [Interactive island preview](https://nabyscape.sigma-bw-0740.chatgpt.site/#experience)
@@ -148,7 +177,7 @@ Uninstall through **Windows Settings → Apps → Installed apps → NabyScape**
 
 You need **Windows 11 x64 or ARM64** and **.NET SDK 10**. Publish for `win-x64` or `win-arm64` as appropriate. Do not run an ARM64 executable on an x64 host.
 
-Open [`NabyScape.slnx`](../NabyScape.slnx) in your IDE, or run `dotnet build NabyScape.slnx -c Release` from the repository root. The app project is [`src/NabyScape/NabyScape.csproj`](../src/NabyScape/NabyScape.csproj). The root build script publishes the standalone distribution and runs checks as before.
+Open [`NabyScape.slnx`](https://github.com/BillyNabil/nabyscape/blob/v2.26.1/NabyScape.slnx) in your IDE, or run `dotnet build NabyScape.slnx -c Release` from the repository root. The app project is [`src/NabyScape/NabyScape.csproj`](https://github.com/BillyNabil/nabyscape/blob/v2.26.1/src/NabyScape/NabyScape.csproj). The root build script publishes the standalone distribution and runs checks as before.
 
 ```powershell
 git clone https://github.com/BillyNabil/nabyscape.git
@@ -308,3 +337,5 @@ In the music lyrics panel, open the compact **Lyrics** source menu. Retry and Lo
 Enable **Power plan** in **Settings → Widgets & tools**. The widget lists the plans Windows exposes, marks the active plan and changes it only after **Apply power plan**. Refresh re-reads Windows state. Some PCs expose just one plan; manufacturer/Windows power modes are separate from legacy power plans. Errors are shown in the widget. There is no background polling while the widget is closed.
 
 The preview volume slider no longer re-enumerates output and microphone devices on every value change. Volume writes reuse the endpoint maintained by the device-change monitor, and identical notifications no longer trigger redundant global UI updates. Real drag smoothness still depends on audio drivers and should be checked on the installed build.
+
+</details>

@@ -1543,3 +1543,4 @@ body.site-awake .demo-shell.in-view:before{animation:ambient-drift 16s ease-in-o
 @keyframes ambient-drift{to{transform:translate3d(2%,-2%,0) scale(1.04);opacity:.47}}
 @media(max-width:800px){.forecast-section{grid-template-columns:1fr;gap:30px}.forecast-visual{padding:18px}.demo-shell:before{inset:10% -3% 0}.ambient-choices{margin-top:16px}}
 @media(prefers-reduced-motion:reduce){body.site-awake .demo-shell.in-view:before{animation:none}}
+.archive-notice{margin:0;padding:10px 20px;text-align:center;color:#e8e7df;background:#1c241d;font-size:14px}.archive-notice a{margin-left:6px;color:inherit;text-decoration:underline}

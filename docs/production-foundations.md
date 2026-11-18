@@ -1,5 +1,7 @@
 # Production foundations · 2.20
 
+> Archived material from the original NabyScape project. For the SentoBar fork, see the [current guide](guide.md).
+
 This local candidate adds recovery and accessibility foundations. Source inspection and compilation do not establish production readiness across PCs. No UI, microphone, provider, model or device acceptance testing was performed for this update.
 
 ## Updates and recovery

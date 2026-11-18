@@ -1,19 +1,19 @@
-# Naby voice · local speech setup
+# Sento voice · local speech setup
 
-Naby voice is a separate optional widget. Turn it on in **Settings → Widgets & tools**, or choose **Voice mode** in the chat header. It shares conversation, Stop and selected screen context with Naby chat. Naby has no built-in action or computer-control tools. Opening Voice mode never starts the microphone.
+Sento voice is a separate optional widget. Turn it on in **Settings → Widgets & tools**, or choose **Voice mode** in the chat header. It shares conversation, Stop and selected screen context with Sento chat. Sento has no built-in action or computer-control tools. Opening Voice mode never starts the microphone.
 
 ## Choose your voice path
 
-Choose **Voice → Voice settings** to jump directly to **Settings → Naby AI → Voice → Voice setup · choose ASR & TTS**. Use **Automatic setup · scan & install** for managed local speech, **Realtime provider** for your realtime API, or **External ASR + TTS · advanced** for an existing speech server.
+Choose **Voice → Voice settings** to jump directly to **Settings → Sento AI → Voice → Voice setup · choose ASR & TTS**. Use **Automatic setup · scan & install** for managed local speech, **Realtime provider** for your realtime API, or **External ASR + TTS · advanced** for an existing speech server.
 
 ## Automatic setup: scan, install and talk
 
 1. Choose **Automatic setup · scan & install**. The scan reads CPU, thread count, available physical RAM and GPU names locally. NVIDIA driver and total/free VRAM are read using the installed NVIDIA utility when available. Hardware data is not uploaded.
 2. Choose a reply language and a Light, Balanced or Quality priority. Choose **Use recommendation**, or select another listening model and speaking voice. Expand **Compare listening models** for sizes and hardware fit. The card shows the pack size, memory budget and installation status. Recommendations consider free memory and are conservative heuristics, not a benchmark or guarantee of speed.
 3. Choose **Install & use**. Only this action downloads engines and weights. Downloads use fixed versions/revisions, bounded sizes, SHA-256 verification and staging before activation. A missing Microsoft Visual C++ x64 runtime is downloaded from Microsoft and installed; Windows may ask for administrator approval. If it requires a restart, the UI tells you to restart and retry. Cancellation does not interrupt an in-progress Windows Installer transaction.
-4. After the pack is installed and selected, choose **Open voice mode**, then **Start conversation**. The shortcut becomes available when the saved language, performance preference and models match the selected pack and a chat model is configured. Naby loads the selected model and starts its local engine automatically; no Python or terminal is needed. Opening the widget or installing a pack does not start the microphone. **End conversation** stops capture, playback and native child processes, releasing model RAM/VRAM.
+4. After the pack is installed and selected, choose **Open voice mode**, then **Start conversation**. The shortcut becomes available when the saved language, performance preference and models match the selected pack and a chat model is configured. Sento loads the selected model and starts its local engine automatically; no Python or terminal is needed. Opening the widget or installing a pack does not start the microphone. **End conversation** stops capture, playback and native child processes, releasing model RAM/VRAM.
 
-## Voice latency · local 2.18 candidate
+## Voice latency
 
 Supertonic 3, Kokoro and Kitten load once into a private native TTS worker when Start conversation is used. They remain loaded while voice is active, including with the dock closed, and are released on End conversation, Stop, hide or quit. This increases active-session memory use. Whisper already stays loaded during the session; native Qwen/Moonshine ASR still load per utterance. The legacy bundled Piper path keeps a single full-reply synthesis; external servers and Windows voices keep their existing engines.
 
@@ -21,7 +21,7 @@ Compatible Chat Completions endpoints, including Hermes, can send streamed reply
 
 Stage labels distinguish transcription, waiting for the provider, preparing voice and speaking. ASR, first-text and first-segment TTS durations appear below voice controls, with detailed timing in the tooltip. Measurements stay in memory and exclude the silence-detection pause and hardware output delay. No performance claim has been established by this candidate: only source review and compilation/package checks were performed, without microphones, inference, provider calls or runtime benchmarks.
 
-## Hardware profiles and model catalog · 2.14
+## Hardware profiles and model catalog
 
 Setup labels, guidance and errors are in English. New configurations default to English; existing language choices are preserved. The language picker filters listening/speaking models. Supertonic 3 is available for the 15 listed conversation languages; Moonshine and Kitten packs are language-specific.
 
@@ -57,23 +57,23 @@ The GPU profiles use supported quantizations of Whisper; quantization does not m
 
 Full pack size shown in settings includes the selected weights, native runtime, optional CUDA runtime and any missing Microsoft C++ prerequisite. These budgets are conservative estimates, not benchmark results. The 1.7B CPU pack can be slow and is intended for the Quality profile on larger machines.
 
-Automatic native packs require **an x64 app process on Windows x64 with AVX2/FMA**. Whisper GPU uses CUDA 12.4 and a compatible NVIDIA driver (551.61+), with CPU fallback included. AMD/Intel graphics and unconfirmed GPUs use CPU; The native ARM64 app package does not make these x64 speech packages compatible: ARM64 users should use a compatible external local ASR/TTS service or provider. Windows voice and wake-word recognition also depend on matching installed SAPI engines. No drivers are installed. The extra native speech runtime is approximately 25 MB; optional Whisper GPU runtime approximately 460 MB. Model weights stay outside the app installer under `%LOCALAPPDATA%\NabyScape\local-speech`.
+Automatic native packs require **an x64 app process on Windows x64 with AVX2/FMA**. Whisper GPU uses CUDA 12.4 and a compatible NVIDIA driver (551.61+), with CPU fallback included. AMD/Intel graphics and unconfirmed GPUs use CPU; The native ARM64 app package does not make these x64 speech packages compatible: ARM64 users should use a compatible external local ASR/TTS service or provider. Windows voice and wake-word recognition also depend on matching installed SAPI engines. No drivers are installed. The extra native speech runtime is approximately 25 MB; optional Whisper GPU runtime approximately 460 MB. Model weights stay outside the app installer under `%LOCALAPPDATA%\SentoBar\local-speech`.
 
-All native engines are session-owned. Whisper stays loaded while talking; Moonshine/Qwen recognize one utterance and exit, and native TTS loads only while speaking. Downloading or choosing a pack does not start the microphone. **End conversation** releases the engines. New compatible versions arrive through Naby updates; this is a curated catalog rather than unrestricted live model discovery.
+All native engines are session-owned. Whisper stays loaded while talking; Moonshine/Qwen recognize one utterance and exit, and native TTS loads only while speaking. Downloading or choosing a pack does not start the microphone. **End conversation** releases the engines. New compatible versions arrive through Sento updates; this is a curated catalog rather than unrestricted live model discovery.
 
 ### Licenses and international use
 
-Model terms differ from NabyScape's MIT license. In particular, Supertonic 3 weights use OpenRAIL-M. **Voice details & license** opens the relevant model page; runtime archives retain their bundled notices and the speech folder records source attribution in `SOURCES.txt`. Downloaded files have pinned revisions/sizes and SHA-256 checksums. Installation stages complete packages before activation; cancellation keeps verified downloads for retry.
+Model terms differ from SentoBar's MIT license. In particular, Supertonic 3 weights use OpenRAIL-M. **Voice details & license** opens the relevant model page; runtime archives retain their bundled notices and the speech folder records source attribution in `SOURCES.txt`. Downloaded files have pinned revisions/sizes and SHA-256 checksums. Installation stages complete packages before activation; cancellation keeps verified downloads for retry.
 
-The default conversation language is English. Non-ASCII text and Windows account/file paths are not runtime-validated in the native CLI adapters. Sherpa documents [Windows UTF-8 requirements](https://k2-fsa.github.io/sherpa/onnx/tts/faq.html); Naby does not change Windows locale settings. A separately configured external speech server remains available if the native command-line encoding is unsuitable for the selected language.
+The default conversation language is English. Non-ASCII text and Windows account/file paths are not runtime-validated in the native CLI adapters. Sherpa documents [Windows UTF-8 requirements](https://k2-fsa.github.io/sherpa/onnx/tts/faq.html); Sento does not change Windows locale settings. A separately configured external speech server remains available if the native command-line encoding is unsuitable for the selected language.
 
 Installing or switching speech packs preserves your chat conversation and external-server settings. The selected chat provider/model is still needed for AI replies; the app shows a setup error before opening the microphone when it is missing.
 
-Local speech recognizes an utterance after a pause, sends its text to your selected **chat provider**, and speaks the reply locally. The microphone waits during recognition and playback to avoid hearing its own reply. End conversation cancels recognition, requests and playback. Whisper/Piper WAV/PCM stays in memory. Moonshine/Qwen3-ASR and native TTS CLI adapters write temporary utterance/reply WAV files under `%TEMP%\NabyScape-speech-*`, deleting them on normal completion, errors and cancellation. A crash can leave temporary audio behind. Captured audio and generated transcripts are not intentionally logged.
+Local speech recognizes an utterance after a pause, sends its text to your selected **chat provider**, and speaks the reply locally. The microphone waits during recognition and playback to avoid hearing its own reply. End conversation cancels recognition, requests and playback. Whisper/Piper WAV/PCM stays in memory. Moonshine/Qwen3-ASR and native TTS CLI adapters write temporary utterance/reply WAV files under `%TEMP%\SentoBar-speech-*`, deleting them on normal completion, errors and cancellation. A crash can leave temporary audio behind. Captured audio and generated transcripts are not intentionally logged.
 
-**Local speech is not automatically local chat.** Select a local Ollama or LM Studio model too if the whole conversation should stay on this computer. Screen sharing is explicit and independent. Naby’s former Actions/Computer controls have been removed; a connected Hermes agent manages its own tools and permissions. See [Hermes connection](hermes.md).
+**Local speech is not automatically local chat.** Select a local Ollama or LM Studio model too if the whole conversation should stay on this computer. Screen sharing is explicit and independent. Sento’s former Actions/Computer controls have been removed; a connected Hermes agent manages its own tools and permissions. See [Hermes connection](hermes.md).
 
-## Use your own model files · 2.15
+## Use your own model files
 
 Choose **Voice → Voice settings → Speech connection → Use your own model files**. Pick the listening and speaking format, then browse to files/folders or paste full local drive paths. **Check files** checks the required file structure without inference. **Prepare engines & use models** downloads only missing pinned engines, saves the selection and enables it for **Start conversation**. When engines are already present, no network download is required. Model weights stay in their original location and are not copied, overwritten or deleted.
 
@@ -90,7 +90,7 @@ You can combine your own ASR with Windows voice or an installed speaking pack, o
 
 Choose speaker ID 0 for the default voice, or an existing ID in the model. A complete file layout does not prove that an arbitrary model is compatible with the pinned engine, fits memory or will synthesize correctly. The app does not execute user-supplied scripts or executables. For a different export/runtime, use **External ASR + TTS** with your existing localhost service.
 
-Full paths are saved in the local assistant settings. Moving/removing model files, disconnecting a drive or deleting supporting files requires choosing the location again. Imported models do not have a catalog memory estimate; available hardware is checked, but custom model capacity cannot be guaranteed. Windows x64/AVX2/FMA and the native CLI encoding limits below still apply. Naby does not change the model's license or language capabilities.
+Full paths are saved in the local assistant settings. Moving/removing model files, disconnecting a drive or deleting supporting files requires choosing the location again. Imported models do not have a catalog memory estimate; available hardware is checked, but custom model capacity cannot be guaranteed. Windows x64/AVX2/FMA and the native CLI encoding limits below still apply. Sento does not change the model's license or language capabilities.
 
 ## External servers: manual setup
 
@@ -108,33 +108,33 @@ These external-server templates configure connections only. They do not install 
 
 ## Lightweight whisper.cpp
 
-Start a [whisper.cpp server](https://github.com/ggml-org/whisper.cpp/tree/master/examples/server) with an installed tiny/base model. Configure **WhisperCpp** and its localhost base URL, typically `http://127.0.0.1:8080/`. Naby posts multipart WAV to `/inference`. Select a multilingual model for languages other than English.
+Start a [whisper.cpp server](https://github.com/ggml-org/whisper.cpp/tree/master/examples/server) with an installed tiny/base model. Configure **WhisperCpp** and its localhost base URL, typically `http://127.0.0.1:8080/`. Sento posts multipart WAV to `/inference`. Select a multilingual model for languages other than English.
 
 ## Optional faster-whisper bridge
 
-Use **Save local ASR server template…** to export the bundled script (default filename: `naby-local-asr.py`). The source is [tools/local_voice_server.py](../tools/local_voice_server.py).
+Use **Save local ASR server template…** to export the bundled script (default filename: `sento-local-asr.py`). The source is [tools/local_voice_server.py](../tools/local_voice_server.py).
 
 In a separate Python environment, install its optional dependencies:
 
 ```powershell
 python -m pip install faster-whisper fastapi python-multipart uvicorn
-python naby-local-asr.py --model small --device cpu --compute-type int8
+python sento-local-asr.py --model small --device cpu --compute-type int8
 ```
 
-Use **OpenAI-compatible**, base `http://127.0.0.1:8178/v1/`, and model `small`. The first recognition downloads the model if absent. The script is user-run; Naby never starts or installs it.
+Use **OpenAI-compatible**, base `http://127.0.0.1:8178/v1/`, and model `small`. The first recognition downloads the model if absent. The script is user-run; Sento never starts or installs it.
 
 For supported CUDA/cuDNN setups with enough free GPU memory:
 
 ```powershell
-python naby-local-asr.py --model large-v3-turbo --device cuda --compute-type int8_float16
+python sento-local-asr.py --model large-v3-turbo --device cuda --compute-type int8_float16
 ```
 
-Set Naby's ASR model to the same ID. See [faster-whisper prerequisites](https://github.com/SYSTRAN/faster-whisper). Keep the bridge on loopback; it is not an authenticated public server.
+Set Sento's ASR model to the same ID. See [faster-whisper prerequisites](https://github.com/SYSTRAN/faster-whisper). Keep the bridge on loopback; it is not an authenticated public server.
 
 ## Local text to speech
 
-- **Windows voice** needs no HTTP server. Naby generates 24 kHz PCM using installed Windows SAPI and meters playback for the character.
-- **Kokoro / compatible** uses a separately running [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI) service. Default base `http://127.0.0.1:8880/v1/`, model `kokoro`, voice `af_heart`. Naby requests WAV at `/audio/speech`.
+- **Windows voice** needs no HTTP server. Sento generates 24 kHz PCM using installed Windows SAPI and meters playback for the character.
+- **Kokoro / compatible** uses a separately running [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI) service. Default base `http://127.0.0.1:8880/v1/`, model `kokoro`, voice `af_heart`. Sento requests WAV at `/audio/speech`.
 - **Piper / compatible** requires an HTTP server providing the same WAV endpoint. A standalone Piper executable is not an HTTP service.
 
 URLs must be localhost or loopback. No speech-server key is sent. **Check local speech services** checks reachability only; it does not activate a microphone, prove model accuracy, or synthesize audio.

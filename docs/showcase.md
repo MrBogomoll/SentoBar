@@ -1,5 +1,7 @@
 # NabyScape · release 2.10 visual tour
 
+> Archived material from the original NabyScape project. For the SentoBar fork, see the [current guide](guide.md).
+
 [Latest silent film](https://github.com/BillyNabil/nabyscape/releases/download/v2.10.0/NabyScape-demo.mp4) · [Repository movie](../Assets/showcase/nabyscape-demo.mp4) · [README](../README.md)
 
 ![Actual NabyScape 2.10 music and compact dock](../Assets/showcase/release-hero.png)

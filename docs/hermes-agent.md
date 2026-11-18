@@ -20,10 +20,10 @@ API_SERVER_KEY=<your-own-private-server-key>
 hermes gateway
 ```
 
-Save the provider and select it for chat. A remote gateway needs HTTPS. Naby does not install Hermes or configure its model and tool backends.
+Save the provider and select it for chat. A remote gateway needs HTTPS. Sento does not install Hermes or configure its model and tool backends.
 
-Hermes executes its own tools under its own permissions; Naby approvals cover Naby actions only. Clear creates a new chat session without deleting Hermes memory. Live voice requires a separate voice provider. Keys remain in Windows Credential Manager.
+Hermes executes its own tools under its own permissions; Sento approvals cover Sento actions only. Clear creates a new chat session without deleting Hermes memory. Live voice requires a separate voice provider. Keys remain in Windows Credential Manager.
 
-Stop cancels Naby's request. Manage any continuing backend jobs in Hermes.
+Stop cancels Sento's request. Manage any continuing backend jobs in Hermes.
 
 [Official Hermes API server documentation](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server/).

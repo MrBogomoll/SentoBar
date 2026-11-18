@@ -1,5 +1,7 @@
 # NabyScape feature roadmap
 
+> Archived material from the original NabyScape project. For the SentoBar fork, see the [current guide](guide.md).
+
 Reviewed 16 October 2026. Reference sites: [NotchNook](https://getnotchnook.com/) and [Vorssaint](https://vorssaint.com/). The first batch was approved and implemented in 1.7. Entries in the proposed sequence remain proposals, not scheduled commitments.
 
 NotchNook groups music, calendar/meeting access, notes, tasks, timers, a camera mirror, and a file tray around the notch. Vorssaint offers modular local tools, including clipboard history, a command bar, clean links, keep-awake controls, audio utilities, and optional Dynamic Island activities. These are feature references; NabyScape keeps its own black-glass presentation and implementation.

@@ -1,4 +1,6 @@
-# NabyScape website
+# Original NabyScape website archive
+
+This folder preserves the original author’s site, screenshots and 2.x guides. Its deployment addresses and historical download links belong to the original project. The [SentoBar README](../README.md) and [fork guide](../docs/guide.md) describe the local fork.
 
 A buildless, dependency-free product site. Near-black surfaces, self-hosted Manrope, lime accents, a chrome Naby hero and a black dock stage with Terracotta, Lagoon and Plum ambience. The home page includes crisp HTML Closed/Hover/Open preview states with original coastal artwork, actual app captures, local AI/voice information, recent Settings captures and a published-release link that does not pretend local source is already released.
 
@@ -24,4 +26,4 @@ Live website: https://nabyscape.vercel.app/ · Guide: https://nabyscape.vercel.a
 
 Deployed as the new `nabyscape` Vercel project on 24 October 2026, following the owner's request. The earlier Sites project was unavailable in the connected account and was not modified.
 
-`vercel.json` serves this directory directly with no build or framework. From `website/`, use `vercel deploy --prod` to publish later changes to the linked project. Project linkage stays in the ignored `.vercel/` directory. No Git integration is configured; a local edit alone does not publish an update.
+`vercel.json` serves this directory directly with no build or framework. The upstream project and domain belong to the original maintainer. Project linkage stays in the ignored `.vercel/` directory. No Git integration is configured; a local edit alone does not publish an update.
