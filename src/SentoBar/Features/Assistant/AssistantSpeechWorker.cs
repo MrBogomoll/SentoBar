@@ -14,12 +14,13 @@ namespace SentoBar;
 internal sealed class AssistantSpeechWorker : IDisposable
 {
     internal sealed record Setup(string Library,string Folder,string Engine,string Language,int Speaker,int Steps);
-    private readonly string pipeName="SentoBar-tts-"+Guid.NewGuid().ToString("N");
+    private const string PipePrefix="SentoBar-tts-";
+    internal string PipeName {get;}=PipePrefix+Guid.NewGuid().ToString("N");
     private readonly NamedPipeServerStream pipe;
     private readonly SemaphoreSlim gate=new(1,1);
     private Process? process;
     private int disposed;
-    internal AssistantSpeechWorker()=>pipe=new(pipeName,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
+    internal AssistantSpeechWorker()=>pipe=new(PipeName,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
     internal async Task Start(Setup setup,Func<ProcessStartInfo,Process> launch,CancellationToken token)
     {
         AssistantSpeechPlatform.RequireNativePacks();
@@ -30,7 +31,7 @@ internal sealed class AssistantSpeechWorker : IDisposable
             string executable=Environment.ProcessPath??throw new IOException(Localization.Text("The app executable is unavailable."));
             var info=new ProcessStartInfo(executable){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=AppContext.BaseDirectory};
             if(Path.GetFileNameWithoutExtension(executable).Equals("dotnet",StringComparison.OrdinalIgnoreCase))info.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory,"SentoBar.dll"));
-            info.ArgumentList.Add("--speech-worker");info.ArgumentList.Add(pipeName);timeout.Token.ThrowIfCancellationRequested();process=launch(info);
+            info.ArgumentList.Add("--speech-worker");info.ArgumentList.Add(PipeName);timeout.Token.ThrowIfCancellationRequested();process=launch(info);
             await pipe.WaitForConnectionAsync(timeout.Token);await WriteFrame(pipe,JsonSerializer.SerializeToUtf8Bytes(setup),timeout.Token);await ReadReply(timeout.Token);
         }
         catch(OperationCanceledException){Dispose();throw;}
@@ -60,10 +61,12 @@ internal sealed class AssistantSpeechWorker : IDisposable
         pipe.Dispose();var child=Interlocked.Exchange(ref process,null);
         if(child!=null){try{if(!child.HasExited)child.Kill(true);}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}finally{child.Dispose();}}
     }
+    internal static bool IsPipeName(string name)
+        =>name.StartsWith(PipePrefix,StringComparison.Ordinal) && Guid.TryParseExact(name.AsSpan(PipePrefix.Length),"N",out _);
     internal static async Task Run(string name)
     {
         if(!AssistantSpeechPlatform.NativePacksSupported)return;
-        if(!name.StartsWith("SentoBar-tts-",StringComparison.Ordinal) || name.Length!=46)return;
+        if(!IsPipeName(name))return;
         using var client=new NamedPipeClientStream(".",name,PipeDirection.InOut,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
         try
         {

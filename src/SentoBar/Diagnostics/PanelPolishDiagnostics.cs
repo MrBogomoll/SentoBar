@@ -93,8 +93,9 @@ internal static class PanelPolishDiagnostics
         var outer=Field<ScrollViewer>("scroll");
         var rows=Field<StackPanel>("monitorRows");
         check($"Expanded system overview fits (rows {rows.ActualHeight:0.##}, panel {island.PaintedHeight:0.##}, viewport {outer.ViewportHeight:0.##}, extent {outer.ExtentHeight:0.##})",
-            !overview.IsVisible && outer.ScrollableHeight<=1);
-        check("Overview includes CPU memory and system uptime",Visible<TextBlock>().Any(text=>text.Text==Localization.Text("System uptime")) && rows.Children.Count>=6);
+            overview.IsVisible && overview.ViewportHeight>0 && outer.ScrollableHeight<=1);
+        check("Overview includes CPU memory and system uptime",Visible<TextBlock>().Any(text=>text.Text==Localization.Text("System uptime")) &&
+            Diagnostics.Descendants(rows).OfType<MonitorHistoryChart>().Count()>=2);
         var systemTabs=Field<Dictionary<string,Button>>("monitorTabs");
         var glassFill=island.FindResource("GlassControlFill");
         check("The active System tab uses the same glass button style as calendar actions",

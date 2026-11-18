@@ -34,9 +34,15 @@ internal static class MediaFooterDiagnostics
         island.Reveal(false);island.SelectPage("media",false);app.PublishUpdate(RuntimeChange.Media);await Task.Delay(180);
         var controls=Field<MediaControls>("mediaControls");double closedHeight=island.PaintedHeight;
         check("Default media has two compact footer actions",controls.SourceButton.IsVisible && controls.VolumeButton.IsVisible);
-        check("Default hides the full-width selector and slider",!Diagnostics.Descendants(island).OfType<Slider>().Any(slider=>slider.IsVisible && AutomationProperties.GetName(slider)=="Windows volume") && !Field<ComboBox>("sessions").IsVisible);
+        var inlineVolume=Field<Slider>("volume");
+        check("Expanded media shows the Windows volume slider beside the percentage",inlineVolume.IsVisible && !Field<ComboBox>("sessions").IsVisible && Diagnostics.Descendants(controls).Contains(inlineVolume));
+        var playButton=Field<Button>("play");
+        check("Expanded media shows Pause while a track plays",playButton.IsVisible && playButton.IsEnabled && AutomationProperties.GetName(playButton)=="Pause");
+        app.Media.DiagnosticPlayback(false);app.PublishUpdate(RuntimeChange.Media);
+        check("Expanded media shows Play and keeps the volume slider when paused",playButton.IsVisible && playButton.IsEnabled && AutomationProperties.GetName(playButton)=="Play" && inlineVolume.IsVisible);
+        app.Media.DiagnosticPlayback(true);app.PublishUpdate(RuntimeChange.Media);
         Click(controls.VolumeButton);await Task.Delay(70);island.UpdateLayout();
-        check("Volume mounts the original Windows slider",Field<Slider>("volume").IsVisible && Diagnostics.Descendants(controls.Popover).Contains(Field<Slider>("volume")));
+        check("Volume settings leave the slider in the same place",inlineVolume.IsVisible && !Diagnostics.Descendants(controls.Popover).Contains(inlineVolume));
         check("Mute, mixer, devices and microphone remain accessible",new[]{"Mute or unmute","Open volume mixer","Audio devices and microphone"}.All(name=>Diagnostics.Descendants(controls.Popover).OfType<Button>().Any(button=>AutomationProperties.GetName(button)==name)));
         check("Volume disclosure opens below the footer without covering playback",controls.Popover.TransformToAncestor(controls).Transform(new Point()).Y>=controls.VolumeButton.TransformToAncestor(controls).Transform(new Point(0,controls.VolumeButton.ActualHeight)).Y);Capture("media-volume-integrated");
         check("Open popover defers cursor following",(bool)typeof(OverlayWindow).GetProperty("FollowInteraction",flags)!.GetValue(island)!);
@@ -71,7 +77,8 @@ internal static class MediaFooterDiagnostics
         MediaControls Inject()
         {
             var old=Field<MediaControls>("mediaControls");old.Close(false);var owner=(Grid)old.Parent;int index=owner.Children.IndexOf(old);var content=(StackPanel)old.Children[0];old.Children.Remove(content);content.Children.RemoveAt(content.Children.Count-1);owner.Children.Remove(old);
-            var replacement=new MediaControls(content,true,true,()=>choices,()=>current,SampleVolume);replacement.LayoutRequested+=()=>typeof(OverlayWindow).GetMethod("QueueMediaLayout",flags)!.Invoke(island,null);owner.Children.Insert(index,replacement);typeof(OverlayWindow).GetField("mediaControls",flags)!.SetValue(island,replacement);replacement.Refresh(63,false,true);return replacement;
+            var sample=new Slider{Minimum=0,Maximum=100,Value=63,Height=22};
+            var replacement=new MediaControls(content,true,true,()=>choices,()=>current,SampleVolume,volumeSlider:sample);replacement.LayoutRequested+=()=>typeof(OverlayWindow).GetMethod("QueueMediaLayout",flags)!.Invoke(island,null);owner.Children.Insert(index,replacement);typeof(OverlayWindow).GetField("mediaControls",flags)!.SetValue(island,replacement);replacement.Refresh(63,false,true);return replacement;
         }
         ResetChoices();controls=Inject();await Task.Delay(90);Capture("media-default");
         Click(controls.VolumeButton);await Task.Delay(60);Capture("media-volume");Click(controls.SourceButton);await Task.Delay(60);Capture("media-sources");
@@ -118,7 +125,7 @@ internal static class MediaFooterDiagnostics
             Diagnostics.Descendants(island).OfType<Button>().Any(button=>button.IsVisible && UI.Identity(button)=="Audio devices and microphone"));
         Capture("volume-only");
         foreach(var widget in s.Widgets)if(widget.Id=="media")widget.Enabled=true;s.CompactLayout=false;app.ChangeSettings();island.Reveal(false);await Task.Delay(80);
-        check("Classic layout retains its inline volume slider",Field<Slider>("volume").IsVisible && Field<MediaControls?>("mediaControls")==null);
+        check("Classic layout retains its full-width inline volume slider",Field<Slider>("volume").IsVisible && double.IsNaN(Field<Slider>("volume").Width) && Field<MediaControls?>("mediaControls")==null);
         check("Fixture leaves voice and screen sharing off",!app.Assistant.VoiceConnected && !app.Assistant.Desktop.Sharing);
         File.WriteAllText(Path.Combine(directory,"capture-notes.txt"),"Actual WPF renders with original artwork/title, injected Spotify/Chrome enumeration and a sample volume slider for screenshots. Actual Windows slider identity checked without modifying its value. No playback, volume/mute/device write, microphone, capture, API key or provider request.");
     }

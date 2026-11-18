@@ -1,7 +1,6 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -9,7 +8,7 @@ using System.Windows.Threading;
 namespace SentoBar;
 
 // A new alert grows out of the closed dock as a compact banner (app, title, one line of text),
-// then folds back on its own. Hovering keeps it; clicking opens the sender or the full card.
+// then folds back on its own. Hover or keyboard focus keeps it available.
 public sealed partial class OverlayWindow
 {
     private readonly DispatcherTimer bannerTimer=new(){Interval=TimeSpan.FromSeconds(6)};
@@ -43,15 +42,15 @@ public sealed partial class OverlayWindow
         string line=hideText?Localization.Text("New notification"):notice.Detail;
         if(line.Length>0){var body=UI.Text(line,12,UI.Muted);body.TextWrapping=TextWrapping.NoWrap;body.TextTrimming=TextTrimming.CharacterEllipsis;body.Margin=new(0,1,0,0);text.Children.Add(body);}
         grid.Children.Add(text);
-        var more=Icons.Button("chevron-right",Localization.Text("View all notifications"),()=>{CloseBanner(false);OpenNotificationCenter();},false,26);more.Background=Brushes.Transparent;more.Margin=new(8,0,0,0);more.Opacity=.6;more.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(more,2);grid.Children.Add(more);
+        var arrow=Icons.Create("chevron-right",12,UI.Muted);arrow.Margin=new(6,0,2,0);arrow.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(arrow,2);grid.Children.Add(arrow);
+        var bannerRow=new Grid();bannerRow.ColumnDefinitions.Add(new());bannerRow.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
+        var more=Icons.Button("bell","View all notifications",()=>{CloseBanner(false);OpenNotificationCenter();},false,26);more.Background=Brushes.Transparent;more.Margin=new(6,0,0,0);more.Opacity=.75;more.VerticalAlignment=VerticalAlignment.Center;
+        bannerRow.Children.Add(NoticeActionButton(notice,grid));Grid.SetColumn(more,1);bannerRow.Children.Add(more);
         bannerProgress=new Border{Height=2,CornerRadius=new(1),Background=UI.Brush(app.Settings.Accent),HorizontalAlignment=HorizontalAlignment.Left,Margin=new(52,10,0,0),Opacity=.85,RenderTransformOrigin=new(0,.5),RenderTransform=new ScaleTransform(1,1)};
-        var content=new StackPanel();content.Children.Add(grid);content.Children.Add(bannerProgress);
-        var hit=new Border{Child=content,Background=Brushes.Transparent,Cursor=Cursors.Hand,Padding=new(2,0,2,0)};
-        System.Windows.Automation.AutomationProperties.SetName(hit,NotificationCenterText.Kind(notice)+": "+notice.Title);
-        hit.ToolTip=Localization.Text(notice.Kind=="external"?Localization.Text("Click to open the app"):Localization.Text("Click for details"));
-        hit.MouseLeftButtonUp+=(_,e)=>{if(e.OriginalSource is DependencyObject source && IsInside(source,more))return;e.Handled=true;ActivateBanner(notice);};
-        hit.MouseEnter+=(_,_)=>PauseBanner(true);hit.MouseLeave+=(_,_)=>PauseBanner(false);
-        var screen=Native.ChooseScreen(app.Settings);double scale=Native.Scale(screen);
+        var content=new StackPanel();content.Children.Add(bannerRow);content.Children.Add(bannerProgress);
+        var hit=new Border{Child=content,Background=Brushes.Transparent,Padding=new(2,0,2,0)};
+        hit.MouseEnter+=(_,_)=>PauseBanner(true);hit.MouseLeave+=(_,_)=>PauseBanner(hit.IsKeyboardFocusWithin);
+        hit.IsKeyboardFocusWithinChanged+=(_,_)=>PauseBanner(hit.IsMouseOver || hit.IsKeyboardFocusWithin);
         // Banners use the hover width from Position & size.
         double width=Math.Max(260,PeekSurfaceWidth);
         double inset=surface.Notch?30:18;
@@ -64,8 +63,6 @@ public sealed partial class OverlayWindow
         ControlFeedback.Notice(noticeCard,app.Settings.NotificationAnimation);
         bannerTimer.Interval=TimeSpan.FromSeconds(BannerSeconds(app.Settings));StartBannerCountdown();
     }
-    private static bool IsInside(DependencyObject source,DependencyObject ancestor)
-    {for(var node=source;node!=null;node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node))if(node==ancestor)return true;return false;}
     private void StartBannerCountdown()
     {
         bannerTimer.Stop();bannerTimer.Start();
@@ -84,6 +81,7 @@ public sealed partial class OverlayWindow
     private void BannerTimeout()
     {
         bannerTimer.Stop();if(!NoticeBannerOpen)return;
+        if(noticeCard?.IsKeyboardFocusWithin==true){PauseBanner(true);return;}
         if(PointerInside()){StartBannerCountdown();return;}
         CloseBanner(true);
     }
@@ -93,10 +91,5 @@ public sealed partial class OverlayWindow
         bannerTimer.Stop();
         if(NoticeBannerOpen){Collapse();app.Notifications.Dismiss();}
         if(showNext)Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(()=>{if(!noticeShowing)QueueNoticeBanner();}));
-    }
-    private void ActivateBanner(InternalNotice notice)
-    {
-        if(notice.Kind=="external" && ExternalAppLauncher.Open(notice.AppId)){CloseBanner(true);return;}
-        bannerTimer.Stop();bannerShowing=false;Collapse();OpenNotice(true);
     }
 }

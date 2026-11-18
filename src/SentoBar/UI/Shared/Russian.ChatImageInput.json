@@ -1,0 +1,5 @@
+{
+  "ChatGPT plan chat supports image attachments only.": "В чат по подписке ChatGPT можно прикреплять изображения.",
+  "ChatGPT plan chat accepts text and images attached by you.": "Чат по подписке ChatGPT принимает текст и прикреплённые вами изображения.",
+  "ChatGPT rejected the message with images. Try a smaller image or another model.": "ChatGPT отклонил сообщение с изображениями. Попробуйте изображение меньшего размера или другую модель."
+}

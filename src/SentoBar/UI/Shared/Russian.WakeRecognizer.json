@@ -1,0 +1,17 @@
+{
+  "Say the phrase on its own to start a voice conversation.": "Чтобы начать голосовой разговор, произнесите фразу отдельно.",
+  "Your installed Whisper model listens on the CPU while wake listening is on.": "Во время ожидания фразы установленная модель Whisper использует процессор и оперативную память.",
+  "Windows listens locally for this phrase.": "Эту фразу распознаёт Windows на вашем ПК.",
+  "Listening on CPU · say “{0}”.": "Микрофон включён. Произнесите «{0}». Распознавание выполняется на процессоре.",
+  "To stop wake listening, choose Stop all microphones in the tray menu.": "Чтобы прекратить ожидание фразы, выберите «Отключить все микрофоны» в меню значка в трее.",
+  "This threshold applies to the Windows recognizer.": "Этот порог применяется к распознавателю Windows.",
+  "Wake phrase saved.": "Фраза активации сохранена.",
+  "Russian wake words need a compatible Windows recognizer. In Windows language options for Russian, install Basic speech recognition if available, then refresh recognizers.": "Для русской фразы активации нужен совместимый распознаватель Windows. В языковых параметрах русского установите «Базовое распознавание речи», если этот компонент доступен. Затем нажмите «Обновить распознаватели».",
+  "No matching Windows recognizer. Install a compatible speech recognizer in Windows language options, then refresh recognizers.": "Подходящий распознаватель Windows не найден. Установите совместимый компонент распознавания в языковых параметрах Windows и нажмите «Обновить распознаватели».",
+  "Russian wake recognition": "Русский",
+  "Russian · Windows recognizer unavailable": "Русский · распознаватель Windows недоступен",
+  "Previously selected recognizer · unavailable": "Ранее выбранный распознаватель · недоступен",
+  "Example Russian wake phrase: «Привет Сенто».": "Пример фразы активации: «Привет Сенто».",
+  "Windows language options": "Языковые параметры Windows",
+  "Open Windows Settings → Time & language → Language & region.": "Откройте «Параметры Windows → Время и язык → Язык и регион»."
+}

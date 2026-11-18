@@ -28,7 +28,7 @@ internal sealed class DetachedPreviewView : IDisposable
     private MediaSeekSlider? seek;
     private Button? toggle,previous,next;
     private TextBox? notes,noteTitle;
-    private ProgressBar? progress,memory;
+    private SystemMonitorDashboard? systemDashboard;
     private ListBox? shelf;
     private Calendar? calendar;
     private StackPanel? eventList;
@@ -49,6 +49,12 @@ internal sealed class DetachedPreviewView : IDisposable
         if(visible==value)return;visible=value;
         if(value){if(Motion.Enabled)Motion.Enter(panel,4);app.Updated+=Refresh;Refresh(RuntimeChange.All);}
         else{app.Updated-=Refresh;Flush();}
+        if(kind=="system" && app.MainWindow is OverlayWindow island)
+        {
+            if(value)island.DetachedMonitorUpdated+=RefreshSystem;
+            else island.DetachedMonitorUpdated-=RefreshSystem;
+            island.SetDetachedMonitorVisible(value);
+        }
     }
     internal void ApplySettings(){if(title!=null)title.FontWeight=kind=="media" && app.Settings.BoldMediaTitle?FontWeights.SemiBold:FontWeights.Normal;if(visible)Refresh(RuntimeChange.All);}
     internal void Flush(){noteSave.Stop();if(dirty){dirty=!app.Productivity.Save();if(status!=null)status.Text=dirty?Localization.Text("Could not save. Try Save again."):Localization.Text("Saved locally");}}
@@ -168,7 +174,13 @@ internal sealed class DetachedPreviewView : IDisposable
     }
     private void BuildSystem()
     {
-        title=UI.Text("CPU",14);Add(title);progress=new ProgressBar{Minimum=0,Maximum=100,Height=5,Background=UI.Brush("#34363C"),Foreground=Brushes.White};Add(progress);detail=UI.Caption("RAM",14);Add(detail);memory=new ProgressBar{Minimum=0,Maximum=100,Height=5,Background=UI.Brush("#34363C"),Foreground=Brushes.White};Add(memory);Add(UI.Text(Localization.Text("Uses the island’s shared system sample."),11,UI.Muted));
+        var settings=SystemDisplaySettingsWindow.SettingsButton(()=>(app.MainWindow as OverlayWindow)?.ShowSystemDisplaySettings(Window.GetWindow(panel)));
+        settings.HorizontalAlignment=HorizontalAlignment.Left;Add(settings);
+        systemDashboard=new();Add(systemDashboard);
+    }
+    private void RefreshSystem()
+    {
+        if(systemDashboard!=null && app.MainWindow is OverlayWindow island) island.RefreshSystemCharts(systemDashboard);
     }
     private void Refresh()=>Refresh(app.CurrentUpdate);
     private void Refresh(RuntimeChange change)
@@ -190,11 +202,7 @@ internal sealed class DetachedPreviewView : IDisposable
                 seek!.Visibility=timelineState==MediaTimelineState.None?Visibility.Collapsed:Visibility.Visible;seek.IsEnabled=timelineState==MediaTimelineState.Seekable;seek.ToolTip=MediaTimelinePolicy.Help(timelineState,media.SeekRejected);ToolTipService.SetShowOnDisabled(seek,true);seek.ShowPosition(timeline.duration>0?timeline.elapsed/timeline.duration:0,media.SeekRevision);
             }
             else if(kind=="notes")SyncNotes();else if(kind=="files")RefreshShelf();else if(kind=="calendar")RenderEvents();
-            else if(kind=="system")
-            {
-                var usage=app.Usage;title!.Text=double.IsFinite(usage.cpu)?$"CPU  {usage.cpu:0}%":Localization.Text("CPU unavailable");progress!.Value=double.IsFinite(usage.cpu)?Math.Clamp(usage.cpu,0,100):0;
-                detail!.Text=usage.total>0?Localization.Format("RAM  {0:0.0} / {1:0.0} GB",usage.used,usage.total):Localization.Text("RAM unavailable");memory!.Value=usage.total>0?Math.Clamp(usage.used/usage.total*100,0,100):0;
-            }
+            else if(kind=="system")RefreshSystem();
         }
         finally{updating=false;}
     }

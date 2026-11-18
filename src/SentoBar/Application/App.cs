@@ -209,7 +209,7 @@ public sealed partial class App : Application
         tick=new DispatcherTimer{Interval=TimeSpan.FromSeconds(1)};
         tick.Tick+=(_,_)=>
         {
-            if(NotificationPolicy.Quiet(Settings,DateTimeOffset.UtcNow) && Notifications.Count>0 && Notifications.Current?.Kind!="preview" && !(Notifications.Current?.Kind=="external" && Settings.ExternalNotificationQuietHours))Notifications.Clear();else Notifications.Tick(DateTimeOffset.UtcNow,overlay.NotificationBusy,Settings.NotificationSeconds);
+            if(NotificationPolicy.Quiet(Settings,DateTimeOffset.UtcNow) && Notifications.Count>0 && Notifications.Current?.Kind is not ("preview" or "test") && !(Notifications.Current?.Kind=="external" && Settings.ExternalNotificationQuietHours))Notifications.Clear();else Notifications.Tick(DateTimeOffset.UtcNow,overlay.NotificationBusy,Settings.NotificationSeconds);
             try{Awake.Tick(DateTimeOffset.UtcNow);}catch(Exception ex){Store.Log(ex);Notify(Localization.Text("Could not update keep awake"),ex.Message);}
             var changed=RuntimeChange.Clock;
             if(++counter%2==0)
@@ -225,7 +225,6 @@ public sealed partial class App : Application
         };
         tick.Start();CheckCountdowns();ScheduleCountdownUpdate();
         if(Store.Warning!=null) Notify(Localization.Text("Settings recovered"),Store.Warning);
-        if(!Array.Exists(e.Args,a=>a=="--background")) Notify(Localization.Text("SentoBar is ready"), Localization.Text("Click the island for your widgets. Right-click the tray icon for settings."));
         InitializeRuntimeRecovery();
         PrivateDiagnostics.SetServiceState(DiagnosticService.Application,DiagnosticServiceState.Ready);
         PrivateDiagnostics.Record(DiagnosticStage.Application,DiagnosticCode.Completed,startupClock.Elapsed);
@@ -284,6 +283,7 @@ public sealed partial class App : Application
         if(changed) SaveSession();
     }
     internal void OpenMixer()=>overlay?.OpenMixer();
+    internal void OpenSystemDisplaySettings(Window owner)=>overlay?.ShowSystemDisplaySettings(owner);
     public void SaveSession() { try { Session.Stopwatch.Checkpoint();Store.Save("session",Session); } catch(Exception ex) { Store.Log(ex);Notify(Localization.Text("Not saved yet"), Localization.Text("Could not save the timer state.")); } ScheduleCountdownUpdate();PublishUpdate(RuntimeChange.Countdown); }
     internal bool SettingsSaveSucceeded {get;private set;}
     internal bool SettingsNeedSave {get;private set;}

@@ -75,6 +75,9 @@ internal static class SettingsThemeDiagnostics
                 check("Window theme switches live to "+theme+" independently of dock color",app.Settings.WindowTheme==theme && app.Settings.Background==dockColor);
                 var text=(SolidColorBrush)window.FindResource("ControlText");var selected=(SolidColorBrush)window.FindResource("SettingsSelected");var ink=(SolidColorBrush)window.FindResource("SettingsSelectedText");
                 check(theme+" selected navigation remains readable",Contrast(selected.Color,ink.Color)>=7);
+                var wakeSwitch=new CheckBox{Content=Localization.Text("Enable wake word on this PC"),Style=(Style)window.FindResource(typeof(CheckBox))};
+                wakeSwitch.Resources["ControlText"]=text;
+                check(theme+" wake switch caption uses the settings text color",wakeSwitch.Foreground is SolidColorBrush captionBrush && captionBrush.Color==text.Color);
                 check(theme+" dropdown backgrounds are opaque",((SolidColorBrush)window.FindResource("PopupFill")).Color.A==255);
                 button.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,0){RoutedEvent=System.Windows.Input.Mouse.MouseEnterEvent});await Task.Delay(250);
                 check(theme+" hovered text retains its original scale",button.RenderTransform.Value.IsIdentity);
@@ -83,6 +86,8 @@ internal static class SettingsThemeDiagnostics
                 check(theme+" visible theme captions use the selected palette",Tree(window).OfType<TextBlock>().Where(t=>t.Text==Localization.Text("Window theme") || t.Text==Localization.Text("Transparency and blur") || t.Text==Localization.Text("Window appearance")).All(t=>t.Foreground is SolidColorBrush color && color.Color==text.Color));
                 Save(window,Path.Combine(directory,"theme-"+theme+".png"));
             }
+            await CheckConnectionStatusContrast(window,app,directory,check);
+            await CheckVoiceToggleContrast(window,app,directory,check);
             foreach(string theme in new[]{"Light","Dark"})
             {
                 app.Settings.WindowTheme=theme;window.ApplyWindowAppearance();
@@ -266,6 +271,64 @@ internal static class SettingsThemeDiagnostics
     }
     private static System.Collections.Generic.IEnumerable<DependencyObject> Tree(DependencyObject node)
     {yield return node;foreach(var child in LogicalTreeHelper.GetChildren(node).OfType<DependencyObject>())foreach(var descendant in Tree(child))yield return descendant;}
+    private static async Task CheckConnectionStatusContrast(SettingsWindow window,App app,string directory,Action<string,bool> check)
+    {
+        window.OpenCategory("AI");
+        var editor=Tree(window).OfType<AssistantProviderSettings>().Single();
+        editor.OpenChatSetup();
+        const BindingFlags fields=BindingFlags.Instance|BindingFlags.NonPublic;
+        var result=typeof(AssistantProviderSettings).GetMethod("ConnectionResult",fields)!;
+        var inline=(TextBlock)typeof(AssistantProviderSettings).GetField("connectionStatus",fields)!.GetValue(editor)!;
+        var footer=(TextBlock)typeof(SettingsWindow).GetField("status",fields)!.GetValue(window)!;
+        foreach(var (name,message,error,success) in new[]{
+            ("success","ChatGPT returned a test reply using your plan.",false,true),
+            ("error","Could not connect to ChatGPT. Try again.",true,false),
+            ("information","Checking a short ChatGPT reply…",false,false)})
+        {
+            string localized=Localization.Text(message);
+            result.Invoke(editor,new object[]{localized,error,success});
+            foreach(string theme in new[]{"Light","Dark"})
+            {
+                app.Settings.WindowTheme=theme;
+                window.ApplyWindowAppearance();
+                await Task.Delay(60);
+                window.UpdateLayout();
+                var canvas=(LinearGradientBrush)window.FindResource("SettingsCanvas");
+                var inlineColor=((SolidColorBrush)inline.Foreground).Color;
+                var footerColor=((SolidColorBrush)footer.Foreground).Color;
+                double inlineRatio=canvas.GradientStops.Min(stop=>Contrast(inlineColor,stop.Color));
+                double footerRatio=canvas.GradientStops.Min(stop=>Contrast(footerColor,stop.Color));
+                check($"{theme} connection {name} text is legible ({inlineRatio:0.00}:1)",inline.IsVisible && inline.Text==localized && inlineRatio>=4.5);
+                check($"{theme} connection {name} footer is legible ({footerRatio:0.00}:1)",footer.IsVisible && footer.Text==localized && footerRatio>=4.5);
+                if(success)Save(window,Path.Combine(directory,theme+"-connection-status.png"));
+            }
+        }
+    }
+
+    private static async Task CheckVoiceToggleContrast(SettingsWindow window,App app,string directory,Action<string,bool> check)
+    {
+        window.OpenCategory("AI");
+        Tree(window).OfType<AssistantProviderSettings>().Single().OpenVoiceChecks();
+        Tree(window).OfType<Expander>().Single(e=>e.Header?.ToString()==Localization.Text("Interrupt spoken replies")).IsExpanded=true;
+        const string name="Let me interrupt Sento while it speaks (use headphones)";
+        var toggle=Tree(window).OfType<CheckBox>().Single(box=>UI.Identity(box)==name);
+        foreach(string theme in new[]{"Light","Dark"})
+        {
+            app.Settings.WindowTheme=theme;
+            window.ApplyWindowAppearance();
+            await Task.Delay(80);
+            toggle.BringIntoView();
+            window.UpdateLayout();
+            var canvas=(LinearGradientBrush)window.FindResource("SettingsCanvas");
+            var color=(toggle.Content as TextBlock)?.Foreground??toggle.Foreground;
+            double ratio=color is SolidColorBrush foreground
+                ?canvas.GradientStops.Min(stop=>Contrast(foreground.Color,stop.Color)):0;
+            check($"{theme} voice interruption caption uses readable theme text ({ratio:0.00}:1)",
+                toggle.IsVisible && ratio>=4.5);
+            Save(window,Path.Combine(directory,theme+"-voice-interruption.png"));
+        }
+    }
+
     internal static double Contrast(Color a,Color b)
     {
         double L(Color c){double F(byte v){double x=v/255d;return x<=.04045?x/12.92:Math.Pow((x+.055)/1.055,2.4);}return .2126*F(c.R)+.7152*F(c.G)+.0722*F(c.B);}

@@ -89,7 +89,14 @@ public sealed partial class OverlayWindow
         assistantPeek.RowDefinitions.Add(new());assistantPeek.RowDefinitions.Add(new(){Height=GridLength.Auto});
         var hero=new Grid();hero.ColumnDefinitions.Add(new(){Width=GridLength.Auto});hero.ColumnDefinitions.Add(new());hero.Children.Add(peekAssistant);
         assistantGreeting.FontWeight=FontWeights.SemiBold;assistantGreeting.TextWrapping=TextWrapping.NoWrap;assistantGreeting.TextTrimming=TextTrimming.CharacterEllipsis;assistantPeekWords.Children.Add(assistantGreeting);assistantCaption.Margin=new(0,5,0,0);assistantCaption.MaxHeight=46;assistantCaption.TextTrimming=TextTrimming.CharacterEllipsis;assistantPeekWords.Children.Add(assistantCaption);Grid.SetColumn(assistantPeekWords,1);hero.Children.Add(assistantPeekWords);assistantPeek.Children.Add(hero);
-        var chat=AssistantWindow.Pill(Localization.Text("Chat here"),()=>OpenAssistant(),true);assistantTalk=AssistantWindow.Pill(Localization.Text("Talk"),()=>{if(app.Assistant.VoiceConnected)_=app.Assistant.EndVoice();else{app.OpenVoice();_=app.Assistant.StartVoice();}});
+        var chat=AssistantWindow.Pill(Localization.Text("Chat here"),()=>OpenAssistant(),true);
+        assistantTalk=AssistantWindow.Pill(Localization.Text("Talk"),()=>
+        {
+            var ai=app.Assistant;
+            if(ai.VoiceActive){_=ai.EndVoice();return;}
+            app.OpenVoice();
+            if(ai.Options.Enabled && ai.Setup.Voice.Configured)_=ai.StartVoice();
+        });
         assistantPeekActions.Children.Add(chat);assistantPeekActions.Children.Add(assistantTalk);Grid.SetRow(assistantPeekActions,1);assistantPeek.Children.Add(assistantPeekActions);InitializeAssistantReply();visuals.Children.Add(assistantPeek);
         assistantHover.Tick+=(_,_)=>{assistantHover.Stop();if(assistantCharacterButton.IsMouseOver && !expanded && !userHidden)PreviewAssistant();};
         assistantReplyDismiss.Tick+=(_,_)=>AssistantReplyTick();
@@ -110,7 +117,9 @@ public sealed partial class OverlayWindow
         if(!AssistantCharacterAvailable && assistantPeeking)CloseAssistant();
         assistantGreeting.Text=app.Assistant.State switch{AssistantState.Listening=>Localization.Text("I'm listening."),AssistantState.Thinking=>Localization.Text("Let me think…"),AssistantState.Speaking=>Localization.Text("Let's talk."),AssistantState.Approval=>Localization.Text("Your call."),AssistantState.Connecting=>Localization.Text("Connecting…"),AssistantState.Error=>Localization.Text("Let's check that."),_=>Localization.Text("Hey, I'm here.")};
         assistantCaption.Text=!app.Assistant.Options.Enabled?Localization.Text("Set up your companion in Settings → AI."):app.Assistant.WakeListening?app.Assistant.WakeStatus:app.Assistant.State==AssistantState.Idle?Localization.Text("Chat or talk, right from your island."):app.Assistant.Status;
-        assistantTalk.Content=app.Assistant.VoiceConnected?Localization.Text("End voice"):Localization.Text("Talk");assistantTalk.IsEnabled=!app.Assistant.Busy;
+        assistantTalk.Content=Localization.Text(app.Assistant.VoiceActive?"End voice":
+            app.Assistant.Options.Enabled && app.Assistant.Setup.Voice.Configured?"Talk":"Voice");
+        assistantTalk.IsEnabled=app.Assistant.VoiceActive || !app.Assistant.Busy;
         var reply=LatestAssistantReply();
         bool fresh=reply!=null && !ReferenceEquals(reply,assistantLastReply);assistantLastReply=reply;
         if(reply!=null && app.Assistant.Options.Enabled && app.Assistant.State is AssistantState.Idle or AssistantState.Listening or AssistantState.Speaking)assistantCaption.Text=reply.Text.Length>180?reply.Text[..180]+"…":reply.Text;

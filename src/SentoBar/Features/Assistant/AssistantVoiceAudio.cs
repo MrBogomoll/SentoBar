@@ -1,29 +1,33 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Threading;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace SentoBar;
 
 /// <summary>Windows default input/output; constructed without opening devices. PCM never leaves memory.</summary>
-internal sealed class AssistantVoiceAudio(string microphoneId="") : IAssistantVoiceAudio
+internal sealed class AssistantVoiceAudio(string microphoneId="",bool localPlayback=false) : IAssistantVoiceAudio
 {
     private readonly object gate = new();
     private WaveInEvent? input;
-    private WaveOutEvent? output;
+    private IWavePlayer? output;
+    private MMDevice? outputDevice;
     private MeteredPcm? pcm;
     private bool disposed;
     public int PlayedMilliseconds => pcm?.PlayedMilliseconds ?? 0;
     public int QueuedMilliseconds => pcm?.QueuedMilliseconds ?? 0;
+    internal int PlaybackLatencyMilliseconds=>localPlayback?160:100;
     public void Start(int inputRate, Action<byte[]> capture, Action<float, bool> level, Action failure)
     {
         lock (gate)
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             if (input != null) throw new InvalidOperationException(Localization.Text("Audio already started."));
-            pcm = new MeteredPcm(value => level(value, true));
-            output = new WaveOutEvent { DeviceNumber = -1, DesiredLatency = 100, NumberOfBuffers = 2 };
+            pcm = new MeteredPcm(value => level(value, true),PlaybackLatencyMilliseconds,localPlayback);
+            output=InitializeOutput(pcm);
             output.PlaybackStopped += (_, e) => { if (e.Exception != null && !Volatile.Read(ref disposed)) ThreadPool.QueueUserWorkItem(_ => failure()); };
-            output.Init(pcm); output.Play();
+            output.Play();
             input = new WaveInEvent { DeviceNumber = AssistantMicrophones.Resolve(microphoneId), WaveFormat = new WaveFormat(inputRate, 16, 1), BufferMilliseconds = 50, NumberOfBuffers = 3 };
             input.DataAvailable += (_, e) =>
             {
@@ -39,6 +43,29 @@ internal sealed class AssistantVoiceAudio(string microphoneId="") : IAssistantVo
             input.StartRecording();
         }
     }
+    private IWavePlayer InitializeOutput(IWaveProvider source)
+    {
+        if(localPlayback)
+        {
+            MMDevice? device=null;
+            WasapiOut? wasapi=null;
+            try
+            {
+                using var endpoints=new MMDeviceEnumerator();
+                device=endpoints.GetDefaultAudioEndpoint(DataFlow.Render,Role.Multimedia);
+                wasapi=new WasapiOut(device,AudioClientShareMode.Shared,true,PlaybackLatencyMilliseconds);
+                wasapi.Init(source);
+                outputDevice=device;
+                return wasapi;
+            }
+            catch(Exception ex) when(ex is COMException or InvalidOperationException or NotSupportedException)
+            {
+                try{wasapi?.Dispose();}finally{device?.Dispose();}
+            }
+        }
+        var waveOut=new WaveOutEvent{DeviceNumber=-1,DesiredLatency=PlaybackLatencyMilliseconds,NumberOfBuffers=2};
+        try{waveOut.Init(source);return waveOut;}catch{waveOut.Dispose();throw;}
+    }
     public bool Append(byte[] bytes)
     { lock (gate) return !disposed && pcm != null && pcm.Append(bytes); }
     public void Clear()
@@ -46,23 +73,24 @@ internal sealed class AssistantVoiceAudio(string microphoneId="") : IAssistantVo
         lock (gate)
         {
             if (disposed) return;
-            // Keep one playback worker alive. Stop/Play here can race the previous
-            // worker's PlaybackStopped event and leave the replacement silent.
-            // Clear generation-buffered PCM; at most the native 100ms tail remains.
+            // Clear queued PCM while keeping the playback worker alive.
             pcm?.Clear();
         }
     }
     public void Dispose()
     {
-        WaveInEvent? mic; WaveOutEvent? speaker;
+        WaveInEvent? mic; IWavePlayer? speaker;MMDevice? device;
         lock (gate)
         {
             if (disposed) return;
-            disposed = true; mic = input; input = null; speaker = output; output = null; pcm?.Clear(); pcm = null;
+            disposed = true; mic = input; input = null; speaker = output; output = null;device=outputDevice;outputDevice=null;pcm?.Clear(); pcm = null;
         }
         try { mic?.StopRecording(); } finally
         {
-            try { mic?.Dispose(); } finally { try { speaker?.Stop(); } finally { speaker?.Dispose(); } }
+            try { mic?.Dispose(); } finally
+            {
+                try { speaker?.Stop(); } finally { try{speaker?.Dispose();}finally{device?.Dispose();} }
+            }
         }
     }
     internal static float Peak(byte[] bytes, int count)
@@ -71,20 +99,21 @@ internal sealed class AssistantVoiceAudio(string microphoneId="") : IAssistantVo
         for (int i = 0; i + 1 < count; i += 2) max = Math.Max(max, Math.Abs((int)(short)(bytes[i] | bytes[i + 1] << 8)));
         return max / 32768f;
     }
-    internal sealed class MeteredPcm(Action<float> level) : IWaveProvider
+    internal sealed class MeteredPcm(Action<float> level,int nativeLatencyMs=100,bool fadeEdges=false) : IWaveProvider
     {
         private readonly object sync = new();
         // Grow with queued audio instead of reserving two minutes for a short reply.
         // The same 120-second limit, ordering, silence fill and overflow contract apply.
         private const int MaximumBytes=24000*2*120;
+        private const int FadeSamples=120;
         private byte[] buffer=Array.Empty<byte>();
         private int head,buffered;
+        private int leadingFade=fadeEdges?FadeSamples:0;
         internal int CapacityBytes {get{lock(sync)return buffer.Length;}}
         private long consumed;
         private int generation;
         public WaveFormat WaveFormat {get;}=new(24000,16,1);
-        // WaveOut can have 100ms pending in native buffers. Report only conservatively heard audio.
-        public int PlayedMilliseconds => Math.Max(0, (int)(Interlocked.Read(ref consumed) / 48) - 100);
+        public int PlayedMilliseconds => Math.Max(0, (int)(Interlocked.Read(ref consumed) / 48) - nativeLatencyMs);
         public int QueuedMilliseconds { get { lock (sync) return buffered / 48; } }
         public bool Append(byte[] bytes)
         {
@@ -109,7 +138,7 @@ internal sealed class AssistantVoiceAudio(string microphoneId="") : IAssistantVo
                 buffered=needed;return true;
             }
         }
-        public void Clear() { lock (sync) { generation++; buffer=Array.Empty<byte>();head=buffered=0;Interlocked.Exchange(ref consumed, 0); } }
+        public void Clear() { lock (sync) { generation++; buffer=Array.Empty<byte>();head=buffered=0;leadingFade=fadeEdges?FadeSamples:0;Interlocked.Exchange(ref consumed, 0); } }
         public int Read(byte[] bytes, int offset, int count)
         {
             int actual, epoch;
@@ -121,6 +150,7 @@ internal sealed class AssistantVoiceAudio(string microphoneId="") : IAssistantVo
                     int first=Math.Min(actual,buffer.Length-head);Buffer.BlockCopy(buffer,head,bytes,offset,first);
                     if(actual>first)Buffer.BlockCopy(buffer,0,bytes,offset+first,actual-first);
                     head=(head+actual)%buffer.Length;buffered-=actual;
+                    if(fadeEdges)FadeQueueEdges(bytes,offset,actual/2);
                 }
                 if(actual<count)Array.Clear(bytes,offset+actual,count-actual);
                 Interlocked.Add(ref consumed,actual);
@@ -131,6 +161,25 @@ internal sealed class AssistantVoiceAudio(string microphoneId="") : IAssistantVo
             float value = peak;
             ThreadPool.QueueUserWorkItem(_ => { if (Volatile.Read(ref generation) == epoch) level(value); });
             return count;
+        }
+        private void FadeQueueEdges(byte[] bytes,int offset,int samples)
+        {
+            // Continuous speech stays unchanged. A temporary empty queue tapers into silence
+            // and the next sample ramps in, avoiding a hard PCM step at either boundary.
+            int begin=Math.Min(samples,leadingFade);
+            for(int i=0;i<begin;i++)Scale(bytes,offset+i*2,FadeSamples-leadingFade+i);
+            leadingFade-=begin;
+            if(buffered>0)return;
+            int end=Math.Min(samples,FadeSamples);
+            for(int i=0;i<end;i++)Scale(bytes,offset+(samples-1-i)*2,i);
+            leadingFade=FadeSamples;
+        }
+        private static void Scale(byte[] bytes,int at,int gain)
+        {
+            int sample=(short)(bytes[at] | bytes[at+1]<<8);
+            int scaled=sample*gain/FadeSamples;
+            bytes[at]=(byte)scaled;
+            bytes[at+1]=(byte)(scaled>>8);
         }
     }
 }

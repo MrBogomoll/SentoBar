@@ -1,0 +1,18 @@
+{
+  "Test microphone with playback": "Проверить микрофон с воспроизведением",
+  "Say a short phrase. The microphone test plays your recording through the Windows default output. The recording stays on this PC and is never saved to a file.": "Скажите короткую фразу. Проверка воспроизведёт запись через устройство вывода Windows по умолчанию. Запись хранится в памяти до конца проверки и никуда не отправляется.",
+  "Transcription sends a short recording to the configured speech service. Play sample speaks a fixed phrase with the saved voice.": "Проверка распознавания отправит короткую запись настроенному речевому сервису. Проверка синтеза озвучит готовую фразу выбранным голосом.",
+  "Preparing the audio check…": "Подготовка к проверке звука…",
+  "Recording for {0} seconds. Say a short phrase.": "Идёт запись ({0} с). Скажите короткую фразу.",
+  "Input level {0}%": "Уровень входа — {0}%",
+  "Playing your recording through the Windows default output. Microphone is off.": "Запись воспроизводится через устройство вывода Windows по умолчанию. Микрофон выключен.",
+  "Recording played. If you heard your phrase, your microphone and Windows sound output work.": "Запись воспроизведена. Если вы услышали свою фразу, микрофон и вывод звука работают.",
+  "No microphone signal detected. Check the selected input, mute switch and Windows input volume.": "Сигнал с микрофона не обнаружен. Проверьте выбранный микрофон, кнопку отключения звука и уровень входа в Windows.",
+  "Could not use the microphone. Check the selected device and microphone access in Windows.": "Не удалось использовать микрофон. Проверьте выбранное устройство и разрешение на доступ к микрофону в Windows.",
+  "The microphone stopped during the test. Reconnect it and try again.": "Микрофон отключился во время проверки. Подключите его снова и повторите проверку.",
+  "The microphone stopped responding. Check the device and try again.": "Микрофон перестал отвечать. Проверьте подключение и повторите проверку.",
+  "Could not play audio through the Windows default output. Check your speakers or headphones.": "Не удалось воспроизвести звук через устройство вывода Windows по умолчанию. Проверьте колонки или наушники.",
+  "The microphone recorded audio, but playback failed. Check your Windows output device and volume.": "Микрофон записал звук, но воспроизведение не удалось. Проверьте устройство вывода и громкость в Windows.",
+  "Audio test cancelled or timed out.": "Проверка звука отменена или время ожидания истекло.",
+  "Audio test failed. Check your Windows sound settings and try again.": "Проверка звука не завершилась. Проверьте параметры звука Windows и повторите проверку."
+}

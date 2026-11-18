@@ -35,8 +35,6 @@ public sealed partial class SettingsWindow
         ["Closed-island brightness indicator"]="Shows brightness changes only on displays supported by Windows.",
         ["Preview new tracks & sessions ending soon"]="Briefly reveals new songs and upcoming timer or focus endings.",
         ["Save text & image history locally"]="Captures new clipboard items on this PC. Turning it off clears saved history.",
-        ["Network transfer rates"]="Shows current upload and download speeds in the Network tab.",
-        ["Storage capacity"]="Shows used and free space for available drives in the Storage tab.",
         ["Processes by memory"]="Lists running processes by RAM usage in the Processes tab.",
         ["24-hour clock"]="Uses 18:30 instead of 6:30 PM.",
         ["Show seconds in Clock"]="Shows seconds in the Clock widget and its mini panel.",

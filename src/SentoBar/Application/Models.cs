@@ -144,6 +144,7 @@ public sealed partial class Settings
     {
         NormalizeLanguageAccessibility();NormalizeHideExceptions();
         NormalizeWindowTheme();
+        SystemDisplay??=new();SystemDisplay.Normalize();
         PanelBackdrop??=new();PanelBackdrop.Normalize();ClosedBackgroundOpacity=Clamp(ClosedBackgroundOpacity,0,1,.95);
         if(Array.IndexOf(SettingsBackdrop.Choices,SettingsMaterial)<0)SettingsMaterial="";
         if(NotificationDelivery is not ("Notch" or "Windows" or "Both" or "Off"))NotificationDelivery="Notch";

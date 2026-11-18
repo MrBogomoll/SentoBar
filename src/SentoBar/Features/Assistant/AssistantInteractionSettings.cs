@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -9,29 +10,64 @@ namespace SentoBar;
 
 internal sealed partial class AssistantProviderSettings
 {
-    private sealed record WakeRecognizerChoice(string Id,string Label){public override string ToString()=>Label;}
+    private sealed record WakeRecognizerChoice(string Id,string Label,bool Available){public override string ToString()=>Label;}
     private FrameworkElement WakeWordSettings()
     {
         var p=new StackPanel();var current=ai.Options.WakeWord;
         var enabled=new CheckBox{Content=Localization.Text("Enable wake word on this PC"),IsChecked=current.Enabled,Margin=new(0,4,0,8)};p.Children.Add(enabled);
-        p.Children.Add(UI.Text(Localization.Text("Say a phrase to open Sento voice and start your selected voice connection. Detection uses an installed Windows speech recognizer, separately from your ASR/TTS models."),11,UI.Muted));
+        p.Children.Add(UI.Text(Localization.Text("Say the phrase on its own to start a voice conversation."),11,UI.Muted));
         var phrase=UI.CaptionInput("Wake phrase",current.Phrase);phrase.MaxLength=64;Label(p,"Wake phrase",phrase);
-        var recognizer=new ComboBox();Label(p,"Windows recognition language",recognizer);UI.LocalizedName(recognizer,"Wake recognition language");
+        var recognizer=new ComboBox();Label(p,"Wake recognition language",recognizer);UI.LocalizedName(recognizer,"Wake recognition language");
+        var languageHint=UI.Text("",12,UI.Muted);languageHint.Margin=new(0,6,0,0);p.Children.Add(languageHint);
         var feedback=UI.Text("",11,UI.Muted);feedback.Margin=new(0,8,0,8);
+        System.Speech.Recognition.RecognizerInfo[] installed=[];
+        var threshold=new Slider{Minimum=.55,Maximum=.95,TickFrequency=.01,IsSnapToTickEnabled=true,Value=Math.Clamp(current.Confidence,.55,.95)};
+        void UpdateLanguageHint()
+        {
+            if(recognizer.SelectedItem is not WakeRecognizerChoice selected)return;
+            string selection=AssistantWakeWord.EffectiveSelection(selected.Id,phrase.Text);
+            bool windows=AssistantWakeWord.ResolveRecognizerId(selection,installed.Select(r=>(r.Id,r.Culture.Name)))!=null;
+            bool local=!windows && selection is ("" or AssistantWakeWord.RussianRecognizerSelection) &&
+                ai.CanUseLocalWake(selection==AssistantWakeWord.RussianRecognizerSelection?"ru":ai.Options.LocalVoice.SpeechLanguage);
+            threshold.IsEnabled=windows;
+            languageHint.Text=local?Localization.Text("Your installed Whisper model listens on the CPU while wake listening is on."):
+                windows?Localization.Text("Windows listens locally for this phrase."):AssistantWakeWord.MissingRecognizerMessage(selection);
+            languageHint.Visibility=languageHint.Text.Length>0?Visibility.Visible:Visibility.Collapsed;
+        }
+        phrase.TextChanged+=(_,_)=>UpdateLanguageHint();
+        recognizer.SelectionChanged+=(_,_)=>UpdateLanguageHint();
         void Languages()
         {
             string selected=(recognizer.SelectedItem as WakeRecognizerChoice)?.Id??current.RecognizerId;
-            try{var installed=AssistantWakeWord.Recognizers();recognizer.ItemsSource=new[]{new WakeRecognizerChoice("",Localization.Text("Automatic · prefer English"))}.Concat(installed.Select(r=>new WakeRecognizerChoice(r.Id,r.Description+" · "+r.Culture.DisplayName))).ToArray();recognizer.SelectedItem=recognizer.Items.Cast<WakeRecognizerChoice>().FirstOrDefault(r=>r.Id==selected)??recognizer.Items[0];if(installed.Length==0)feedback.Text=Localization.Text("No Windows speech recognizer found. Install a Speech language in Windows settings, then refresh.");}
-            catch{feedback.Text=Localization.Text("Windows speech recognizers could not be listed. Check installed speech languages and microphone permissions.");}
+            installed=[];
+            try{installed=AssistantWakeWord.Recognizers();}
+            catch(InvalidOperationException ex){feedback.Text=ex.Message;}
+            const string russian=AssistantWakeWord.RussianRecognizerSelection;
+            bool russianAvailable=AssistantWakeWord.ResolveRecognizerId(russian,installed.Select(r=>(r.Id,r.Culture.Name)))!=null;
+            var choices=new List<WakeRecognizerChoice>
+            {
+                new("",Localization.Text("Automatic"),installed.Length>0),
+                new(russian,Localization.Text("Russian wake recognition"),russianAvailable)
+            };
+            choices.AddRange(installed.Select(r=>new WakeRecognizerChoice(r.Id,r.Description+" · "+r.Culture.DisplayName,true)));
+            var selectedChoice=choices.FirstOrDefault(r=>r.Id==selected);
+            if(selectedChoice==null)
+            {
+                selectedChoice=new(selected,Localization.Text("Previously selected recognizer · unavailable"),false);
+                choices.Add(selectedChoice);
+            }
+            recognizer.ItemsSource=choices;
+            recognizer.SelectedItem=selectedChoice;
+            UpdateLanguageHint();
         }
-        var languageActions=new WrapPanel();languageActions.Children.Add(AssistantWindow.Pill("Refresh recognizers",Languages));languageActions.Children.Add(AssistantWindow.Pill("Windows speech settings",()=>{try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:speech"){UseShellExecute=true});}catch{feedback.Text=Localization.Text("Open Windows Settings → Time & language → Speech.");}}));p.Children.Add(languageActions);
-        var threshold=new Slider{Minimum=.55,Maximum=.95,TickFrequency=.01,IsSnapToTickEnabled=true,Value=Math.Clamp(current.Confidence,.55,.95)};var sensitivity=UI.Text("",11,UI.Muted);void ThresholdLabel()=>sensitivity.Text=Localization.Text("Activation confidence · ")+Math.Round(threshold.Value*100)+"%";ThresholdLabel();threshold.ValueChanged+=(_,_)=>ThresholdLabel();sensitivity.Margin=new(0,10,0,4);p.Children.Add(sensitivity);p.Children.Add(threshold);UI.LocalizedName(threshold,"Wake word activation confidence");p.Children.Add(UI.Text(Localization.Text("Higher confidence reduces accidental activation. If your phrase is missed, lower it or try a phrase suited to the selected Windows language."),10,UI.Muted));
-        var actions=new WrapPanel{Margin=new(0,8,0,0)};actions.Children.Add(AssistantWindow.Pill("Save & apply wake word",()=>{try{ai.SaveWakeWord(new(){Enabled=enabled.IsChecked==true,Phrase=phrase.Text,RecognizerId=(recognizer.SelectedItem as WakeRecognizerChoice)?.Id??"",Confidence=threshold.Value});feedback.Text=ai.WakeStatus;Feedback(Localization.Text("Wake word saved · ")+(ai.Options.WakeWord.Enabled?Localization.Text("On"):Localization.Text("Off"))+". "+ai.WakeStatus);}catch(Exception ex){feedback.Text=ex.Message;Feedback(Localization.Text("Wake word not saved · ")+ex.Message,true);}},true));
+        var languageActions=new WrapPanel();languageActions.Children.Add(AssistantWindow.Pill("Refresh recognizers",Languages));languageActions.Children.Add(AssistantWindow.Pill("Windows language options",()=>{try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:regionlanguage"){UseShellExecute=true});}catch{feedback.Text=Localization.Text("Open Windows Settings → Time & language → Language & region.");}}));p.Children.Add(languageActions);
+        var sensitivity=UI.Text("",11,UI.Muted);void ThresholdLabel()=>sensitivity.Text=Localization.Text("Activation confidence · ")+Math.Round(threshold.Value*100)+"%";ThresholdLabel();threshold.ValueChanged+=(_,_)=>ThresholdLabel();sensitivity.Margin=new(0,10,0,4);p.Children.Add(sensitivity);p.Children.Add(threshold);UI.LocalizedName(threshold,"Wake word activation confidence");p.Children.Add(UI.Text(Localization.Text("This threshold applies to the Windows recognizer."),10,UI.Muted));
+        var actions=new WrapPanel{Margin=new(0,8,0,0)};actions.Children.Add(AssistantWindow.Pill("Save & apply wake word",()=>{try{ai.SaveWakeWord(new(){Enabled=enabled.IsChecked==true,Phrase=phrase.Text,RecognizerId=(recognizer.SelectedItem as WakeRecognizerChoice)?.Id??"",Confidence=threshold.Value});feedback.Text="";Feedback(Localization.Text("Wake phrase saved."));}catch(Exception ex){feedback.Text=ex.Message;Feedback(Localization.Text("Wake word not saved · ")+ex.Message,true);}},true));
         var pause=AssistantWindow.Pill("Resume wake word",ai.ToggleWakeListening);actions.Children.Add(pause);p.Children.Add(actions);p.Children.Add(feedback);
         var live=UI.Text("",11,UI.Muted);p.Children.Add(live);
         void Refresh(){live.Text=ai.WakeStatus;pause.Content=ai.WakeArmed?Localization.Text("Pause wake word"):Localization.Text("Resume wake word");pause.IsEnabled=ai.Options.Enabled && ai.Options.WakeWord.Enabled;}
         bool subscribed=false;p.Loaded+=(_,_)=>{if(!subscribed){ai.Changed+=Refresh;subscribed=true;}Refresh();};p.Unloaded+=(_,_)=>{if(subscribed){ai.Changed-=Refresh;subscribed=false;}};
-        p.Children.Add(UI.Text(Localization.Text("Enabling this keeps the default microphone listening locally while SentoBar runs. After activation, voice uses your chosen provider. End conversation returns to wake listening when enabled. Stop, Hide, screen lock and sleep pause it; resume from Options or the tray. Wake word is off by default."),10,UI.Muted));Languages();Refresh();
+        p.Children.Add(UI.Text(Localization.Text("To stop wake listening, choose Stop all microphones in the tray menu."),10,UI.Muted));Languages();Refresh();
         var expander=new Expander{Header=Localization.Text("Wake word · hands-free voice"),Content=p,Margin=new(0,12,0,14)};UI.LocalizedName(expander,"Wake word settings");return expander;
     }
     private FrameworkElement WidgetNavigationSettings()

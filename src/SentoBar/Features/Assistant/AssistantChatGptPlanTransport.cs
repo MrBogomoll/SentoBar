@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,23 +18,36 @@ internal sealed partial class AssistantTransport
     private async Task<AssistantReply> CompleteWithChatGptPlan(AssistantProvider provider,string? access,
         IReadOnlyList<AssistantMessage> messages,CancellationToken cancellationToken)
     {
+        if(messages.Any(m=>m.Role=="tool" || m.Calls is {Count:>0} || m.ImageDataUrl!=null ||
+            m.Role!="user" && m.Attachments is {Count:>0}))
+            throw new InvalidOperationException(Localization.Text("ChatGPT plan chat accepts text and images attached by you."));
         ValidateInput(provider,messages,Array.Empty<AssistantTool>());
         if(string.IsNullOrEmpty(access) || access.Length>32000 || access.Any(char.IsControl))
             throw ChatGptPlanError(HttpStatusCode.Unauthorized);
-        if(messages.Any(m=>m.Role=="tool" || m.Calls is {Count:>0} || m.Attachments is {Count:>0} || m.ImageDataUrl!=null))
-            throw new InvalidOperationException(Localization.Text("ChatGPT plan chat currently supports text only."));
+
+        object Content(AssistantMessage message)
+        {
+            if(message.Attachments is not {Count:>0} attachments)return message.Text;
+            var parts=new JsonArray(Text("input_text",message.Text));
+            foreach(var file in attachments)
+                parts.Add(new JsonObject{["type"]="input_image",["image_url"]=file.Source,["detail"]="auto"});
+            return parts;
+        }
+        bool hasImages=messages.Any(m=>m.Attachments is {Count:>0});
 
         // The subscription endpoint takes streamed, stateless requests with no paid-API fallback.
         var body=new
         {
             model=provider.Model,
             instructions=string.Join("\n",messages.Where(m=>m.Role=="system").Select(m=>m.Text)),
-            input=messages.Where(m=>m.Role is "user" or "assistant").Select(m=>new{role=m.Role,content=m.Text}),
+            input=messages.Where(m=>m.Role is "user" or "assistant").Select(m=>new{role=m.Role,content=Content(m)}),
             store=false,
             stream=true
         };
+        var payload=JsonSerializer.SerializeToUtf8Bytes(body);
+        if(payload.Length>MaximumBodyBytes)throw new InvalidOperationException(Localization.Text("The assistant request is too large. Reduce the conversation or image size."));
         using var request=new HttpRequestMessage(HttpMethod.Post,ChatGptPlanSession.ApiBase+"responses"){
-            Content=new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body))};
+            Content=new ByteArrayContent(payload)};
         request.Content.Headers.ContentType=new MediaTypeHeaderValue("application/json");
         request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",access);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
@@ -42,8 +56,13 @@ internal sealed partial class AssistantTransport
         try
         {
             using var response=await client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,deadline.Token).ConfigureAwait(false);
+            if(hasImages && (int)response.StatusCode is 400 or 413 or 415 or 422)
+                throw new IOException(Localization.Text("ChatGPT rejected the message with images. Try a smaller image or another model."));
             if(!response.IsSuccessStatusCode)throw ChatGptPlanError(response.StatusCode);
-            if(!string.Equals(response.Content.Headers.ContentType?.MediaType,"text/event-stream",StringComparison.OrdinalIgnoreCase))
+            // A plan response can omit Content-Type. The SSE parser still requires
+            // framed events and a response.completed event before accepting the reply.
+            if(response.Content.Headers.ContentType is {} contentType &&
+                !string.Equals(contentType.MediaType,"text/event-stream",StringComparison.OrdinalIgnoreCase))
                 throw new IOException(Localization.Text("ChatGPT returned an invalid reply stream."));
 
             var answer=new StringBuilder();

@@ -32,7 +32,7 @@ internal sealed partial class AssistantProviderSettings
     private void BuildSetupNavigation(StackPanel page)
     {
         var tabs=new WrapPanel{Margin=new(0,0,0,16)};
-        foreach(var item in new[]{("Overview","nav-launch"),("Chat","chat"),("Voice","mic"),("Hermes","link"),("Advanced","settings")})
+        foreach(var item in new[]{("Overview","nav-launch"),("Chat","chat"),("Voice","mic"),("Personalization","notes"),("Hermes","link"),("Advanced","settings")})
         {
             string section=item.Item1;var button=AssistantControls.Action(section=="Overview"?Localization.Text("Get started"):section=="Advanced"?"More":section,item.Item2,()=>SelectSetupSection(section));
             button.Margin=new(0,0,4,4);setupTabs[section]=button;tabs.Children.Add(button);setupPages[section]=new StackPanel();

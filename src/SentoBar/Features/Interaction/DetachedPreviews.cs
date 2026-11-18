@@ -46,13 +46,14 @@ public sealed class DetachedPreviewManager : IDisposable
     private bool disposed;
     public DetachedPreviewManager(App app,Action<string> openMainPage){this.app=app;openMain=openMainPage;}
     internal static string NormalizeKind(string kind)=>kind.ToLowerInvariant() switch {"music"=>"media","shelf"=>"files","note"=>"notes",var value=>value};
+    internal static bool Supports(string kind)=>kind is "stopwatch" or "media" or "timer" or "focus" or "calendar" or "notes" or "files" or "system";
     public bool CanOpen(string kind)
     {
         kind=NormalizeKind(kind);
-        if(disposed || !app.Settings.DetachablePreviews || kind is "calendar" or "notes" or "files" && !HoverPagePolicy.Available(app.Settings,kind))return false;
-        string widget=kind;
-        return kind is "stopwatch" or "media" or "timer" or "focus" or "calendar" or "notes" or "files" or "system"
-            && (app.Settings.HoverViews.Any(v=>v.Id==kind && v.Enabled) || app.Settings.Widgets.Any(w=>w.Id==widget && w.Enabled) || kind=="media" && app.Settings.Widgets.Any(w=>w.Id=="volume" && w.Enabled));
+        if(disposed || !app.Settings.DetachablePreviews || !Supports(kind) ||
+            kind is "calendar" or "notes" or "files" && !HoverPagePolicy.Available(app.Settings,kind))return false;
+        return app.Settings.HoverViews.Any(v=>v.Id==kind && v.Enabled) || app.Settings.Widgets.Any(w=>w.Id==kind && w.Enabled)
+            || kind=="media" && app.Settings.Widgets.Any(w=>w.Id=="volume" && w.Enabled);
     }
     public void Open(string kind)=>OpenCore(kind,null,false);
     public void OpenAt(string kind,Point screenPixels,bool drag)=>OpenCore(kind,screenPixels,drag);

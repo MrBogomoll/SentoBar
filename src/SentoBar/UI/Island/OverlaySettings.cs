@@ -11,6 +11,7 @@ internal readonly record struct OverlaySettingsState(int Content,int Reflow,int 
     internal static OverlaySettingsState Capture(Settings s)
     {
         var content=new HashCode();content.Add(s.CompactLayout);content.Add(s.PanelNavigationStyle);content.Add(s.LaunchStyle);content.Add(s.LiveActivity);content.Add(s.MonitorNetwork);content.Add(s.MonitorStorage);content.Add(s.MonitorProcesses);
+        content.Add(s.SystemDisplay.Network??s.MonitorNetwork);content.Add(s.SystemDisplay.Storage??s.MonitorStorage);
         foreach(var widget in s.Widgets){content.Add(widget.Id);content.Add(widget.Enabled);}foreach(var tool in s.Tools){content.Add(tool.Id);content.Add(tool.Enabled);}foreach(var shortcut in s.Shortcuts){content.Add(shortcut.Name);content.Add(shortcut.Target);content.Add(shortcut.AppId);}
         int reflow=HashCode.Combine(s.PanelWidth,s.PanelPadding,s.PanelScale,s.SectionGap);
         int geometry=HashCode.Combine(HashCode.Combine(s.Width,s.Height,s.Radius,s.Preset,s.Horizontal,s.Top,s.Monitor),s.PanelMaxHeight,s.HoverWidth,s.HoverHeight,s.DisplayMode,HashCode.Combine(s.PanelAutoHeight,s.DockEdge,s.DockVertical,s.DockInset));
@@ -86,6 +87,7 @@ public sealed partial class OverlayWindow
         ApplyDockOpacity(!expanded && !peeking);surface.Fill=UI.Brush(s.Background);surface.GlassStyle=s.GlassStyle;surface.SetMaterial(s.Background,s.GlassStrength);surface.Notch=s.UsesTopNotch;surface.Radius=s.Radius;
         hoverDelay.Interval=TimeSpan.FromMilliseconds(s.HoverDelayMs);detailDelay.Interval=TimeSpan.FromMilliseconds(s.HoverDetailDelayMs);
         ApplyHeadingTypography(body);ApplyMediaTypography(title,s.BoldMediaTitle);
+        RefreshExpandedDetachButtons();
         foreach(var tab in compactTabs)StyleCategory(tab.Value,tab.Key,tab.Key==(activePage=="mixer"?"media":activePage));
         if(previous.Geometry!=next.Geometry || previous.Reflow!=next.Reflow)
         {

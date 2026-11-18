@@ -70,7 +70,10 @@ public sealed partial class SettingsWindow
     }
     private void SystemSettings()
     {
-        var s=app.Settings;page.Children.Add(Section("Monitor details",Check("Network transfer rates",s.MonitorNetwork,v=>s.MonitorNetwork=v),Check("Storage capacity",s.MonitorStorage,v=>s.MonitorStorage=v),Check("Processes by memory",s.MonitorProcesses,v=>s.MonitorProcesses=v),UI.Caption("Overview shows CPU, memory and uptime. Switch tabs for network, storage or processes. Sampling stops when Status is hidden.",11,UI.Muted)));
+        var s=app.Settings;
+        page.Children.Add(Section("Monitor details",
+            UI.CaptionButton("System display settings",()=>app.OpenSystemDisplaySettings(this)),
+            Check("Processes by memory",s.MonitorProcesses,v=>s.MonitorProcesses=v)));
         page.Children.Add(Section("Clock",Check("24-hour clock",s.Clock24Hour,v=>s.Clock24Hour=v),Check("Show seconds in Clock",s.ClockSeconds,v=>s.ClockSeconds=v),Check("Show date",s.ShowDate,v=>s.ShowDate=v)));
     }
     private void HoverControls()

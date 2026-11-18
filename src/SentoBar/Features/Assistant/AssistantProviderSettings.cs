@@ -14,7 +14,7 @@ internal sealed partial class AssistantProviderSettings : UserControl
     private readonly ComboBox list=new(),preset=new(){ItemsSource=AssistantProviderCatalog.Presets,SelectedIndex=0},voiceProvider=new(),chatProvider=new();
     private readonly ComboBox protocol=new(){ItemsSource=new[]{"ChatCompletions","Responses","Anthropic","Gemini"}};
     private readonly ComboBox realtimeProtocol=new(){ItemsSource=AssistantVoiceSession.Protocols};
-    private readonly TextBox name=UI.CaptionInput("Provider name",""),url=UI.CaptionInput("API base URL",""),realtimeUrl=UI.CaptionInput("Realtime WebSocket URL",""),voiceName=UI.CaptionInput("Voice name",""),instructions=UI.CaptionInput("Assistant instructions","");
+    private readonly TextBox name=UI.CaptionInput("Provider name",""),url=UI.CaptionInput("API base URL",""),realtimeUrl=UI.CaptionInput("Realtime WebSocket URL",""),voiceName=UI.CaptionInput("Voice name","");
     private readonly PasswordBox key=new(){MaxLength=2000};
     private readonly TextBlock status=UI.Text("",11,UI.Muted),keyStatus=UI.Text("",11,UI.Muted);
     private readonly TextBlock hermesHelp=UI.Text(Localization.Text("Connect your own Hermes API server. Its tools, skills and memory stay in Hermes. Sento handles chat, voice and the sharing source you select. Use Connect Hermes for the setup guide."),11,UI.Muted);
@@ -22,8 +22,13 @@ internal sealed partial class AssistantProviderSettings : UserControl
     private readonly Button editConnection;
     private readonly CheckBox vision,imageReplies;
     private readonly TextBlock capabilityStatus=UI.Text("",11,UI.Muted);
-    internal event Action<string,bool>? FeedbackChanged;
-    private void Feedback(string text,bool error=false){status.Foreground=error?UI.Brush("#F0B8B2"):UI.Muted;Accessibility.Announce(status,text);FeedbackChanged?.Invoke(text,error);}
+    internal event Action<string,bool,bool>? FeedbackChanged;
+    private void Feedback(string text,bool error=false,bool success=false)
+    {
+        UI.SetStatusForeground(status,error,success);
+        Accessibility.Announce(status,text);
+        FeedbackChanged?.Invoke(text,error,success);
+    }
     private bool syncing,imageInput,imageOutput;
     private readonly Expander connectionEditor=new(){Header=Localization.Text("Edit connection details"),IsExpanded=false,Margin=new(0,14,0,8)};
     internal AssistantProviderSettings(App app,bool embedded=true)
@@ -60,7 +65,7 @@ Label(providerLibrary,"Saved connection to edit",list);chatPage.Children.Add(new
 
         BuildVoiceWorkspace(voicePage);
         advancedPage.Children.Add(WidgetNavigationSettings());
-        var prompt=new StackPanel();Label(prompt,"Assistant instructions",instructions);instructions.AcceptsReturn=true;instructions.TextWrapping=TextWrapping.Wrap;instructions.Height=92;instructions.MaxLength=8000;instructions.Text=ai.Options.Instructions;prompt.Children.Add(AssistantWindow.Pill("Save instructions",()=>{ai.Options.Instructions=instructions.Text;SaveConfiguration(Localization.Text("Assistant instructions"));}));advancedPage.Children.Add(new Expander{Header=Localization.Text("Assistant instructions"),Content=prompt,Margin=new(0,14,0,8)});
+        BuildPersonalization(setupPages["Personalization"]);
         status.Margin=new(0,12,0,0);page.Children.Add(status);
         page.Children.Add(UI.Text(Localization.Text("You choose when to use the microphone or share your screen. Hermes manages its own tools and permissions."),11,UI.Muted));
         Content=page;
@@ -71,7 +76,7 @@ Label(providerLibrary,"Saved connection to edit",list);chatPage.Children.Add(new
     {if(control is ComboBox combo && !combo.IsEditable)UI.LocalizeOptions(combo);var label=UI.Caption(title,13,UI.Muted);label.Margin=new(0,12,0,5);page.Children.Add(label);if(control is Control c){c.MinHeight=40;if(System.Windows.Automation.AutomationProperties.GetName(c).Length==0)UI.LocalizedName(c,title);}page.Children.Add(control);}
     private AssistantProvider? editorProvider;
     private AssistantProvider? Selected=>editorProvider;
-    private void RefreshEnabled(){RefreshSetupOverview();enable.Content=ai.Options.Enabled?Localization.Text("AI companion on"):Localization.Text("Enable AI companion");if(speechEnable!=null)speechEnable.Content=enable.Content;}
+    private void RefreshEnabled(){RefreshSetupOverview();enable.Content=ai.Options.Enabled?Localization.Text("AI companion on"):Localization.Text("Enable AI companion");if(speechEnable!=null)speechEnable.Visibility=ai.Options.Enabled?Visibility.Collapsed:Visibility.Visible;}
     private void RefreshCapabilities()
     {
         vision.IsChecked=imageInput;vision.Content=Localization.Text("Image input · ")+(imageInput?Localization.Text("On"):Localization.Text("Off"));
@@ -87,12 +92,12 @@ Label(providerLibrary,"Saved connection to edit",list);chatPage.Children.Add(new
     }
     private void LoadSelected(bool keepRequest=false)
     {
-        if(!keepRequest)CancelProviderRequest();imageCheckStatus.Text=Localization.Text("Image support: not tested for this selected connection.");loadingProvider=true;editorProvider=list.SelectedItem as AssistantProvider;draftPending=false;connectionStatus.Text=Localization.Text("Not tested yet.");model.ItemsSource=null;realtimeModel.ItemsSource=null;var selected=Selected;key.Clear();connectionEditor.Visibility=selected==null || selected.UsesChatGptPlan?Visibility.Collapsed:Visibility.Visible;
+        if(!keepRequest)CancelProviderRequest();imageCheckStatus.Text=Localization.Text("Image support: not tested for this selected connection.");loadingProvider=true;editorProvider=list.SelectedItem as AssistantProvider;draftPending=false;connectionStatus.Text=Localization.Text("Not tested yet.");UI.SetStatusForeground(connectionStatus);model.ItemsSource=null;realtimeModel.ItemsSource=null;var selected=Selected;key.Clear();connectionEditor.Visibility=selected==null || selected.UsesChatGptPlan?Visibility.Collapsed:Visibility.Visible;
         editConnection.Visibility=connectionEditor.Visibility;
         ResetChatGptPlanPicker(selected);
         list.IsEnabled=chatProvider.IsEnabled=voiceProvider.IsEnabled=ai.Options.Providers.Count>0;
         hermesHelp.Visibility=selected?.Backend=="Hermes"?Visibility.Visible:Visibility.Collapsed;
-        if(selected==null){loadingProvider=false;status.Text=Localization.Text("Choose a preset and Add provider to get started.");keyStatus.Text="";RefreshCapabilities();return;}
+        if(selected==null){loadingProvider=false;status.Text=Localization.Text("Choose a preset and Add provider to get started.");UI.SetStatusForeground(status);keyStatus.Text="";RefreshCapabilities();return;}
         name.Text=selected.Name;url.Text=selected.BaseUrl;model.Text=selected.Model;protocol.SelectedItem=selected.Protocol;realtimeProtocol.SelectedItem=selected.RealtimeProtocol;realtimeUrl.Text=selected.RealtimeUrl;realtimeModel.Text=selected.RealtimeModel;voiceName.Text=selected.Voice;key.Clear();imageInput=selected.Vision;imageOutput=selected.ImageOutput;RefreshCapabilities();
         try{keyStatus.Text=ai.Keys.Exists(selected.Id)?Localization.Text("A key is saved for this Windows user. Leave blank to keep it."):Localization.Text("No key saved.");}catch{keyStatus.Text=Localization.Text("Windows credential storage is unavailable.");}
         connectionEditor.IsExpanded=selected.BaseUrl.Length==0 || selected.Model.Length==0 && selected.RealtimeModel.Length==0;loadingProvider=false;RefreshDraftFeedback();

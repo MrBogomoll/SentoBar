@@ -273,19 +273,83 @@ public sealed partial class OverlayWindow
 internal sealed class WeatherGlance : UserControl
 {
     private readonly App app;
-    private readonly Grid scene=new();
-    private readonly TextBlock temperature=UI.Text("—°",34),detail=UI.Text(Localization.Text("Choose a city in Weather"),11,UI.Muted);
-    private readonly WeatherArtwork art=new(){Width=84,Height=82,DecorativeMotion=false};
+    private static readonly GridLength ArtworkWidth=new(1,GridUnitType.Star);
+    private readonly WeatherSky sky=new(){Visibility=Visibility.Collapsed};
+    private readonly WeatherArtwork art=new(){Width=108,Height=90,DecorativeMotion=false};
+    private readonly Viewbox temperatureBox,artBox;
+    private readonly ColumnDefinition artColumn=new(){Width=new GridLength(0),MaxWidth=96};
+    private readonly Grid readings=new(){Margin=new(16,10,16,10)};
+    private readonly TextBlock title=UI.Heading("",13,UI.Brush("#DBE7F4")),temperature=UI.Text("",36,UI.Brush("#F2F5FA"));
+    private readonly TextBlock detail=UI.Text("",12,UI.Brush("#C6D5E3")),empty=UI.Text("",12,UI.Brush("#C6D5E3"));
     private System.Threading.CancellationTokenSource? lifetime;
     private WeatherSnapshot? shown;
     private DateTimeOffset shownAt;
-    private bool busy;
+    private bool busy,compact;
     internal WeatherGlance(App app)
     {
-        this.app=app;var content=new Grid{VerticalAlignment=VerticalAlignment.Top};content.ColumnDefinitions.Add(new());content.ColumnDefinitions.Add(new(){Width=new GridLength(90)});var info=new StackPanel();info.Children.Add(UI.Heading(Localization.Text("Weather"),13));info.Children.Add(temperature);info.Children.Add(detail);content.Children.Add(info);Grid.SetColumn(art,1);content.Children.Add(art);scene.Children.Add(content);Content=scene;
+        this.app=app;
+        var scene=new Grid();
+        scene.Children.Add(new Border{Background=UI.Brush("#182535"),CornerRadius=new(16)});
+        scene.Children.Add(sky);
+        scene.Children.Add(readings);
+        Content=scene;
+
+        readings.RowDefinitions.Add(new(){Height=GridLength.Auto});
+        readings.RowDefinitions.Add(new());
+        readings.RowDefinitions.Add(new(){Height=GridLength.Auto});
+        readings.ColumnDefinitions.Add(new(){Width=new GridLength(3,GridUnitType.Star)});
+        readings.ColumnDefinitions.Add(artColumn);
+        title.TextWrapping=TextWrapping.NoWrap;
+        title.TextTrimming=TextTrimming.CharacterEllipsis;
+        readings.Children.Add(title);
+
+        temperature.FontWeight=FontWeights.Light;
+        temperature.TextWrapping=TextWrapping.NoWrap;
+        temperatureBox=new Viewbox{Child=temperature,StretchDirection=StretchDirection.DownOnly,HorizontalAlignment=HorizontalAlignment.Left};
+        Grid.SetRow(temperatureBox,1);
+        readings.Children.Add(temperatureBox);
+        Grid.SetRow(empty,1);
+        readings.Children.Add(empty);
+
+        artBox=new Viewbox{Child=art,StretchDirection=StretchDirection.DownOnly,HorizontalAlignment=HorizontalAlignment.Right};
+        Grid.SetColumn(artBox,1);
+        Grid.SetRowSpan(artBox,2);
+        readings.Children.Add(artBox);
+
+        detail.Margin=new(0,3,0,0);
+        Grid.SetColumnSpan(detail,2);
+        Grid.SetRow(detail,2);
+        readings.Children.Add(detail);
+        ShowPlaceholder("Choose a city in Weather");
+
         Loaded+=(_,_)=>{lifetime??=new();app.Updated-=Update;app.SettingsChanged-=Changed;app.Updated+=Update;app.SettingsChanged+=Changed;Watch(IsVisible);Changed();};
         Unloaded+=(_,_)=>{Watch(false);app.Updated-=Update;app.SettingsChanged-=Changed;lifetime?.Cancel();lifetime?.Dispose();lifetime=null;};
         IsVisibleChanged+=(_,_)=>{if(!IsLoaded)return;Watch(IsVisible);if(IsVisible)Changed();};
+    }
+    internal void SetCompactLayout(bool value)
+    {
+        if(compact==value)return;
+        compact=value;
+        readings.Margin=new(16,compact?6:10,16,compact?6:10);
+        UpdatePresentation();
+    }
+    private void UpdatePresentation()
+    {
+        bool hasWeather=shown!=null;
+        string city=app.Settings.WeatherCity.Trim();
+        title.Text=compact && shown is {} current?WeatherService.Condition(current.Code):
+            city.Length>0 && WeatherService.Key(app.Settings).Length>0?city:Localization.Text("Weather");
+        temperatureBox.Visibility=artBox.Visibility=hasWeather?Visibility.Visible:Visibility.Collapsed;
+        detail.Visibility=hasWeather && !compact?Visibility.Visible:Visibility.Collapsed;
+        empty.Visibility=hasWeather?Visibility.Collapsed:Visibility.Visible;
+        artColumn.Width=hasWeather?ArtworkWidth:new GridLength(0);
+        sky.Visibility=hasWeather && !Accessibility.HighContrast?Visibility.Visible:Visibility.Collapsed;
+    }
+    private void ShowPlaceholder(string caption)
+    {
+        shown=null;
+        empty.Text=Localization.Text(caption);
+        UpdatePresentation();
     }
     private void Watch(bool on){app.Weather.SetVisible(this,on);app.Weather.Changed-=ServiceChanged;if(on)app.Weather.Changed+=ServiceChanged;}
     private void ServiceChanged()
@@ -299,16 +363,25 @@ internal sealed class WeatherGlance : UserControl
     {
         shownAt=DateTimeOffset.UtcNow;string? stale=WeatherSchedule.StaleLabel(shownAt,data.Updated);
         Motion.Text(temperature,$"{data.Temperature:0}°");Motion.Text(detail,WeatherService.Condition(data.Code)+(stale!=null?" · "+stale:Localization.Format(" · H {0:0}° L {1:0}°",data.High,data.Low)));
-        if(ReferenceEquals(data,shown))return;shown=data;art.Code=data.Code;art.Day=data.Day;art.ReduceMotion=true;art.InvalidateVisual();
-        if(scene.Children[0] is WeatherSky old)scene.Children.Remove(old);scene.Children.Insert(0,new WeatherSky{Code=data.Code,Day=data.Day});
+        if(!ReferenceEquals(data,shown))
+        {
+            shown=data;
+            art.Code=sky.Code=data.Code;
+            art.Day=sky.Day=data.Day;
+            art.InvalidateVisual();
+            sky.InvalidateVisual();
+        }
+        UpdatePresentation();
     }
     private async void Changed()
     {
-        if(!IsVisible || lifetime==null || busy)return;string key=WeatherService.Key(app.Settings);
-        if(shown!=null && shown.Key!=key){shown=null;Motion.Text(temperature,"—°");}
-        if(key.Length==0){Motion.Text(detail,Localization.Text("Choose a city in Weather"));return;}
+        if(!IsVisible || lifetime==null)return;
+        string key=WeatherService.Key(app.Settings);
+        if(key.Length==0){ShowPlaceholder("Choose a city in Weather");return;}
         // Show the saved outlook at once instead of a blank glance while a due refresh runs.
         if(app.Weather.Saved(app.Settings) is {} saved)Show(saved);
+        else if(shown?.Key!=key)ShowPlaceholder("Open Weather for your outlook");
+        if(busy)return;
         busy=true;var token=lifetime.Token;
         try
         {
@@ -316,7 +389,11 @@ internal sealed class WeatherGlance : UserControl
             Show(data);
         }
         catch(System.OperationCanceledException) when(token.IsCancellationRequested){}
-        catch(Exception){if(IsLoaded && shown==null)Motion.Text(detail,Localization.Text("Open Weather for your outlook"));}
-        finally{busy=false;}
+        catch(Exception){if(IsLoaded && shown==null && key==WeatherService.Key(app.Settings))ShowPlaceholder("Open Weather for your outlook");}
+        finally
+        {
+            busy=false;
+            if(IsLoaded && key!=WeatherService.Key(app.Settings))Changed();
+        }
     }
 }

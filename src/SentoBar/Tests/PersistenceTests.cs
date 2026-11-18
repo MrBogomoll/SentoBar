@@ -60,6 +60,22 @@ internal static class PersistenceTests
             File.WriteAllText(path,custom);store.UpgradeAssistantDefaults(store.Load<AssistantOptions>("assistant"));
             Assert(File.ReadAllText(path)==custom);
         });
+        Fixture("Sento personalization retains existing reply instructions and saves separate profile details",root=>
+        {
+            var store=new Store(root);
+            File.WriteAllText(Path.Combine(root,"assistant.json"),JsonSerializer.Serialize(new{Instructions="Prefer short answers."}));
+            var options=store.Load<AssistantOptions>("assistant");
+            Assert(options.AboutUser=="" && options.ReplyPreferences=="Prefer short answers.");
+            options.SetPersonalization("  I work with Windows apps.  ",options.ReplyPreferences);
+            store.Save("assistant",options);
+            var restored=new Store(root).Load<AssistantOptions>("assistant");
+            Assert(restored.AboutUser=="I work with Windows apps." && restored.ReplyPreferences=="Prefer short answers.");
+            var prompt=restored.WithPersonalization("This is a spoken conversation.");
+            Assert(prompt.StartsWith(AssistantOptions.DefaultInstructions) && prompt.Contains("This is a spoken conversation.") &&
+                prompt.Contains("I work with Windows apps.") && prompt.Contains("Prefer short answers."));
+            restored.SetPersonalization(""," ");
+            Assert(restored.ReplyPreferences=="" && restored.WithPersonalization("chat")==AssistantOptions.DefaultInstructions+"\nchat");
+        });
         Fixture("Migration ignores interrupted staging and never merges existing destination",root=>
         {
             string legacy=Path.Combine(root,"legacy"),next=Path.Combine(root,"next");new Store(legacy).Save("settings",new Settings{Width=301});Directory.CreateDirectory(next+".migration-interrupted");File.WriteAllText(Path.Combine(next+".migration-interrupted","settings.json"),"{broken");

@@ -22,7 +22,7 @@ internal sealed partial class AssistantProviderSettings
     {
         var content=new StackPanel();
         content.Children.Add(UI.Heading(Localization.Text("ChatGPT plan chat"),16));
-        var description=UI.Caption("Use your ChatGPT plan for text chat. Manage app limits and extra credits in ChatGPT.",12,UI.Muted);
+        var description=UI.Caption("Use your ChatGPT plan for chat and for replies in local voice mode. Manage app limits and extra credits in ChatGPT.",12,UI.Muted);
         description.Margin=new(0,5,0,8);
         content.Children.Add(description);
         var actions=new WrapPanel();

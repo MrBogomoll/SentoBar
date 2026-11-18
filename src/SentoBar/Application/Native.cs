@@ -22,6 +22,9 @@ internal static class Native
     [DllImport("user32.dll")] internal static extern int GetWindowLong(IntPtr hwnd,int index);
     [DllImport("user32.dll")] internal static extern int SetWindowLong(IntPtr hwnd,int index,int value);
     [DllImport("user32.dll")] internal static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll")] internal static extern IntPtr WindowFromPoint(Point point);
+    [DllImport("user32.dll",EntryPoint="GetAncestor")] private static extern IntPtr GetAncestor(IntPtr hwnd,uint flags);
+    internal static IntPtr RootWindow(IntPtr window)=>GetAncestor(window,2);
     [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)] private struct DisplayMode
     {
         [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string DeviceName;
@@ -130,6 +133,8 @@ internal static class Native
         var b=screen.Bounds;return r.Left<=b.Left && r.Top<=b.Top && r.Right>=b.Right && r.Bottom>=b.Bottom;
     }
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] private static extern int GetClassName(IntPtr hwnd,System.Text.StringBuilder text,int max);
+    internal static string WindowClassName(IntPtr window)
+    {var name=new System.Text.StringBuilder(128);GetClassName(window,name,name.Capacity);return name.ToString();}
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr hwnd,int attribute,ref int value,int size);
     internal static void DarkTitleBar(Window window)
     {var handle=new WindowInteropHelper(window).Handle;int dark=1;DwmSetWindowAttribute(handle,20,ref dark,sizeof(int));}
@@ -139,7 +144,7 @@ internal sealed class OutsideClick : IDisposable
 {
     private IntPtr hook;
     private readonly Native.HookProc callback;
-    public OutsideClick(Window window,Action close,Func<System.Windows.Point,bool>? contains=null,Action? pointerMoved=null,Func<bool>? needsPointerWake=null)
+    public OutsideClick(Window window,Action close,Func<System.Windows.Point,bool>? contains=null,Action? pointerMoved=null,Func<bool>? needsPointerWake=null,Func<Native.Point,bool>? ignoreOutsideClick=null)
     {
         bool pointerQueued=false;
         callback=(code,wparam,lparam)=>
@@ -151,8 +156,9 @@ internal sealed class OutsideClick : IDisposable
                 var p=Marshal.PtrToStructure<Native.Point>(lparam);
                 Native.GetWindowRect(new WindowInteropHelper(window).Handle,out var r);
                 var local=window.PointFromScreen(new System.Windows.Point(p.X,p.Y));
-                if(p.X<r.Left || p.X>=r.Right || p.Y<r.Top || p.Y>=r.Bottom || (contains!=null && !contains(local)))
-                    window.Dispatcher.BeginInvoke(close);
+                if((p.X<r.Left || p.X>=r.Right || p.Y<r.Top || p.Y>=r.Bottom || (contains!=null && !contains(local))) &&
+                    ignoreOutsideClick?.Invoke(p)!=true)
+                    window.Dispatcher.BeginInvoke(new Action(()=>{if(hook!=IntPtr.Zero)close();}));
             }
             return Native.CallNextHookEx(hook,code,wparam,lparam);
         };

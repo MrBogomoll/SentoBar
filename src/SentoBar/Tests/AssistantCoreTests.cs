@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -33,6 +34,65 @@ internal static class AssistantCoreTests
     private static Task Send(AssistantConversation chat,string text="Hello",Func<AssistantCall,CancellationToken,Task<string>>? action=null,CancellationToken token=default)=>chat.Send(Provider,null,"Fixture",text,null,new[]{Tool},action??((_,_)=>Task.FromResult("ok")),token);
     internal static void Run(Action<string,Action> test)
     {
+        test("Assistant chat history saves, reopens and deletes protected conversations",()=>
+        {
+            WithArchive(store=>
+            {
+                var archive=new AssistantChatArchive(store);
+                Assert(archive.ActiveId==null && archive.Summaries.Count==0 && archive.OpenError=="");
+                const string first="Приватная тестовая реплика";
+                var local=new AssistantAttachment("local.png","image/png","data:image/png;base64,AQID");
+                var remote=new AssistantAttachment("remote.png","image/png","https://example.test/token",Origin:"https://example.test",ProviderId:"fixture");
+                Assert(archive.SaveCurrent(new AssistantMessage[]{
+                    new("user",first,"screen-data-fixture",Attachments:new[]{local,remote}),
+                    new("tool","private-tool-fixture",CallId:"private-call"),
+                    new("assistant","Response",Calls:new[]{new AssistantCall("private-call","fixture","private-argument")},
+                        ProtocolItems:new[]{Json("{\"signature\":\"private-protocol-fixture\"}")}),
+                    new AssistantMessage("assistant","Reviewed voice action outcome · hidden"){UiNoticePrefix="Reviewed voice action outcome · "}}));
+                string id=archive.ActiveId!;
+                archive.Write(archive.Snapshot());
+                var loaded=new AssistantChatArchive(store);
+                Assert(loaded.ActiveId==id && loaded.Summaries.Single().Title==first);
+                var messages=loaded.Messages(id)!;
+                Assert(messages.Count==2 && messages[0].ImageDataUrl==null && messages[0].Attachments!.Single()==local
+                    && messages[1].Calls==null && messages[1].ProtocolItems==null);
+                Assert(!System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(store.DirectoryPath,"assistant-chats.protected"))).Contains(first));
+                Assert(loaded.Select(null) && loaded.SaveCurrent(new AssistantMessage[]{new("user","Another chat")}));
+                Assert(loaded.ActiveId!=id && loaded.Summaries.Count==2 && loaded.Select(id) && loaded.Delete(id));
+                loaded.Write(loaded.Snapshot());
+                var deleted=new AssistantChatArchive(store);
+                Assert(deleted.ActiveId==null && deleted.Messages(id)==null && deleted.Summaries.Single().Title=="Another chat");
+            });
+        });
+        test("Assistant chat history preserves unreadable histories",()=>
+        {
+            WithArchive(store=>
+            {
+                string path=Path.Combine(store.DirectoryPath,"assistant-chats.protected");byte[] original=[1,2,3];
+                File.WriteAllBytes(path,original);
+                var archive=new AssistantChatArchive(store);
+                Assert(archive.OpenError.Length>0 && archive.SaveCurrent(new AssistantMessage[]{new("user","New")}));
+                Reject<IOException>(()=>archive.Write(archive.Snapshot()));
+                Assert(File.ReadAllBytes(path).SequenceEqual(original));
+            });
+        });
+        test("Assistant chat history keeps the full display and resumes a saved text context",()=>Task.Run(async()=>
+        {
+            int commits=0;
+            var local=new AssistantAttachment("local.jpg","image/jpeg","data:image/jpeg;base64,AQID");
+            using var chat=new AssistantConversation(new Transport((messages,_) =>
+            {
+                Assert(messages.Any(message=>message.Text=="Earlier question") &&
+                    messages.All(message=>message.Attachments==null && message.ImageDataUrl==null));
+                return Task.FromResult(Done);
+            }),keepTranscript:true);
+            chat.Committed+=()=>commits++;
+            chat.Restore(new AssistantMessage[]{new("user","Earlier question",Attachments:new[]{local}),new("assistant","Earlier reply")});
+            await Send(chat,"New question");
+            Assert(commits==1 && chat.Messages.Count==4 && chat.Messages[0].Attachments!.Single()==local);
+            for(int i=0;i<51;i++)chat.Record("user","Speech "+i);
+            Assert(commits==52 && chat.ContextMessages.Count<49 && chat.Messages.Count==55 && chat.Messages[0].Text=="Earlier question");
+        }).GetAwaiter().GetResult());
         test("Assistant complete tool turn preserves protocol metadata, IDs and fresh screen",()=>Task.Run(async()=>
         {
             int turns=0,actions=0;var metadata=new[]{Json("{\"encrypted_content\":\"opaque-fixture\"}")};
@@ -68,5 +128,11 @@ internal static class AssistantCoreTests
         {var fake=new DesktopBackend{FailBegin=true};using var desktop=new AssistantDesktop(fake);Reject<InvalidOperationException>(()=>desktop.Start(fake.Target.Id,IntPtr.Zero));Assert(fake.Ends==2 && !desktop.Sharing);});
         test("Assistant is available by default with no provider secrets or active wake listening",()=>
         {var options=new AssistantOptions();Assert(options.Enabled && !options.WakeWord.Enabled && options.Providers.Count==0);var keys=new AssistantMemoryKeys();string id=Guid.NewGuid().ToString("N");keys.Write(id,"fixture-secret");options.Providers.Add(new(){Id=id});string json=JsonSerializer.Serialize(options);Assert(!json.Contains("fixture-secret") && keys.Exists(id));keys.Remove(id);Assert(!keys.Exists(id));});
+    }
+    private static void WithArchive(Action<Store> action)
+    {
+        string root=Path.Combine(Path.GetTempPath(),"SentoBar-chat-history-fixture-"+Guid.NewGuid().ToString("N"));
+        try{action(new Store(root));}
+        finally{if(Directory.Exists(root))Directory.Delete(root,true);}
     }
 }

@@ -15,10 +15,12 @@ internal sealed partial class AssistantTransport
 {
     internal static IEnumerable<JsonObject> AttachmentParts(AssistantProvider provider,AssistantAttachment file)
     {
+        if(provider.UsesChatGptPlan && (!file.IsImage || file.Text!=null || file.Frames is {Count:>0}))
+            throw new InvalidOperationException(Localization.Text("ChatGPT plan chat supports image attachments only."));
         if(file.Text!=null){yield return PartText(provider,$"Attached document: {file.Name}\n{file.Note}\n<attachment>\n{file.Text}\n</attachment>");yield break;}
         if(file.IsImage)
         {
-            if(!provider.Vision)throw new InvalidOperationException(Localization.Text("Enable Image input in AI settings for a model that supports images."));
+            if(!provider.Vision && !provider.UsesChatGptPlan)throw new InvalidOperationException(Localization.Text("Enable Image input in AI settings for a model that supports images."));
             yield return PartImage(provider,file.Source);yield break;
         }
         bool video=file.Mime.StartsWith("video/",StringComparison.Ordinal);

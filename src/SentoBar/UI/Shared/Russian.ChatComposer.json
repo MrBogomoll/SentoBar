@@ -1,0 +1,10 @@
+{
+  "Dictate": "Диктовать",
+  "Set up dictation": "Настроить диктовку",
+  "Finish dictation": "Завершить диктовку",
+  "Cancel dictation": "Отменить диктовку",
+  "Attach images": "Прикрепить изображения",
+  "Attach images to Sento": "Прикрепить изображения к сообщению",
+  "Choose, paste or drop images": "Выбрать, вставить или перетащить изображение",
+  "Images|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.tif;*.tiff;*.webp": "Изображения|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.tif;*.tiff;*.webp"
+}

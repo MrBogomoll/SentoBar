@@ -3,15 +3,15 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
 namespace SentoBar;
 internal static class AssistantControls
 {
-    private static FrameworkElement Modes(App app,bool voice)
+    private static void AddModes(Panel row,App app,bool voice)
     {
-        var row=new StackPanel{Orientation=Orientation.Horizontal};
         foreach(var item in new[]{("Chat",false),("Voice",true)})
         {
             bool selected=item.Item2==voice;var button=Action(item.Item1,item.Item2?"mic":"chat",()=>{if(!selected){if(item.Item2)app.OpenVoice();else app.ShowAssistant();}});
@@ -26,7 +26,6 @@ internal static class AssistantControls
             if(button.Content is StackPanel content && content.Children[1] is TextBlock label)label.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;
             System.Windows.Automation.AutomationProperties.SetHelpText(button,selected?Localization.Text("Current mode"):Localization.Text("Switch conversation mode"));row.Children.Add(button);
         }
-        return row;
     }
     internal static Button Action(string text,string icon,Action action,bool primary=false)
     {
@@ -54,34 +53,48 @@ internal static class AssistantControls
     }
     internal static FrameworkElement Connection(App app,out TextBlock description,bool voice=false)
     {
-        var row=new Grid();row.ColumnDefinitions.Add(new(){Width=GridLength.Auto});row.ColumnDefinitions.Add(new());row.ColumnDefinitions.Add(new(){Width=GridLength.Auto});row.Children.Add(Modes(app,voice));
         // Keep connection details in the menu so the footer stays one compact row.
         description=UI.Caption("",11,UI.Muted);description.MaxWidth=260;
         var menu=new ContextMenu{Placement=System.Windows.Controls.Primitives.PlacementMode.Top,MinWidth=230};
         UI.LocalizedName(menu,"Sento options");menu.Items.Add(new MenuItem{Header=description,Focusable=false,IsHitTestVisible=false});menu.Items.Add(new Separator());
         menu.Items.Add(Option(Localization.Text("AI settings"),Localization.Text("Providers & API keys"),"settings",app.ShowAssistantProviders));
+        menu.Items.Add(Option("Personalization","","notes",app.ShowAssistantPersonalization));
         menu.Items.Add(Option(Localization.Text("Voice settings"),Localization.Text("Models & microphone"),"mic",app.ShowVoiceSettings));
         menu.Items.Add(Option(Localization.Text("Connect Hermes"),Localization.Text("Connect or manage your own agent"),"link",app.ShowHermesSettings));
         var wake=Option(Localization.Text("Wake word"),Localization.Text("Pause or resume local wake listening"),"mic",()=>{if(app.Assistant.Options.WakeWord.Enabled)app.Assistant.ToggleWakeListening();else app.ShowVoiceSettings();});menu.Items.Add(new Separator());menu.Items.Add(wake);
         menu.Opened+=(_,_)=>{string label=app.Assistant.Options.WakeWord.Enabled?(app.Assistant.WakeArmed?Localization.Text("Pause wake word"):Localization.Text("Resume wake word")):Localization.Text("Set up wake word…");if(wake.Header is StackPanel header && header.Children[1] is TextBlock text)text.Text=Localization.Text(label);UI.LocalizedName(wake,label);wake.ToolTip=app.Assistant.WakeStatus;};
-        var options=Action("Options","settings",()=>menu.IsOpen=true);options.ToolTip=Localization.Text("AI settings, voice setup and Hermes");options.ContextMenu=menu;menu.PlacementTarget=options;Grid.SetColumn(options,2);row.Children.Add(options);
-        FrameworkElement footer=row;
-        if(voice && row.Children[0] is StackPanel modes)
-        {
-            // Wrap each mode independently so a narrow large-text viewport does
-            // not inherit the combined minimum width of Chat and Voice.
-            row.Children.Clear();var actions=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center};
-            foreach(var button in modes.Children.OfType<Button>().ToArray()){modes.Children.Remove(button);actions.Children.Add(button);}
-            actions.Children.Add(options);footer=actions;
-        }
+        var options=Action("Options","settings",()=>{});
+        options.ToolTip=Localization.Text("AI settings, voice setup and Hermes");
+        AttachMenu(options,menu);
+        var footer=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center};
+        AddModes(footer,app,voice);footer.Children.Add(options);
         var frame=new Border{Child=footer,BorderThickness=new(0,1,0,0),Padding=new(0,7,0,0),Margin=new(0,7,0,0)};
         frame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
         return frame;
     }
+    internal static void AttachMenu(Button button,ContextMenu menu)
+    {
+        button.Click+=(_,_)=>menu.IsOpen=!menu.IsOpen;
+        button.ContextMenu=menu;menu.PlacementTarget=button;
+        var input=InputManager.Current;
+        void DismissOnOptionsPress(object sender,PreProcessInputEventArgs e)
+        {
+            if(!menu.IsOpen || !button.IsVisible ||
+                e.StagingItem.Input is not MouseButtonEventArgs {ChangedButton:MouseButton.Left,ButtonState:MouseButtonState.Pressed} press ||
+                press.RoutedEvent!=Mouse.PreviewMouseDownEvent || !new Rect(button.RenderSize).Contains(press.GetPosition(button)))return;
+            // An open menu captures the next outside press. Consume a press on
+            // its own anchor so the same gesture cannot open the menu again.
+            e.Cancel();
+            menu.IsOpen=false;
+        }
+        menu.Opened+=(_,_)=>input.PreProcessInput+=DismissOnOptionsPress;
+        menu.Closed+=(_,_)=>input.PreProcessInput-=DismissOnOptionsPress;
+        button.Unloaded+=(_,_)=>{input.PreProcessInput-=DismissOnOptionsPress;menu.IsOpen=false;};
+    }
     private static MenuItem Option(string title,string subtitle,string icon,Action action)
     {
         var row=new StackPanel{Orientation=Orientation.Horizontal};var glyph=Icons.Create(icon,15);glyph.Margin=new(0,0,10,0);row.Children.Add(glyph);row.Children.Add(UI.Caption(title,12));
-        var item=new MenuItem{Header=row,ToolTip=Localization.Text(subtitle)};UI.LocalizedName(item,title);item.Click+=(_,_)=>action();return item;
+        var item=new MenuItem{Header=row,ToolTip=subtitle.Length==0?null:Localization.Text(subtitle)};UI.LocalizedName(item,title);item.Click+=(_,_)=>action();return item;
     }
     internal static void RefreshConnection(TextBlock label,AssistantRuntime ai,bool voice=false)
     {

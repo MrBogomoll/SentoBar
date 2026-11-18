@@ -75,6 +75,7 @@ public sealed partial class SettingsWindow
         Add("Clipboard capture","Clipboard","Clipboard history","Save text & image history locally","clipboard history salin copy paste riwayat gambar capture");
         Add("Weather city","Weather","","Weather city search","cuaca kota city location lokasi weather");
         Add("Weather temperature units","Weather","","Weather temperature units","suhu temperature celsius fahrenheit derajat");
+        Add("System display settings","System","Monitor details","System display settings","CPU GPU RAM disk drives network processor memory процессор видеокарта оперативная память диск сеть");
         Add("AI connection & API key","AI","AI companion","Chat provider","sento hermes gemini provider api key endpoint model voice chat");
         Add("Choose a chat model","AI","AI companion","Chat model","discover models paste manual ai model");
         Add("Voice setup & local models","AI","AI companion","Speech connection","asr tts microphone voice speech local hardware install model");

@@ -10,7 +10,6 @@ internal sealed partial class AssistantProviderSettings
     private void BuildVoiceWorkspace(StackPanel host)
     {
         voiceSetupSummary=UI.Text("",13,UI.Muted);voiceSetupSummary.Margin=new(0,0,0,16);host.Children.Add(voiceSetupSummary);
-        host.Children.Add(MicrophoneSettings());
         var navigation=new WrapPanel{Margin=new(0,0,0,20)};host.Children.Add(navigation);
         var pages=new Dictionary<string,FrameworkElement>();var buttons=new Dictionary<string,Button>();
         void Select(string id)
@@ -49,7 +48,14 @@ internal sealed partial class AssistantProviderSettings
         Add("Setup",Localization.Text("Voice setup"),"mic",LocalVoiceSettings);
         Add("Wake",Localization.Text("Wake word"),"mic",()=>Direct(Localization.Text("Wake Sento with your voice"),Localization.Text("Choose a phrase and turn hands-free listening on or off."),WakeWordSettings()));
         Add("Models","Models","nav-launch",()=>Direct(Localization.Text("Models on this PC"),Localization.Text("See installed voices and remove models you no longer use."),InstalledSpeechSettings()));
-        Add("Audio",Localization.Text("Check audio"),"settings",()=>Direct(Localization.Text("Check your audio"),Localization.Text("Check listening and speaking separately using your saved setup."),SpeechChecks()));
+        Add("Audio","Microphone and sound","mic",()=>
+        {
+            var body=new StackPanel();
+            body.Children.Add(MicrophoneSettings());
+            body.Children.Add(Direct(Localization.Text("Check your audio"),Localization.Text("Record a short phrase and hear it back."),SpeechChecks()));
+            body.Children.Add(new Expander{Header=Localization.Text("Interrupt spoken replies"),Content=BargeInSettings(),Margin=new(0,14,0,8)});
+            return body;
+        });
         Select("Setup");
     }
 }

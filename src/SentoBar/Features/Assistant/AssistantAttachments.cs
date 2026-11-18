@@ -46,6 +46,8 @@ internal static class AssistantAttachments
     }
     internal static AssistantAttachment EncodedImage(byte[] bytes)
     {if(bytes.Length is <=0 or >MaximumFileBytes)throw new IOException(Localization.Text("Choose a clipboard image up to 16 MB."));return new("Pasted image.jpg","image/jpeg",Picture(bytes),Note:"Pasted image · optimized for chat");}
+    internal static bool IsImageFile(string path)=>Path.GetExtension(path).ToLowerInvariant() is
+        ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".tif" or ".tiff" or ".webp";
     internal static Task<AssistantAttachment> Read(string path,CancellationToken token)=>Task.Run(async()=>
     {
         var info=new FileInfo(path);if(!info.Exists || info.Length is <=0 or >MaximumFileBytes)throw new IOException(Localization.Text("Choose a nonempty file up to 16 MB."));
@@ -57,7 +59,7 @@ internal static class AssistantAttachments
             while((count=await input.ReadAsync(buffer,token))>0){if(output.Length+count>MaximumFileBytes)throw new IOException(Localization.Text("The file exceeds 16 MB."));output.Write(buffer,0,count);}bytes=output.ToArray();
         }
         token.ThrowIfCancellationRequested();string extension=Path.GetExtension(path).ToLowerInvariant();
-        if(new[]{".png",".jpg",".jpeg",".gif",".bmp",".tif",".tiff",".webp"}.Contains(extension))
+        if(IsImageFile(path))
             return new AssistantAttachment(Path.GetFileNameWithoutExtension(name)+".jpg","image/jpeg",Picture(bytes),Note:"Image · optimized for chat");
         if(extension==".pdf")
         {

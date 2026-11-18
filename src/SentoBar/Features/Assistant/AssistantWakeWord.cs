@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Speech.Recognition;
 using System.Threading;
@@ -10,6 +11,9 @@ namespace SentoBar;
 // Wake audio is never sent to a provider, stored, or passed to the chat model.
 internal sealed class AssistantWakeWord
 {
+    internal const string RussianRecognizerSelection="language:ru";
+    internal static string EffectiveSelection(string selection,string phrase)=>
+        selection=="" && phrase.Any(c=>c is >= 'А' and <= 'я' or 'Ё' or 'ё')?RussianRecognizerSelection:selection;
     private readonly SemaphoreSlim transition=new(1,1);
     private SpeechRecognitionEngine? engine;
     private AssistantWakeInput? selectedInput;
@@ -21,6 +25,25 @@ internal sealed class AssistantWakeWord
         try{return SpeechRecognitionEngine.InstalledRecognizers().ToArray();}
         catch(Exception ex) when(ex is PlatformNotSupportedException or System.Runtime.InteropServices.COMException or InvalidOperationException or System.IO.IOException)
         {throw new InvalidOperationException(Localization.Text("Windows wake recognition is unavailable for this app architecture. Install a compatible Windows speech engine, or start voice manually with an external local ASR/TTS service."),ex);}
+    }
+    internal static string? ResolveRecognizerId(string selection,IEnumerable<(string Id,string Language)> installed)
+    {
+        if(selection.Length==0)
+            return installed.FirstOrDefault(r=>r.Language=="en-US").Id??installed.FirstOrDefault().Id;
+        if(selection==RussianRecognizerSelection)
+            return installed.FirstOrDefault(r=>r.Language=="ru-RU").Id??
+                installed.FirstOrDefault(r=>r.Language=="ru" || r.Language.StartsWith("ru-",StringComparison.OrdinalIgnoreCase)).Id;
+        return installed.FirstOrDefault(r=>r.Id==selection).Id;
+    }
+    internal static string MissingRecognizerMessage(string selection)
+        =>Localization.Text(selection==RussianRecognizerSelection?
+            "Russian wake words need a compatible Windows recognizer. In Windows language options for Russian, install Basic speech recognition if available, then refresh recognizers.":
+            "No matching Windows recognizer. Install a compatible speech recognizer in Windows language options, then refresh recognizers.");
+    internal static RecognizerInfo RequireRecognizer(string selection)
+    {
+        var available=Recognizers();
+        string? id=ResolveRecognizerId(selection,available.Select(r=>(r.Id,r.Culture.Name)));
+        return available.FirstOrDefault(r=>r.Id==id)??throw new InvalidOperationException(MissingRecognizerMessage(selection));
     }
     internal static string Phrase(string value)
     {
@@ -36,8 +59,7 @@ internal sealed class AssistantWakeWord
             {
                 if(version!=Volatile.Read(ref generation))return;
                 if(engine!=null){Release(engine);engine=null;}
-                string phrase=Phrase(options.Phrase);var available=Recognizers();var selected=options.RecognizerId.Length>0?available.FirstOrDefault(r=>r.Id==options.RecognizerId):available.FirstOrDefault(r=>r.Culture.Name=="en-US")??available.FirstOrDefault();
-                if(selected==null)throw new InvalidOperationException(Localization.Text("No matching Windows speech recognizer is installed. Install a speech language in Windows Settings → Time & language → Speech, then choose Refresh recognizers."));
+                string phrase=Phrase(options.Phrase);var selected=RequireRecognizer(options.RecognizerId);
                 var candidate=new SpeechRecognitionEngine(selected);int fired=0;
                 try
                 {

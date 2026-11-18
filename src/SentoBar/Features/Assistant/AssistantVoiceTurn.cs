@@ -87,6 +87,10 @@ internal sealed partial class LocalAssistantVoice
             }
             await foreach(var chunk in voices.Reader.ReadAllAsync(ct))
             {
+                // A short first phrase can finish before the next phrase is synthesized.
+                // Start it with a following phrase ready, or once synthesis has completed.
+                if(queuedMs==0 && chunk.Pcm.Length<48000)
+                    await voices.Reader.WaitToReadAsync(ct);
                 // Keep roughly one second queued before accepting another segment.
                 // PCM and synthesized segments cannot grow with an unbounded response.
                 await WaitForPlayback(()=>queuedMs-engine.PlayedMilliseconds>1100);
@@ -95,9 +99,8 @@ internal sealed partial class LocalAssistantVoice
                 queuedMs+=chunk.Pcm.Length/48;
                 if(Interlocked.Exchange(ref playing,1)==0){audioReady=asrMs+clock.ElapsedMilliseconds;Phase?.Invoke(AssistantState.Speaking);Status?.Invoke(Localization.Text("Speaking · microphone waits until the reply finishes"));Report();}
             }
-            // PlayedMilliseconds conservatively subtracts the native 100ms buffer.
-            await WaitForPlayback(()=>queuedMs>0 && engine.PlayedMilliseconds+100<queuedMs);
-            if(queuedMs>0)await Task.Delay(150,ct);
+            await WaitForPlayback(()=>engine.QueuedMilliseconds>0);
+            if(queuedMs>0)await Task.Delay(engine.PlaybackLatencyMilliseconds+50,ct);
         }
         using var captionLifetime=CancellationTokenSource.CreateLinkedTokenSource(ct);
         async Task Captions()

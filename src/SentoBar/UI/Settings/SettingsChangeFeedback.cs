@@ -19,7 +19,7 @@ internal static class SettingsChangeFeedback
         ["CoverAmbient"]="Ambient light",["ClosedAmbient"]="Closed dock ambience",
         ["AmbientStrength"]="Ambient intensity",["AutoCheckUpdates"]="Automatic update checks",
         ["AutoDownloadUpdates"]="Automatic update downloads",["Width"]="Closed dock width",
-        ["Height"]="Closed dock height",["TuckEdge"]="Tucked edge height",["Widgets"]="Widgets & order",
+        ["Height"]="Closed dock height",["PanelAutoHeight"]="Fit panel height to content",["TuckEdge"]="Tucked edge height",["Widgets"]="Widgets & order",
         ["HoverViews"]="Hover pages",["Tools"]="Tools & order",["Shortcuts"]="Shortcuts",
         ["Performance"]="Animation performance",["AutoStart"]="Start with Windows",["ClosedIdleContent"]="Idle dock content"
     };

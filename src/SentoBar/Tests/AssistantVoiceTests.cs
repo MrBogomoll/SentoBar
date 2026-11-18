@@ -517,6 +517,20 @@ internal static class AssistantVoiceTests
         });
         test("Voice PCM meter measures signed samples including negative full scale", () =>
         { Assert(AssistantVoiceAudio.Peak(new byte[] { 0, 0, 0, 128 }, 4) == 1f); Assert(AssistantVoiceAudio.Peak(new byte[20], 20) == 0); });
+        test("Local reply fades into and out of an empty playback queue", () =>
+        {
+            var pcm=new AssistantVoiceAudio.MeteredPcm(_=>{},160,true);
+            var packet=new byte[960];
+            for(int i=0;i<packet.Length;i+=2){packet[i]=0x20;packet[i+1]=0x4e;}
+            Assert(pcm.Append(packet));
+            var output=new byte[packet.Length+120];
+            pcm.Read(output,0,output.Length);
+            Assert(BitConverter.ToInt16(output,0)==0 && BitConverter.ToInt16(output,packet.Length/2)==20000);
+            Assert(BitConverter.ToInt16(output,packet.Length-2)==0 && output.Skip(packet.Length).All(b=>b==0));
+            Assert(pcm.Append(packet));pcm.Read(output,0,output.Length);
+            Assert(BitConverter.ToInt16(output,0)==0 && BitConverter.ToInt16(output,packet.Length-2)==0);
+            Assert(pcm.QueuedMilliseconds==0);
+        });
         test("Voice playback buffer accepts long response bursts and repeated generation clears", () =>
         {
             var buffer = new AssistantVoiceAudio.MeteredPcm(_ => { }); var second = new byte[48000]; second[0] = 32;

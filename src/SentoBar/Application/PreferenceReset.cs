@@ -24,7 +24,7 @@ internal static class PreferenceReset
         ["Controls"]="PanelNavigationStyle HoverPeek TwoStageHover HoverDelayMs HoverDetailDelayMs SwipeDistance PanelSwipe DropReveal DetachablePreviews CoverGestures WheelAction WheelWrapTabs MiddleAction VolumeStep HotkeyEnabled HotkeyKey HotkeyModifiers".Split(' '),
         ["ClosedDock"]="ClosedIdleContent ClosedMediaIcon ClosedMediaContent".Split(' '),
         ["Audio"]="MediaIntegrationEnabled WaveformSource WaveformSensitivity LyricsEnabled LyricsAnimation LyricsTextMode LyricsOffset ReactiveFeedback WaveformIdleMotion VolumeFeedback BrightnessFeedback".Split(' '),
-        ["System"]="Clock24Hour ClockSeconds ShowDate MonitorNetwork MonitorStorage MonitorProcesses".Split(' '),
+        ["System"]="Clock24Hour ClockSeconds ShowDate MonitorNetwork MonitorStorage MonitorProcesses SystemDisplay".Split(' '),
         ["Launch"]="LaunchStyle".Split(' '),
         ["AI"]=Array.Empty<string>(),
         ["Application"]="AutoCheckUpdates AutoDownloadUpdates UiLanguage AccessibilityTextScale AccessibilityHighContrast".Split(' ')
@@ -74,7 +74,7 @@ internal static class PreferenceReset
         {
             if(PremiumPreferences.Keys.Contains(key) || key is "DisplayMode" or "ClosedIdleContent" or "CountdownSoundDuringQuietHours" or "SettingsMaterial" or "HideAppExceptions" or "WheelWrapTabs" or "WindowTheme" or "WindowGlass" or "WindowLargeCorners" or "WindowEffects" or "WindowCompact" or "WindowHoverAccents" || Categories["Application"].Contains(key))continue;
             // Backups made before exact durations use their original minute values.
-            if((key is "TimerDurationSeconds" or "FocusDurationSeconds" or "BreakDurationSeconds") && !json.RootElement.TryGetProperty(key,out _))continue;
+            if((key is "TimerDurationSeconds" or "FocusDurationSeconds" or "BreakDurationSeconds" or "SystemDisplay") && !json.RootElement.TryGetProperty(key,out _))continue;
             bool nullable=Nullable.GetUnderlyingType(typeof(Settings).GetProperty(key)!.PropertyType)!=null;
             if(!json.RootElement.TryGetProperty(key,out var value) || value.ValueKind==JsonValueKind.Null && !nullable)
                 throw new InvalidDataException(Localization.Text("The preference backup is incomplete: ")+key);

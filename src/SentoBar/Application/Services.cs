@@ -136,7 +136,7 @@ public sealed class MediaService : IDisposable
         timelineStamp=0;
         try{var playback=session.GetPlaybackInfo();var controls=playback?.Controls;
         Playing=playback?.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
-        CanToggle=controls?.IsPlayPauseToggleEnabled==true;CanNext=controls?.IsNextEnabled==true;CanPrevious=controls?.IsPreviousEnabled==true;CanSeek=controls?.IsPlaybackPositionEnabled==true;}
+        CanToggle=controls?.IsPlayPauseToggleEnabled==true || (Playing?controls?.IsPauseEnabled:controls?.IsPlayEnabled)==true;CanNext=controls?.IsNextEnabled==true;CanPrevious=controls?.IsPreviousEnabled==true;CanSeek=controls?.IsPlaybackPositionEnabled==true;}
         catch(Exception ex){log(ex);Playing=false;CanToggle=CanNext=CanPrevious=CanSeek=false;}
     }
     public async Task Refresh()
@@ -177,13 +177,28 @@ public sealed class MediaService : IDisposable
     {
         try
         {
-            if(selected==null) return;
+            if(selected is not {} session)return;
             if(command=="next" && CanNext || command=="previous" && CanPrevious)ResetSeekTarget();
-            bool ok=command switch { "next" when CanNext=>await selected.TrySkipNextAsync(), "previous" when CanPrevious=>await selected.TrySkipPreviousAsync(), "toggle" when CanToggle=>await selected.TryTogglePlayPauseAsync(), _=>false };
+            bool ok=command switch { "next" when CanNext=>await session.TrySkipNextAsync(), "previous" when CanPrevious=>await session.TrySkipPreviousAsync(), "toggle" when CanToggle=>await TogglePlayback(session), _=>false };
+            if(disposed || !ReferenceEquals(session,selected))return;
             if(!ok) Artist=Localization.Text("This media app does not support this control");
+            else if(command=="toggle")ReadPlayback(session);
             Changed?.Invoke();
         }
         catch(Exception ex) { log(ex); Artist=Localization.Text("Media control failed; try selecting the session again");Changed?.Invoke(); }
+    }
+    private async Task<bool> TogglePlayback(GlobalSystemMediaTransportControlsSession session)
+    {
+        var playback=session.GetPlaybackInfo();
+        bool wasPlaying=playback.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+        var controls=playback.Controls;
+        if(wasPlaying?controls.IsPauseEnabled:controls.IsPlayEnabled)
+        {
+            if(wasPlaying?await session.TryPauseAsync():await session.TryPlayAsync())return true;
+            if(disposed || !ReferenceEquals(session,selected))return false;
+            if((session.GetPlaybackInfo().PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)!=wasPlaying)return true;
+        }
+        return controls.IsPlayPauseToggleEnabled && await session.TryTogglePlayPauseAsync();
     }
     public (double elapsed,double duration) Timeline()
     {

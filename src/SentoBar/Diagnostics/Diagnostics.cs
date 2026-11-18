@@ -124,6 +124,8 @@ internal static class Diagnostics
             if(Environment.GetCommandLineArgs().Contains("--isolated-diagnostics"))overlay.IsolateDiagnosticFeedback();
             if(Environment.GetCommandLineArgs().Contains("--settings-persistence-reload")){SettingsPersistenceDiagnostics.CheckReload(app,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--settings-persistence-only")){await SettingsPersistenceDiagnostics.Run(app,Check);return;}
+            if(Environment.GetCommandLineArgs().Contains("--system-display-only")){await SystemDisplayDiagnostics.Run(app,overlay,Check,CaptureContour);return;}
+            if(Environment.GetCommandLineArgs().Contains("--system-display-live-only")){await SystemDisplayDiagnostics.RunLive(app,overlay,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--settings-themes-only")){await SettingsThemeDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--russian-ui-only")){await RussianUiDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--lyrics-language-live-only")){await LyricsPopoverDiagnostics.RunLanguageLive(app,directory);return;}

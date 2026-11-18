@@ -80,6 +80,16 @@
   "MonitorNetwork": true,
   "MonitorStorage": true,
   "MonitorProcesses": true,
+  "SystemDisplay": {
+    "Cpu": true,
+    "Memory": true,
+    "Gpu": null,
+    "Storage": null,
+    "Network": null,
+    "GpuDevices": null,
+    "StorageDevices": null,
+    "NetworkDevices": null
+  },
   "HoverViews": [
     {
       "Id": "media",

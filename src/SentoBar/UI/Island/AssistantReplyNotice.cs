@@ -12,6 +12,7 @@ public sealed partial class OverlayWindow
     private readonly StackPanel assistantPeekWords=new(){VerticalAlignment=VerticalAlignment.Center,Margin=new(12,0,0,0)};
     private readonly WrapPanel assistantPeekActions=new(){Margin=new(0,6,0,0)};
     private readonly DockPanel assistantReplyActions=new(){Margin=new(0,6,0,0),Visibility=Visibility.Collapsed};
+    private Button assistantReplyDismissButton=null!;
     private AssistantMessage? assistantPendingReply,assistantDisplayedReply;
     private bool assistantReplyShowing;
     private long assistantReplyUntil,assistantReplyQueuedUntil;
@@ -26,17 +27,24 @@ public sealed partial class OverlayWindow
 
     private void InitializeAssistantReply()
     {
-        var dismiss=Icons.Button("x",Localization.Text("Dismiss reply"),Collapse,size:28);dismiss.Content=Icons.Create("x",14);dismiss.Margin=new(8,0,0,0);DockPanel.SetDock(dismiss,Dock.Right);assistantReplyActions.Children.Add(dismiss);
+        var dismiss=assistantReplyDismissButton=Icons.Button("x","Dismiss reply",DismissAssistantReply,size:28);dismiss.Content=Icons.Create("x",14);dismiss.Margin=new(8,0,0,0);DockPanel.SetDock(dismiss,Dock.Right);assistantReplyActions.Children.Add(dismiss);
         var open=AssistantWindow.Pill(Localization.Text("Open chat"),()=>OpenAssistant());open.HorizontalAlignment=HorizontalAlignment.Left;open.MinHeight=open.Height=28;open.Padding=new(10,3,10,3);open.Margin=new(0);assistantReplyActions.Children.Add(open);
         Grid.SetRow(assistantReplyActions,1);assistantPeek.Children.Add(assistantReplyActions);
         AutomationProperties.SetName(assistantPeek,Localization.Text("Sento reply"));
         AutomationProperties.SetLiveSetting(assistantCaption,AutomationLiveSetting.Polite);
     }
 
+    private void DismissAssistantReply()
+    {
+        Collapse();
+        if(app.Assistant.VoiceActive)_=app.Assistant.EndVoice();
+    }
+
     private void ApplyAssistantPeekMode()
     {
         assistantPeekActions.Visibility=assistantReplyShowing?Visibility.Collapsed:Visibility.Visible;
         assistantReplyActions.Visibility=assistantReplyShowing?Visibility.Visible:Visibility.Collapsed;
+        UI.LocalizedName(assistantReplyDismissButton,app.Assistant.VoiceActive?"End conversation":"Dismiss reply");
         peekAssistant.Width=peekAssistant.Height=assistantReplyShowing?64:72;
         assistantGreeting.FontSize=assistantReplyShowing?11:17;
         assistantGreeting.Foreground=assistantReplyShowing?UI.Muted:UI.Brush("#F2F3F5");

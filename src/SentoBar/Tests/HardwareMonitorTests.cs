@@ -21,6 +21,12 @@ internal static class HardwareMonitorTests
         check("GPU unchanged counters are measured zero",HardwareMonitor.Utilization(new[]{E(1,0,100,1100)},prior)[adapter]==0);
         check("GPU aggregate is bounded to one hundred percent",HardwareMonitor.Utilization(new[]{E(1,0,300,1100)},prior)[adapter]==100);
         check("Malformed adapter names cannot become measurements",HardwareMonitor.AdapterId("_Total")==null && HardwareMonitor.AdapterId(A(1,0))==adapter);
+        const string software=@"\??\ROOT#BasicRender#0000#{1024e4c9-47c9-48d3-b4a8-f9df78523b53}";
+        var staleSelection=new SystemDisplayPreferences{GpuDevices=new(){new(software+"_phys_0","Old software adapter"),new("physical","Physical graphics")}};
+        staleSelection.Normalize();
+        check("GPU choices skip the Windows software renderer, including existing profiles",
+            HardwareMonitor.IsSoftwareAdapter(software) && !HardwareMonitor.IsSoftwareAdapter(@"\??\PCI#VEN_10DE&DEV_2F04#01") &&
+            staleSelection.GpuDevices is [{Id:"physical"}]);
         check("GPU formatting preserves unavailable states",HardwareMonitor.Percent(null)=="Unavailable / sampling" && HardwareMonitor.Percent(double.NaN)=="Unavailable / sampling" && HardwareMonitor.Percent(0)=="0%");
         check("Sensor units distinguish temperatures and fans",HardwareMonitor.SensorValue(new("CPU","Temperature",42.5,"test"))=="42.5 °C" && HardwareMonitor.SensorValue(new("CPU fan","Fan",1200,"test"))=="1200 RPM");
         var unavailable=HardwareMonitor.Unavailable("Test unavailable");

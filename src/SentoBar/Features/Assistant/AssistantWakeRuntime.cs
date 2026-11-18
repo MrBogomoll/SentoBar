@@ -14,7 +14,10 @@ internal sealed partial class AssistantRuntime
     private long wakeNotBefore;
     private Task wakeClosing=Task.CompletedTask,voiceClosing=Task.CompletedTask;
     private AssistantWidgetBridge? widgetBridge;
-    internal bool WakeListening=>wake.Listening;
+    private CancellationTokenSource? localWakeStop;
+    private Task localWakeTask=Task.CompletedTask;
+    private bool localWakeListening;
+    internal bool WakeListening=>wake.Listening || localWakeListening;
     internal bool WakeArmed=>wakeWanted && !wakeFailed;
     internal string WakeStatus {get;private set;}=Localization.Text("Wake word is off. Microphone stays off until you start voice.");
     internal void StartBackgroundFeatures()
@@ -32,8 +35,6 @@ internal sealed partial class AssistantRuntime
     internal void SaveWakeWord(AssistantWakeOptions options)
     {
         options.Phrase=AssistantWakeWord.Phrase(options.Phrase);options.Confidence=Math.Clamp(options.Confidence,.55,.95);
-        if(options.Enabled && !Options.Enabled)throw new InvalidOperationException(Localization.Text("Enable AI companion before enabling the wake word."));
-        if(options.Enabled && !WakeVoiceReady())throw new InvalidOperationException(Localization.Text("Choose and save a working voice connection before enabling the wake word. Local speech needs a selected chat model; realtime voice needs a model and WebSocket URL."));
         var previous=Options.WakeWord;Options.WakeWord=options;
         try{app.Store.Save("assistant",Options);}catch{Options.WakeWord=previous;throw;}
         PauseWake();wakeWanted=options.Enabled;wakeFailed=false;WakeStatus=options.Enabled?Localization.Text("Preparing wake listening…"):Localization.Text("Wake word is off. Microphone stays off until you start voice.");Notify();
@@ -46,14 +47,30 @@ internal sealed partial class AssistantRuntime
         Notify();
     }
     private void PauseWake()
-    {wakeWanted=false;wakeVersion++;wakeClosing=wake.Stop();}
+    {wakeWanted=false;wakeVersion++;StopWakeEngines();}
     private void SuspendWake(string reason)
-    {wakeVersion++;wakeClosing=wake.Stop();if(wakeWanted)WakeStatus=reason;}
+    {wakeVersion++;StopWakeEngines();if(wakeWanted)WakeStatus=reason;}
+    private void StopWakeEngines()
+    {
+        localWakeListening=false;
+        localWakeStop?.Cancel();
+        wakeClosing=Task.WhenAll(wake.Stop(),localWakeTask);
+    }
+    internal bool CanUseLocalWake(string language)
+    {
+        if(!Options.LocalVoice.Managed)return false;
+        try
+        {
+            var model=AssistantOwnSpeech.Asr(Options.LocalVoice);
+            return !model.Native && model.Supports(language) && Speech.Installed(model,SpeechCatalog.TtsById("windows"));
+        }
+        catch(Exception ex) when(ex is System.IO.IOException or ArgumentException or InvalidOperationException){return false;}
+    }
     private bool WakeVoiceReady()
     {var selected=Options.LocalVoice.Enabled?Provider:VoiceProvider;return Setup.Voice.Configured && selected!=null && (Options.LocalVoice.Enabled?!string.IsNullOrWhiteSpace(selected.Model):!string.IsNullOrWhiteSpace(selected.RealtimeModel) && !string.IsNullOrWhiteSpace(selected.RealtimeUrl));}
     private void QueueWake()
     {
-        if(!backgroundReady || disposed || !wakeWanted || wakeStarting || wakeTriggering || wakeFailed || !Options.Enabled || !Options.WakeWord.Enabled || SpeechCheckBusy || Speech.Busy || Busy || VoiceConnected || WakeListening)return;
+        if(!backgroundReady || disposed || !wakeWanted || wakeStarting || wakeTriggering || wakeFailed || localWakeStop is {IsCancellationRequested:false} || !Options.Enabled || !Options.WakeWord.Enabled || SpeechCheckBusy || Speech.Busy || Busy || VoiceConnected || WakeListening)return;
         if(!WakeVoiceReady()){wakeFailed=true;WakeStatus=Localization.Text("Complete Voice settings and choose a saved model, then resume wake listening.");return;}
         wakeStarting=true;_ =ArmWake(wakeVersion);
     }
@@ -64,6 +81,37 @@ internal sealed partial class AssistantRuntime
             await wakeClosing;await voiceClosing;long delay=wakeNotBefore-Environment.TickCount64;if(delay>0)await Task.Delay((int)Math.Min(delay,2000));
             if(version!=wakeVersion || disposed || !wakeWanted || !Options.Enabled || !Options.WakeWord.Enabled || SpeechCheckBusy || Speech.Busy || Busy || VoiceConnected)return;
             var options=JsonSerializer.Deserialize<AssistantWakeOptions>(JsonSerializer.Serialize(Options.WakeWord))!;
+            options.RecognizerId=AssistantWakeWord.EffectiveSelection(options.RecognizerId,options.Phrase);
+            bool automatic=options.RecognizerId is "" or AssistantWakeWord.RussianRecognizerSelection;
+            string language=options.RecognizerId==AssistantWakeWord.RussianRecognizerSelection?"ru":Options.LocalVoice.SpeechLanguage;
+            if(automatic && CanUseLocalWake(language))
+            {
+                bool hasWindows;
+                try{AssistantWakeWord.RequireRecognizer(options.RecognizerId);hasWindows=true;}
+                catch(InvalidOperationException){hasWindows=false;}
+                if(!hasWindows)
+                {
+                    var stop=localWakeStop=new CancellationTokenSource();
+                    var speech=new LocalAssistantVoice(Options.LocalVoice,(_,_,_,_)=>throw new InvalidOperationException(),Speech,Options.MicrophoneId);
+                    localWakeTask=Task.Run(async()=>
+                    {
+                        try
+                        {
+                            await using(speech)
+                                await speech.ListenForWake(options.Phrase,language,()=>Dispatch(()=>
+                                {
+                                    if(version!=wakeVersion)return;
+                                    localWakeListening=true;WakeStatus=Localization.Format("Listening on CPU · say “{0}”.",options.Phrase);Notify();
+                                }),stop.Token);
+                            Dispatch(()=>_=WakeDetected(version));
+                        }
+                        catch(OperationCanceledException) when(stop.IsCancellationRequested){}
+                        catch(Exception ex){Dispatch(()=>{if(version==wakeVersion){localWakeListening=false;wakeFailed=true;WakeStatus=ex.Message;Notify();}});}
+                        finally{_=app.Dispatcher.BeginInvoke(()=>{if(ReferenceEquals(localWakeStop,stop))localWakeStop=null;stop.Dispose();});}
+                    });
+                    return;
+                }
+            }
             await wake.Start(options,()=>Dispatch(()=>_=WakeDetected(version)),message=>Dispatch(()=>{if(version==wakeVersion){wakeFailed=true;WakeStatus=message;wakeClosing=wake.Stop();Notify();}}),Options.MicrophoneId);
             if(version==wakeVersion && wakeWanted && WakeListening)WakeStatus=Localization.Format("Wake microphone on · say “{0}”. Detection stays on this PC.",options.Phrase);
         }
@@ -73,7 +121,7 @@ internal sealed partial class AssistantRuntime
     private async Task WakeDetected(int version)
     {
         if(disposed || version!=wakeVersion || !wakeWanted || !Options.Enabled || SpeechCheckBusy || Speech.Busy || Busy || VoiceConnected)return;
-        wakeTriggering=true;int activation=++wakeVersion;wakeClosing=wake.Stop();
+        wakeTriggering=true;int activation=++wakeVersion;StopWakeEngines();
         try{await wakeClosing;if(disposed || !wakeWanted || activation!=wakeVersion)return;app.OpenVoice();await StartVoice();if(wakeWanted && !VoiceConnected){wakeWanted=false;wakeFailed=true;WakeStatus=Localization.Text("Voice did not start. Check Voice settings, then resume wake listening.");}}
         catch{wakeWanted=false;wakeFailed=true;WakeStatus=Localization.Text("Wake activation failed. Check the microphone and Voice settings.");}
         finally{wakeTriggering=false;Notify();}

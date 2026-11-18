@@ -14,8 +14,18 @@ internal static class RecentUxDiagnostics
     private const BindingFlags Private=BindingFlags.Instance|BindingFlags.NonPublic;
     internal static async Task Run(App app,OverlayWindow overlay,string directory,Action<string,bool> check)
     {
+        app.Settings.UiLanguage="en";Localization.Configure(app.Settings);
         T Field<T>(object obj,string name)=>(T)obj.GetType().GetField(name,Private)!.GetValue(obj)!;
         object? Call(object obj,string method,params object[] args)=>obj.GetType().GetMethod(method,Private)!.Invoke(obj,args);
+        async Task<bool> WaitForSave(Func<bool> matches)
+        {
+            for(int attempt=0;attempt<30;attempt++)
+            {
+                if(matches())return true;
+                await Task.Delay(100);
+            }
+            return matches();
+        }
         void Capture(Window window,string name){window.UpdateLayout();var bitmap=new RenderTargetBitmap((int)window.ActualWidth,(int)window.ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(window);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(directory,name+".png"));encoder.Save(file);}
         SettingsWindow? settings=null;WelcomeWindow? welcome=null;
         try
@@ -36,14 +46,43 @@ internal static class RecentUxDiagnostics
             finally{installer.Close();}
             settings=new SettingsWindow(app){ShowActivated=false};settings.Show();await Task.Delay(200);settings.UpdateLayout();
             check("Start here exposes five readiness statuses without API or microphone checks",Diagnostics.LogicalDescendants(settings).OfType<Border>().Any(b=>b.Tag as string=="Your setup") && Diagnostics.Descendants(settings).OfType<TextBlock>().Any(t=>t.Text.StartsWith("Voice ·")));Capture(settings,"settings-home-current");
-            double original=app.Settings.Width;app.Settings.Width=original+24;Call(settings,"Save");await Task.Delay(500);
-            var undo=Field<Button>(settings,"undoSettings");check("Undo offered after a saved layout edit",undo.Visibility==Visibility.Visible);undo.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(200);check("Undo restores live and persisted width",app.Settings.Width==original && app.Store.Load<Settings>("settings").Width==original);
+            var settingsPage=Field<StackPanel>(settings,"page");
+            Diagnostics.NavigateSettings(settings,"Layout");await Task.Delay(100);
+            var width=Diagnostics.LogicalDescendants(settingsPage).OfType<Slider>().Single(s=>UI.Identity(s)=="Closed width");
+            double original=width.Value,newWidth=original+24<=width.Maximum?original+24:original-24;
+            width.Value=newWidth;
+            var undo=Field<Button>(settings,"undoSettings");
+            check("Undo offered after a saved layout edit",await WaitForSave(()=>undo.IsVisible && app.Store.Load<Settings>("settings").Width==newWidth));
+            undo.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(200);
+            var restoredWidth=Diagnostics.LogicalDescendants(settingsPage).OfType<Slider>().Single(s=>UI.Identity(s)=="Closed width");
+            check("Undo restores live and persisted width",!undo.IsVisible && restoredWidth.Value==original && app.Settings.Width==original && app.Store.Load<Settings>("settings").Width==original);
+
+            var fitHeight=Diagnostics.LogicalDescendants(settingsPage).OfType<CheckBox>().Single(c=>UI.Identity(c)=="Fit panel height to content");
+            bool originalFit=app.Settings.PanelAutoHeight;
+            fitHeight.IsChecked=!originalFit;fitHeight.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            check("Undo offered after switching between automatic and manual panel height",await WaitForSave(()=>undo.IsVisible && app.Store.Load<Settings>("settings").PanelAutoHeight!=originalFit));
+            if(undo.IsVisible)undo.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(200);
+            check("Undo restores the saved panel height mode",!undo.IsVisible && app.Settings.PanelAutoHeight==originalFit && app.Store.Load<Settings>("settings").PanelAutoHeight==originalFit);
             Diagnostics.NavigateSettings(settings,"Content");await Task.Delay(100);check("Feature usage is directly visible",Diagnostics.Descendants(settings).OfType<TextBlock>().Any(t=>t.Text=="Feature usage"));Capture(settings,"settings-widgets-current");
-            Diagnostics.NavigateSettings(settings,"Audio");await Task.Delay(100);check("Closed media has all four direct choices",new[]{"Waveform","Live lyrics","Song title","None"}.All(label=>Diagnostics.Descendants(settings).OfType<Button>().Any(b=>AutomationProperties.GetName(b)==label)));Capture(settings,"settings-music-current");
+            Diagnostics.NavigateSettings(settings,"Audio");await Task.Delay(100);Capture(settings,"settings-music-current");
+            var dockContent=Diagnostics.LogicalDescendants(settingsPage).OfType<Button>().Single(b=>UI.Identity(b)=="Set dock content");
+            dockContent.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(100);
+            var choices=new[]{(Label:"Waveform",Value:"Waveform"),(Label:"Live lyrics",Value:"Lyrics"),(Label:"Song title",Value:"Title"),(Label:"None",Value:"None")};
+            var musicModes=Diagnostics.LogicalDescendants(settingsPage).OfType<Button>().Where(b=>choices.Any(c=>UI.Identity(b)==c.Label)).ToArray();
+            check("Music settings link to all four closed-dock choices",musicModes.Length==choices.Length && musicModes.All(b=>b.IsVisible && b.IsEnabled));
+            foreach(var choice in choices)
+            {
+                var mode=musicModes.Single(b=>UI.Identity(b)==choice.Label);
+                mode.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                check("Closed dock saves "+choice.Label+" and marks the choice selected",await WaitForSave(()=>app.Settings.ClosedMediaContent==choice.Value &&
+                    app.Store.Load<Settings>("settings").ClosedMediaContent==choice.Value &&
+                    mode.Content is StackPanel {Children.Count:>0} body && body.Children[0] is TextBlock text && text.Text==choice.Label+" · Selected"));
+            }
             Diagnostics.NavigateSettings(settings,"Application");await Task.Delay(80);check("General exposes an uninstall entry without executing it",Diagnostics.Descendants(settings).OfType<Button>().Any(b=>b.Content?.ToString()=="Uninstall SentoBar…"));
-            Diagnostics.NavigateSettings(settings,"AI");var ai=Field<AssistantProviderSettings>(settings,"aiSettings");ai.OpenVoiceSetup();await Task.Delay(100);check("Voice setup shows source choices without expander gate",Diagnostics.Descendants(settings).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="On this PC" && b.IsVisible));Capture(settings,"settings-voice-current");
+            Diagnostics.NavigateSettings(settings,"AI");var ai=Field<AssistantProviderSettings>(settings,"aiSettings");ai.OpenVoiceSetup();await Task.Delay(100);check("Voice setup defaults to on-device speech without changing preferences",Field<ComboBox>(ai,"speechModePicker").SelectedIndex==1 && !app.Assistant.Options.LocalVoice.Enabled && Diagnostics.Descendants(settings).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="On this PC" && b.IsVisible));Capture(settings,"settings-voice-current");
+            ai.OpenVoiceChecks();await Task.Delay(100);
             var microphone=Diagnostics.Descendants(settings).OfType<ComboBox>().Single(c=>AutomationProperties.GetName(c)=="Input microphone");
-            check("Voice setup exposes the microphone picker without an expander",microphone.IsVisible && microphone.ActualHeight>=36 && microphone.Items.Cast<AssistantMicrophone>().Any(d=>d.Id==""));
+            check("Microphone and sound exposes the microphone picker without an expander",microphone.IsVisible && microphone.ActualHeight>=36 && microphone.Items.Cast<AssistantMicrophone>().Any(d=>d.Id==""));
             var refreshInput=Diagnostics.Descendants(settings).OfType<Button>().Single(b=>b.Content?.ToString()=="Refresh inputs");refreshInput.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             check("Refreshing inputs retains the saved system-default selection",microphone.SelectedItem is AssistantMicrophone {Id:""});
             app.Assistant.SaveMicrophone("");check("Microphone preference persists in the isolated assistant profile",app.Store.Load<AssistantOptions>("assistant").MicrophoneId=="");

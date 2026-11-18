@@ -8,11 +8,34 @@ namespace SentoBar;
 
 public sealed partial class OverlayWindow
 {
+    private SystemSummaryExtras? classicSystemRows;
+    private bool ClassicSystemCardVisible=>expanded && IsVisible && !commandOpen && !app.Settings.CompactLayout
+        && classicSystemRows?.IsVisible==true && classicSystemRows.IsDescendantOf(body);
+
+    private Border BuildClassicSystemCard()
+    {
+        cpuBar.Foreground=ramBar.Foreground=Brushes.White;
+        cpuBar.Background=ramBar.Background=UI.Brush("#3A3A3C");
+        var settings=SystemDisplaySettingsWindow.SettingsButton(()=>ShowSystemDisplaySettings(this),true);
+        settings.HorizontalAlignment=HorizontalAlignment.Right;
+        classicSystemRows=new();
+        RefreshClassicSystemCard();
+        return UI.Card(Localization.Text("System"),cpu,cpuBar,ram,ramBar,classicSystemRows,settings);
+    }
+
+    private void RefreshClassicSystemCard()
+    {
+        if(classicSystemRows==null)return;
+        var display=app.Settings.SystemDisplay;
+        cpu.Visibility=cpuBar.Visibility=display.Cpu?Visibility.Visible:Visibility.Collapsed;
+        ram.Visibility=ramBar.Visibility=display.Memory?Visibility.Visible:Visibility.Collapsed;
+        classicSystemRows.Refresh(display,monitorLatest,monitorPrevious);
+    }
+
     private readonly List<UIElement> monitorLayout=new();
     private readonly List<Grid> monitorValueRows=new();
     private int monitorRowIndex;
-    private readonly CpuHistoryVisual monitorHistory=new();
-    private readonly Grid monitorMemoryTrack=new(){Height=3,Margin=new(0,4,0,8),Background=UI.Brush("#28FFFFFF")};
+    private readonly SystemMonitorDashboard monitorDashboard=new();
     private void BeginMonitorRender(){monitorLayout.Clear();monitorRowIndex=0;}
     private void AddMonitorElement(UIElement element)=>monitorLayout.Add(element);
     private Grid GetMonitorRow()
@@ -41,30 +64,5 @@ public sealed partial class OverlayWindow
         // A process/device list may shrink. Do not retain detached historical rows indefinitely.
         if(monitorValueRows.Count>monitorRowIndex)monitorValueRows.RemoveRange(monitorRowIndex,monitorValueRows.Count-monitorRowIndex);
         monitorLayout.Clear();
-    }
-    private void UpdateMonitorMemory(ulong total,ulong available)
-    {
-        if(monitorMemoryTrack.ColumnDefinitions.Count==0){monitorMemoryTrack.ColumnDefinitions.Add(new());monitorMemoryTrack.ColumnDefinitions.Add(new());monitorMemoryTrack.Children.Add(new Border());}
-        monitorMemoryTrack.ColumnDefinitions[0].Width=new GridLength(Math.Max(1,total-available),GridUnitType.Star);monitorMemoryTrack.ColumnDefinitions[1].Width=new GridLength(Math.Max(1,available),GridUnitType.Star);((Border)monitorMemoryTrack.Children[0]).Background=UI.Brush(app.Settings.Accent);
-    }
-}
-
-internal sealed class CpuHistoryVisual : FrameworkElement
-{
-    private readonly double?[] values=new double?[30];
-    private int count;
-    private Brush color=Brushes.White;
-    private static readonly Pen baseline=new(UI.Brush("#28FFFFFF"),1);
-    internal CpuHistoryVisual(){Height=42;ClipToBounds=true;Margin=new(0,4,0,2);}
-    internal void SetValues(IEnumerable<double?> history,Brush accent){count=0;foreach(var value in history)values[count++]=value;color=accent;InvalidateVisual();}
-    protected override void OnRender(DrawingContext dc)
-    {
-        dc.DrawLine(baseline,new Point(0,41),new Point(ActualWidth,41));var geometry=new StreamGeometry();
-        using(var path=geometry.Open())
-        {
-            bool started=false;
-            for(int i=0;i<count;i++){if(values[i] is not double value){started=false;continue;}var point=new Point(ActualWidth*(30-count+i)/29,40-value*.38);if(!started){path.BeginFigure(point,false,false);started=true;}else path.LineTo(point,true,false);}
-        }
-        geometry.Freeze();dc.DrawGeometry(null,new Pen(color,1.6),geometry);
     }
 }

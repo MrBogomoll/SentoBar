@@ -12,6 +12,7 @@ internal sealed partial class AssistantProviderSettings
     {
         var service=ai.Speech;var body=new StackPanel();
         body.Children.Add(UI.Text(Localization.Text("Remove listening or speaking models you no longer need. Matching download caches are removed too. Shared speech engines stay installed. You can reinstall a model from Automatic setup."),11,UI.Muted));
+        body.Children.Add(AssistantWindow.Pill("Open speech folder",service.OpenFolder));
         var empty=UI.Text(Localization.Text("No downloaded speech models on this PC."),12,UI.Muted);empty.Margin=new(0,12,0,8);body.Children.Add(empty);
         var result=UI.Text("",11,UI.Muted);Accessibility.Live(result);body.Children.Add(result);
         bool showReinstall=false;
@@ -38,7 +39,7 @@ internal sealed partial class AssistantProviderSettings
                 try{bool ok=await ai.UninstallSpeechModel(id,tts);result.Text=service.Status;Feedback(result.Text,!ok);if(ok)showReinstall=true;Refresh();}
                 catch(Exception ex){result.Text=Localization.Text("Could not uninstall this model. ")+ex.Message;Feedback(result.Text,true);}
             };
-            row.Children.Add(remove);var card=new Border{Child=row,Padding=new(12),Margin=new(0,6,0,0),CornerRadius=new(8),Background=UI.Brush("#22262D")};body.Children.Add(card);rows.Add((id,tts,card,detail,remove));
+            row.Children.Add(remove);var card=SpeechCard(row,12,new(0,6,0,0));body.Children.Add(card);rows.Add((id,tts,card,detail,remove));
         }
         void Refresh()
         {
@@ -52,7 +53,7 @@ internal sealed partial class AssistantProviderSettings
                 bool ready=false;
                 try{ready=row.Tts?service.HasTtsWeights(SpeechCatalog.TtsById(row.Id)):service.HasAsrWeights(SpeechCatalog.AsrById(row.Id));}
                 catch(System.IO.IOException){}catch(UnauthorizedAccessException){}
-                row.Detail.Text=(ready?"Installed":Localization.Text("Cached or incomplete download"))+(service.ModelInUse(ai.Options.LocalVoice,row.Id,row.Tts)?Localization.Text(" · Currently selected"):"");
+                row.Detail.Text=Localization.Text(ready?"Installed":"Cached or incomplete download")+(service.ModelInUse(ai.Options.LocalVoice,row.Id,row.Tts)?Localization.Text(" · Currently selected"):"");
                 string sizeKey=(row.Tts?"tts:":"asr:")+row.Id;
                 if(sizes.TryGetValue(sizeKey,out long measured) && measured>=0)row.Detail.Text+=" · "+AssistantSpeechInstall.StorageSize(measured)+Localization.Text(" on disk, including cache");
                 else if(!sizes.ContainsKey(sizeKey))Measure(row.Id,row.Tts,row.Detail,sizeKey);

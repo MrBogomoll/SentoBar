@@ -1142,7 +1142,6 @@
   "Permission to use the ChatGPT plan was not granted.": "Разрешение на использование подписки ChatGPT не выдано.",
   "ChatGPT could not verify this sign-in.": "Не удалось проверить вход в ChatGPT.",
   "Could not read the protected ChatGPT session.": "Не удалось прочитать защищённые данные входа в ChatGPT.",
-  "ChatGPT plan chat currently supports text only.": "Чат по подписке ChatGPT пока поддерживает текстовые сообщения.",
   "ChatGPT returned an invalid reply stream.": "Получен некорректный поток ответа ChatGPT.",
   "ChatGPT returned no text.": "ChatGPT не вернул текст ответа.",
   "ChatGPT plan usage is temporarily unavailable.": "Использование подписки ChatGPT временно недоступно.",

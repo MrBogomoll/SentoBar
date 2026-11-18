@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -128,6 +129,10 @@ internal static class MiniLayoutDiagnostics
                     }
                     if(style=="Dots")
                     {
+                        var pageName=Field<TextBlock>("peekPageName");
+                        check(scenario+" shows the current label on the left",
+                            pageName.IsVisible && pageName.Text==UI.Identity(tabs[id]) &&
+                            Math.Abs(pageName.TranslatePoint(new Point(0,0),footer).X)<.5);
                         double center=strip.TranslatePoint(new Point(strip.ActualWidth/2,0),footer).X;
                         var positions=island.HoverDeckIds.Select(page=>tabs[page].TranslatePoint(new Point(tabs[page].ActualWidth/2,0),footer).X).ToArray();
                         dotPositions??=positions;
@@ -154,6 +159,53 @@ internal static class MiniLayoutDiagnostics
                 check($"{preset} {style}: pushpin is centered in its circle ({offset.X:F2}, {offset.Y:F2})",
                     Math.Abs(offset.X)<.18 && Math.Abs(offset.Y)<.18 && LayoutInformation.GetLayoutClip((Viewbox)detach.Content)==null);
             }
+
+            var previousMotionSettings=(s.AnimationMs,s.WheelWrapTabs);
+            s.ReduceMotion=false;s.AnimationMs=400;s.WheelWrapTabs=false;app.ChangeSettings();
+            island.Collapse();island.PreviewActivity();await Task.Delay(80);
+            var pages=island.HoverDeckIds;
+            var moves=Field<Dictionary<string,TranslateTransform>>("peekMoves");
+            var views=Field<Dictionary<string,FrameworkElement>>("peekViews");
+            var carouselViewport=Field<Grid>("peekViewport");
+
+            async Task CheckWrap(Button arrow,string from,string to,int direction)
+            {
+                island.SelectPeek(from);await Task.Delay(350);island.UpdateLayout();
+                check("Mini arrow remains enabled at "+from,arrow.IsEnabled);
+                arrow.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                check($"Mini arrow wraps {from} to {to}",island.PeekPage==to);
+                if(Motion.Enabled)
+                {
+                    await Task.Delay(50);
+                    check($"Mini wrap slides one page from {from} to {to}",
+                        views[from].IsVisible && views[to].IsVisible && moves[from].X*direction<-.1 &&
+                        moves[to].X*direction>.1 && Math.Abs((moves[to].X-moves[from].X)*direction-carouselViewport.ActualWidth)<.5);
+                }
+                await Task.Delay(350);
+                check($"Mini wrap settles on {to}",views[to].IsVisible && !views[from].IsVisible &&
+                    Math.Abs(moves[to].X)<.1 && island.PeekTabSafe);
+            }
+
+            await CheckWrap(Field<Button>("peekNext"),pages[^1],pages[0],1);
+            await CheckWrap(Field<Button>("peekPrevious"),pages[0],pages[^1],-1);
+
+            s.ReduceMotion=true;app.ChangeSettings();
+            Keyboard.ClearFocus();
+            foreach(var (pressed,from,to) in new[]{(Key.Left,pages[0],pages[^1]),(Key.Right,pages[^1],pages[0])})
+            {
+                island.SelectPeek(from);
+                var key=new KeyEventArgs(Keyboard.PrimaryDevice,PresentationSource.FromVisual(island)!,Environment.TickCount,pressed)
+                    {RoutedEvent=Keyboard.PreviewKeyDownEvent};
+                carouselViewport.RaiseEvent(key);
+                check($"Mini {pressed} key wraps with reduced motion",key.Handled && island.PeekPage==to && !island.PeekMoving);
+            }
+            island.SelectPeek(pages[^1]);
+            check("Mini wheel stops at the edge when wrapping is off",
+                island.RoutePeekWheel(-120,false,null,false) && island.PeekPage==pages[^1]);
+            s.WheelWrapTabs=true;app.ChangeSettings();
+            check("Mini wheel wraps when its setting is on",
+                island.RoutePeekWheel(-120,false,null,false) && island.PeekPage==pages[0]);
+            (s.AnimationMs,s.WheelWrapTabs)=previousMotionSettings;app.ChangeSettings();
 
             island.SelectPeek("media");
             var miniSeek=Field<PeekSeekStrip>("peekSeek");
@@ -196,6 +248,45 @@ internal static class MiniLayoutDiagnostics
                 expandedTabs["notes"].IsHitTestVisible && expandedTabs["notes"].Content is FrameworkElement { Tag:"notes" } &&
                 UI.Identity(expandedTabs["notes"])==Localization.Text("Notes"));
             Capture("expanded-icons");
+
+            s.UiLanguage="ru";s.Preset="iPhone";s.PanelNavigationStyle="Dots";
+            s.WeatherCity="Москва, Россия";s.WeatherLatitude=55.75;s.WeatherLongitude=37.62;
+            var weather=new WeatherSnapshot
+            {
+                Key=WeatherService.Key(s),Updated=DateTimeOffset.UtcNow,Temperature=2,High=2,Low=0,Code=3,Day=true
+            };
+            typeof(WeatherService).GetProperty(nameof(WeatherService.Cached),Fields)!.SetValue(app.Weather,weather);
+            foreach(double width in new[]{300d,500d})
+            {
+                s.HoverWidth=width;app.ChangeSettings();
+                island.Collapse();island.PreviewActivity();island.SelectPeek("weather");await Task.Delay(80);island.UpdateLayout();
+                var glance=Diagnostics.Descendants(Field<Grid>("peekViewport")).OfType<WeatherGlance>().Single(view=>view.IsVisible);
+                Validate($"Weather mini {width}",glance);
+                var labels=Diagnostics.Descendants(glance).OfType<TextBlock>().Where(label=>label.IsVisible).ToArray();
+                check($"Weather mini shows the configured city and forecast at {width}",labels.Any(label=>label.Text==s.WeatherCity) &&
+                    labels.Any(label=>label.Text=="2°") && labels.Any(label=>label.Text.Contains(WeatherService.Condition(weather.Code))));
+                check($"Weather mini gives readings space inside the weather card at {width}",labels.All(label=>
+                {
+                    var bounds=label.TransformToAncestor(glance).TransformBounds(new Rect(label.RenderSize));
+                    return bounds.Left>=10 && bounds.Right<=glance.ActualWidth-10 && bounds.Top>=6 && bounds.Bottom<=glance.ActualHeight-6;
+                }));
+                Capture($"weather-mini-ru-{width}");
+            }
+            s.HoverWidth=300;s.TwoStageHover=true;s.HoverDetailDelayMs=1200;app.ChangeSettings();
+            island.Collapse();island.PreviewActivity();await Task.Delay(80);island.UpdateLayout();
+            var compactGlance=Diagnostics.Descendants(Field<Grid>("peekViewport")).OfType<WeatherGlance>().Single(view=>view.IsVisible);
+            var compactArt=Diagnostics.Descendants(compactGlance).OfType<WeatherArtwork>().Single(element=>element.IsVisible);
+            var compactArtBounds=compactArt.TransformToAncestor(compactGlance).TransformBounds(new Rect(compactArt.RenderSize));
+            check("First-stage weather mini fits the forecast icon inside the card",
+                !island.PeekDetailed && compactArtBounds.Top>=0 && compactArtBounds.Bottom<=compactGlance.ActualHeight);
+            Validate("First-stage weather mini",compactGlance);
+            Capture("weather-mini-ru-compact");
+
+            s.WeatherLatitude=s.WeatherLongitude=null;app.ChangeSettings();island.UpdateLayout();
+            check("Weather mini explains how to set a city and clears the old forecast when the location is removed",
+                !compactArt.IsVisible && Diagnostics.Descendants(compactGlance).OfType<TextBlock>().Any(label=>
+                    label.IsVisible && label.Text==Localization.Text("Choose a city in Weather")));
+            check("Weather mini uses only synthetic cached data",app.Weather.LastAttempt==default);
             island.Collapse();island.PreviewAssistant();await Task.Delay(80);island.UpdateLayout();
             Validate("Sento preview",Field<Grid>("assistantPeek"));Capture("sento");
         }

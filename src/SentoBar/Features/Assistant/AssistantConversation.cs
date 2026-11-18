@@ -9,7 +9,10 @@ namespace SentoBar;
 internal sealed class AssistantConversation : IDisposable
 {
     private readonly IAssistantTransport transport;
+    private readonly bool keepTranscript;
     private readonly List<AssistantMessage> messages=new();
+    private readonly List<AssistantMessage> transcript=new();
+    private AssistantMessage[] restoredContext=[];
     private AssistantMessage[]? snapshot;
     private CancellationTokenSource? current;
     private int busy,epoch;
@@ -17,13 +20,32 @@ internal sealed class AssistantConversation : IDisposable
     internal bool LastTurnHasActionResults {get;private set;}
     internal bool Busy=>Volatile.Read(ref busy)!=0;
     internal int Epoch=>epoch;
-    internal IReadOnlyList<AssistantMessage> Messages=>snapshot??=messages.ToArray();
+    internal IReadOnlyList<AssistantMessage> Messages=>snapshot??=[..transcript,..messages];
+    internal IReadOnlyList<AssistantMessage> ContextMessages=>[..restoredContext,..messages];
     internal event Action<AssistantMessage>? Added;
-    internal AssistantConversation(IAssistantTransport transport)=>this.transport=transport;
+    internal event Action? Committed,Cleared;
+    internal AssistantConversation(IAssistantTransport transport,bool keepTranscript=false)
+    {this.transport=transport;this.keepTranscript=keepTranscript;}
     internal void Stop()=>current?.Cancel();
-    internal void Clear(){Stop();epoch++;ResetMessages();hermesSession=Guid.NewGuid().ToString("N");LastTurnHasActionResults=false;}
+    internal void Clear(){Reset();Cleared?.Invoke();}
+    internal void Restore(IReadOnlyList<AssistantMessage> saved)
+    {
+        Reset();
+        transcript.AddRange(saved);
+        // Reopening a chat restores recent conversational context without uploading
+        // its saved image files or old provider/session metadata again.
+        int characters=0;
+        restoredContext=saved.Reverse().Where(m=>!string.IsNullOrWhiteSpace(m.Text)).Take(40)
+            .TakeWhile(m=>(characters+=m.Text.Length)<=AssistantTransport.MaximumTextCharacters/2)
+            .Reverse().Select(m=>new AssistantMessage(m.Role,m.Text)).ToArray();
+    }
+    private void Reset()
+    {
+        Stop();epoch++;messages.Clear();transcript.Clear();restoredContext=[];snapshot=null;
+        hermesSession=Guid.NewGuid().ToString("N");LastTurnHasActionResults=false;
+    }
     internal void Record(string role,string text)
-    {if(!Busy && text.Length<=16000 && role is "user" or "assistant"){if(messages.Count>48)ResetMessages();Add(new(role,text));}}
+    {if(!Busy && text.Length<=16000 && role is "user" or "assistant"){if(messages.Count>48)TrimContext();Add(new(role,text));Committed?.Invoke();}}
     internal void RecordVoiceOutcome(int generation,AssistantCall call,string result)
     {
         if(generation!=epoch)return;
@@ -31,11 +53,16 @@ internal sealed class AssistantConversation : IDisposable
         // plain text rather than an orphan protocol tool result on a later session.
         // Keep HTTP tool-call turns intact: trimming individual messages can leave
         // an orphan tool result that makes the next provider request invalid.
-        if(messages.Count>=48)ResetMessages();
+        if(messages.Count>=48)TrimContext();
         string Bound(string text,int limit)=>text.Length>limit?text[..limit]:text;
         Add(new("assistant","Reviewed voice action outcome · "+Bound(call.Name,100)+" ["+Bound(call.Id,128)+"] "+Bound(call.Arguments,2000)+" → "+Bound(result,12000)){UiNoticePrefix="Reviewed voice action outcome · "});
+        Committed?.Invoke();
     }
-    private void ResetMessages(){messages.Clear();snapshot=null;}
+    private void TrimContext()
+    {
+        if(keepTranscript)transcript.AddRange(AssistantChatArchive.PublicTranscript(messages));
+        messages.Clear();restoredContext=[];snapshot=null;
+    }
     private void Add(AssistantMessage message)
     {
         messages.Add(message);snapshot=null;Added?.Invoke(message);
@@ -47,7 +74,7 @@ internal sealed class AssistantConversation : IDisposable
         int generation=epoch;
         if(provider.Backend=="Hermes")provider.HermesSessionId=hermesSession;
         using var run=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);current=run;
-        int turnStart=messages.Count;var delivered=new System.Text.StringBuilder();
+        int turnStart=messages.Count;var delivered=new System.Text.StringBuilder();bool committed=false;
         async Task Deliver(string delta,CancellationToken token)
         {
             token.ThrowIfCancellationRequested();if(delivered.Length+delta.Length>64000)throw new InvalidOperationException(Localization.Text("The streamed voice reply exceeded its limit."));
@@ -59,21 +86,24 @@ internal sealed class AssistantConversation : IDisposable
             AssistantTransport.CheckAttachments(provider,attachments);
             // Keep complete tool-call turns together; never trim an orphan tool result.
             long incoming=attachments?.Sum(f=>f.Weight)??0;
-            if(messages.Count>48 || messages.Sum(m=>(long)m.Text.Length+(m.ProtocolItems?.Sum(p=>(long)p.GetRawText().Length)??0)+(m.Calls?.Sum(c=>(long)c.Arguments.Length)??0)+(m.Attachments?.Sum(f=>f.Weight)??0))+incoming>AssistantAttachments.MaximumPayload)ResetMessages();
-            if(messages.Sum(m=>(long)m.Text.Length+(m.Attachments?.Sum(f=>(long)(f.Text?.Length??0))??0))+(attachments?.Sum(f=>(long)(f.Text?.Length??0))??0)+text.Length+instructions.Length>AssistantTransport.MaximumTextCharacters)ResetMessages();
+            if(restoredContext.Length+messages.Count>48 || messages.Sum(m=>(long)m.Text.Length+(m.ProtocolItems?.Sum(p=>(long)p.GetRawText().Length)??0)+(m.Calls?.Sum(c=>(long)c.Arguments.Length)??0)+(m.Attachments?.Sum(f=>f.Weight)??0))+incoming>AssistantAttachments.MaximumPayload)TrimContext();
+            if(restoredContext.Sum(m=>(long)m.Text.Length)+messages.Sum(m=>(long)m.Text.Length+(m.Attachments?.Sum(f=>(long)(f.Text?.Length??0))??0))+(attachments?.Sum(f=>(long)(f.Text?.Length??0))??0)+text.Length+instructions.Length>AssistantTransport.MaximumTextCharacters)TrimContext();
             turnStart=messages.Count;
             for(int i=0;i<messages.Count;i++)if(messages[i].ImageDataUrl!=null)messages[i]=messages[i] with{ImageDataUrl=null};snapshot=null;
             Add(new("user",text,image,Attachments:attachments));
             for(int step=0;step<6;step++)
             {
                 run.Token.ThrowIfCancellationRequested();
-                var input=new[]{new AssistantMessage("system",instructions)}.Concat(messages).ToArray();
+                // A hands-free voice turn should only reuse the text from earlier chat messages.
+                var history=provider.UsesChatGptPlan && (voiceText!=null || voiceProgress!=null)?
+                    messages.Select(message=>message with{Attachments=null}):messages;
+                var input=new[]{new AssistantMessage("system",instructions)}.Concat(restoredContext).Concat(history).ToArray();
                 var reply=voiceText==null?await transport.Complete(provider,key,input,tools,run.Token):await transport.CompleteStreaming(provider,key,input,tools,Deliver,voiceProgress,run.Token);
                 run.Token.ThrowIfCancellationRequested();if(generation!=epoch)throw new OperationCanceledException(run.Token);
                 if(reply.Calls.Count>8)throw new InvalidOperationException(Localization.Text("The provider requested too many actions in one reply."));
                 if(reply.Text.Length>64000 || (reply.ProtocolItems?.Sum(p=>(long)p.GetRawText().Length)??0)>AssistantAttachments.MaximumPayload)throw new InvalidOperationException(Localization.Text("The reply exceeded the conversation size limit."));
                 Add(new("assistant",reply.Text,Calls:reply.Calls,ProtocolItems:reply.ProtocolItems,Attachments:reply.Attachments));
-                if(reply.Calls.Count==0)return;
+                if(reply.Calls.Count==0){committed=true;return;}
                 foreach(var call in reply.Calls)
                 {
                     run.Token.ThrowIfCancellationRequested();
@@ -105,16 +135,23 @@ internal sealed class AssistantConversation : IDisposable
                 {
                     Add(new("user",text));
                     Add(new("assistant","The reply was interrupted after action results arrived. Check these outcomes before repeating an action:\n"+string.Join("\n",outcomes)){UiNoticePrefix="The reply was interrupted after action results arrived. Check these outcomes before repeating an action:\n"});
+                    committed=true;
                 }
                 else if(delivered.Length>0)
                 {
                     Add(new("user",text));
                     Add(new("assistant","The reply was interrupted before completion. Partial streamed text follows; it does not confirm that any agent work completed:\n"+delivered.ToString(0,Math.Min(delivered.Length,16000))){UiNoticePrefix="The reply was interrupted before completion. Partial streamed text follows; it does not confirm that any agent work completed:\n"});
+                    committed=true;
                 }
             }
             throw;
         }
-        finally{if(ReferenceEquals(current,run))current=null;Interlocked.Exchange(ref busy,0);}
+        finally
+        {
+            if(ReferenceEquals(current,run))current=null;
+            Interlocked.Exchange(ref busy,0);
+            if(committed && generation==epoch)Committed?.Invoke();
+        }
     }
-    public void Dispose(){Clear();}
+    public void Dispose(){Reset();}
 }

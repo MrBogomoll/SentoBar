@@ -83,7 +83,7 @@ internal sealed partial class LocalAssistantVoice : IAssistantVoice
             managed=new AssistantManagedSpeech(assets??throw new IOException(Localization.Text("Managed speech is unavailable.")),options);await managed.Start(message=>Status?.Invoke(message),sessionToken);sessionToken.ThrowIfCancellationRequested();if(managed.AsrUrl!=null){options.AsrProtocol="WhisperCpp";options.AsrUrl=managed.AsrUrl.AbsoluteUri;}
         }
         else{Endpoint(options.AsrUrl);if(options.TtsEngine!="Windows voice")Endpoint(options.TtsUrl);}
-        sessionToken.ThrowIfCancellationRequested();audio=new(microphoneId);connected=true;
+        sessionToken.ThrowIfCancellationRequested();audio=new(microphoneId,localPlayback:true);connected=true;
         try{audio.Start(16000,Capture,(peak,speaking)=>{if(connected && Processing)Level?.Invoke(peak,speaking);},()=>Fail(Localization.Text("The local voice audio device stopped. End voice and check Windows sound settings.")));}
         catch{connected=false;audio.Dispose();audio=null;throw;}
         Phase?.Invoke(AssistantState.Listening);Status?.Invoke(Localization.Text("Listening locally · speak, then pause. ASR/TTS stay on this PC; chat uses the selected chat provider."));
@@ -113,30 +113,55 @@ internal sealed partial class LocalAssistantVoice : IAssistantVoice
         try
         {
             Phase?.Invoke(AssistantState.Thinking);Status?.Invoke(Localization.Text("Transcribing speech…"));var recognitionClock=System.Diagnostics.Stopwatch.StartNew();
-            using var wav=new MemoryStream();using(var writer=new WaveFileWriter(new IgnoreDisposeStream(wav),new WaveFormat(16000,16,1)))writer.Write(pcm,0,pcm.Length);
-            string text;
-            if(options.Managed && AssistantOwnSpeech.Asr(options).Native)text=await managed!.Recognize(wav.ToArray(),token);
-            else
-            {
-            using var form=new MultipartFormDataContent();var file=new ByteArrayContent(wav.ToArray());file.Headers.ContentType=new MediaTypeHeaderValue("audio/wav");form.Add(file,"file","voice.wav");form.Add(new StringContent("json"),"response_format");
-            bool cpp=options.AsrProtocol=="WhisperCpp";
-            if(cpp)form.Add(new StringContent("auto"),"language");else form.Add(new StringContent(options.AsrModel),"model");
-            using var request=new HttpRequestMessage(HttpMethod.Post,new Uri(Endpoint(options.AsrUrl),cpp?"inference":"audio/transcriptions")){Content=form};
-            using var deadline=CancellationTokenSource.CreateLinkedTokenSource(token);deadline.CancelAfter(TimeSpan.FromMinutes(2));
-            using var response=await client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,deadline.Token);
-            if(!response.IsSuccessStatusCode)throw new IOException(Localization.Text("Local ASR: ")+await AssistantTransport.Failure(response,null,deadline.Token));
-            using var json=JsonDocument.Parse(await AssistantTransport.ReadBounded(response,65536,deadline.Token));
-            text=json.RootElement.TryGetProperty("text",out var item)?item.GetString()?.Trim()??"":"";
-            }
-            if(text.Length==0){Status?.Invoke(Localization.Text("No speech recognized. Try again or adjust microphone sensitivity."));return;}
+            string text=await TranscribePcm(pcm,token);
+            if(text.Length==0){Status?.Invoke(Localization.Text("No speech recognized. Try the microphone check in Voice settings."));return;}
             await Turn(text[..Math.Min(8000,text.Length)],token,recognitionClock.ElapsedMilliseconds);
         }
         catch(OperationCanceledException) when(!token.IsCancellationRequested && connected){failed=true;Fail(Localization.Text("Speech recognition timed out. Choose a lighter listening model or check your local service, then start voice again."));}
         catch(OperationCanceledException){}
-        catch(Exception ex){failed=true;if(connected)Fail(Localization.Text("Voice stopped. ")+(ex is HttpRequestException?Localization.Text("Local speech service is unavailable. Check its port in Voice settings, then start voice again."):ex.Message));}
+        catch(Exception ex){failed=true;if(connected)Fail(ex is HttpRequestException?Localization.Text("The speech service is not responding. Check that it is running."):ex.Message);}
         finally{Interlocked.Exchange(ref processing,0);if(connected){Level?.Invoke(0,false);Phase?.Invoke(failed?AssistantState.Error:AssistantState.Listening);}}
     }
+    private async Task<string> TranscribePcm(byte[] pcm,CancellationToken token,string whisperLanguage="auto")
+    {
+        using var wav=new MemoryStream();
+        using(var writer=new WaveFileWriter(new IgnoreDisposeStream(wav),AssistantAudioCheck.MicrophoneFormat))writer.Write(pcm,0,pcm.Length);
+        if(options.Managed && AssistantOwnSpeech.Asr(options).Native)return (await managed!.Recognize(wav.ToArray(),token)).Trim();
+
+        using var form=new MultipartFormDataContent();
+        var file=new ByteArrayContent(wav.ToArray());
+        file.Headers.ContentType=new MediaTypeHeaderValue("audio/wav");
+        form.Add(file,"file","voice.wav");
+        form.Add(new StringContent("json"),"response_format");
+        bool cpp=options.AsrProtocol=="WhisperCpp";
+        form.Add(new StringContent(cpp?whisperLanguage:options.AsrModel),cpp?"language":"model");
+        using var request=new HttpRequestMessage(HttpMethod.Post,new Uri(Endpoint(options.AsrUrl),cpp?"inference":"audio/transcriptions")){Content=form};
+        using var deadline=CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(TimeSpan.FromMinutes(2));
+        using var response=await client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,deadline.Token);
+        if(!response.IsSuccessStatusCode)throw new IOException(Localization.Text("Local ASR: ")+await AssistantTransport.Failure(response,null,deadline.Token));
+        using var json=JsonDocument.Parse(await AssistantTransport.ReadBounded(response,65536,deadline.Token));
+        return json.RootElement.TryGetProperty("text",out var item)?item.GetString()?.Trim()??"":"";
+    }
     private async Task<byte[]> Synthesize(string spoken,CancellationToken cancellationToken)
+    {
+        if(options.SpeechLanguage!="ru" || !spoken.Any(char.IsAsciiDigit))return await SynthesizeSegment(spoken,cancellationToken);
+        string words=RussianSpeechNumbers.Speak(spoken);
+        if(words.Length<=360)return await SynthesizeSegment(words,cancellationToken);
+        using var result=new MemoryStream();
+        for(int offset=0;offset<words.Length;)
+        {
+            int length=Math.Min(360,words.Length-offset);
+            if(offset+length<words.Length && words.LastIndexOf(' ',offset+length-1,length) is int space && space>offset)
+                length=space-offset+1;
+            string part=words.Substring(offset,length).Trim();
+            if(part.Length>0)result.Write(await SynthesizeSegment(part,cancellationToken));
+            if(result.Length>48000L*120)throw new IOException(Localization.Text("TTS reply exceeds two minutes."));
+            offset+=length;
+        }
+        return result.ToArray();
+    }
+    private async Task<byte[]> SynthesizeSegment(string spoken,CancellationToken cancellationToken)
     {
         using var generationDeadline=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);generationDeadline.CancelAfter(TimeSpan.FromMinutes(2));var token=generationDeadline.Token;
         try

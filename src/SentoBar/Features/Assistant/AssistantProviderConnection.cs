@@ -23,9 +23,9 @@ internal sealed partial class AssistantProviderSettings
         if(loadingProvider || providerBusy || Selected is not {} saved)return;
         bool changed=HasProviderDraft;
         if(changed)imageCheckStatus.Text=Localization.Text("Image support: connection changed. Save and test again.");
-        if(changed){draftPending=true;connectionStatus.Text=Localization.Text("Not saved yet · choose Save provider to apply your connection changes. Test connection checks this draft only.");connectionStatus.Foreground=UI.Muted;Feedback(connectionStatus.Text);return;}
+        if(changed){draftPending=true;ConnectionResult(Localization.Text("Not saved yet · choose Save provider to apply your connection changes. Test connection checks this draft only."));return;}
         if(draftPending){draftPending=false;Feedback(Localization.Text("No unsaved connection changes · image input ")+(saved.Vision?Localization.Text("On"):Localization.Text("Off"))+".");}
-        var check=ai.ChatSetupFor(saved);connectionStatus.Text=check.Title+"\n"+check.Detail;connectionStatus.Foreground=check.Verified?UI.Brush("#A9CDBD"):UI.Muted;
+        var check=ai.ChatSetupFor(saved);connectionStatus.Text=check.Title+"\n"+check.Detail;UI.SetStatusForeground(connectionStatus,success:check.Verified);
     }
     private (string,string,string,string,bool,bool,string,string,string,string) ReadDraftIdentity()
         =>(name.Text.Trim(),url.Text.Trim(),model.Text.Trim(),protocol.SelectedItem?.ToString()??"",imageInput,imageOutput,realtimeUrl.Text.Trim(),realtimeModel.Text.Trim(),realtimeProtocol.SelectedItem?.ToString()??"",voiceName.Text.Trim());
@@ -64,7 +64,11 @@ internal sealed partial class AssistantProviderSettings
         return ai.Keys.Read(saved.Id);
     }
     private void ConnectionResult(string text,bool error=false,bool success=false)
-    {connectionStatus.Text=text;connectionStatus.Foreground=error?UI.Brush("#EAB3AD"):success?UI.Brush("#A9CDBD"):UI.Muted;Feedback(text,error);status.Foreground=connectionStatus.Foreground;}
+    {
+        connectionStatus.Text=text;
+        UI.SetStatusForeground(connectionStatus,error,success);
+        Feedback(text,error,success);
+    }
     private async Task<bool> LoadModels()
     {
         if(providerBusy)return false;
@@ -103,10 +107,10 @@ internal sealed partial class AssistantProviderSettings
             if(request!=providerRequest || Selected?.Id!=candidate.Id || url.Text.Trim()!=candidate.BaseUrl)return;
             if(string.IsNullOrWhiteSpace(reply.Text))throw new InvalidOperationException(Localization.Text("The API responded but returned no text. Select a text/chat model."));
             if(savedConnection)ai.RecordConnectionCheck(candidate,true,candidate.Name+" · "+candidate.Model+Localization.Text(" returned a chat response."));
-            ConnectionResult(Localization.Text("Connected · ")+candidate.Model+Localization.Text(" returned a chat response. ")+(savedConnection?Localization.Text("Saved connection checked."):Localization.Text("These are draft settings. Save the provider, then check its saved connection."))+Localization.Text(" Voice and tools were not tested."),success:true);app.Notify(Localization.Text("Sento AI connected"),candidate.Name+Localization.Text(" · Chat model responded successfully."));
+            ConnectionResult(savedConnection?Localization.Text("Sento received a reply. Chat is ready."):Localization.Text("Sento received a reply. Save the provider to use it in chat."),success:true);
         }
         catch(OperationCanceledException){if(request==providerRequest){if(savedConnection && candidate!=null)ai.RecordConnectionCheck(candidate,false,Localization.Text("Connection check timed out. Confirm the server is running and check its address and model."));ConnectionResult(Localization.Text("Connection check timed out. Check the endpoint, model and server availability."),true);}}
-        catch(Exception ex){if(request!=providerRequest)return;if(savedConnection && candidate!=null)ai.RecordConnectionCheck(candidate,false,ex.Message);ConnectionResult(Localization.Text("Connection failed · ")+ex.Message,true);app.Notify(Localization.Text("Sento AI connection failed"),ex.Message);}
+        catch(Exception ex){if(request!=providerRequest)return;if(savedConnection && candidate!=null)ai.RecordConnectionCheck(candidate,false,ex.Message);ConnectionResult(ex.Message,true);}
         finally{if(request==providerRequest){providerRequest=null;SetProviderBusy(false);}request?.Dispose();}
     }
 }

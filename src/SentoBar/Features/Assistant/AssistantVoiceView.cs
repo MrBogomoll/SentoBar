@@ -12,7 +12,7 @@ internal sealed class AssistantVoiceView : UserControl
     private readonly App app;
     private readonly AssistantRuntime ai;
     private readonly AssistantOrb orb=new(){Width=140,Height=140};
-    private readonly TextBlock phase=UI.Caption("Ready to talk",12,UI.Muted),caption=UI.Caption("Speak naturally. Sento will reply.",17),heard=UI.Caption("",11,UI.Muted),error=UI.Caption("",10,UI.Muted);
+    private readonly TextBlock phase=UI.Caption("Ready to talk",12,UI.Muted),caption=UI.Caption("",17),heard=UI.Caption("",11,UI.Muted),error=UI.Caption("",11);
     private readonly Ellipse halo=new(){Width=172,Height=172,Stroke=UI.Brush("#849FBE"),StrokeThickness=1.2,Opacity=.18,IsHitTestVisible=false};
     private readonly ScaleTransform pulse=new(1,1);
     private readonly TextBlock connection;
@@ -35,7 +35,7 @@ internal sealed class AssistantVoiceView : UserControl
         primary.FontWeight=FontWeights.SemiBold;primary.MinHeight=40;primary.MaxWidth=260;primary.HorizontalAlignment=HorizontalAlignment.Stretch;primary.Margin=new(0,12,0,6);
         // A finite grid lets the action label wrap at high text/panel scales.
         if(primary.Content is StackPanel action && action.Children[1] is TextBlock label){var glyph=action.Children[0];action.Children.Clear();var content=new Grid();content.ColumnDefinitions.Add(new(){Width=GridLength.Auto});content.ColumnDefinitions.Add(new());content.Children.Add(glyph);label.TextWrapping=TextWrapping.Wrap;label.TextAlignment=TextAlignment.Center;Grid.SetColumn(label,1);content.Children.Add(label);primary.Content=content;}
-        error.Margin=new(0,2,0,4);error.TextAlignment=TextAlignment.Center;error.MaxHeight=30*Accessibility.TextScale;Add(error);privacy.TextAlignment=TextAlignment.Center;privacy.Margin=new(0,4,0,0);Add(privacy);
+        error.Margin=new(0,2,0,4);error.TextAlignment=TextAlignment.Center;Add(error);privacy.TextAlignment=TextAlignment.Center;privacy.Margin=new(0,4,0,0);Add(privacy);
         footer=AssistantControls.Connection(app,out connection,true);controls.Children.Add(primary);controls.Children.Add(footer);layout.RowDefinitions.Add(new());layout.RowDefinitions.Add(new(){Height=GridLength.Auto});
         var viewport=detailsViewport=new ScrollViewer{Content=p,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};UI.LocalizedName(viewport,"Voice conversation details");layout.Children.Add(viewport);Grid.SetRow(controls,1);layout.Children.Add(controls);
         Content=pageViewport=new ScrollViewer{Content=layout,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Loaded+=(_,_)=>Subscribe();Unloaded+=(_,_)=>Unsubscribe();IsVisibleChanged+=(_,_)=>{if(IsVisible)Subscribe();else Unsubscribe();};
@@ -73,20 +73,37 @@ internal sealed class AssistantVoiceView : UserControl
     }
     private async System.Threading.Tasks.Task Toggle()
     {
-        if(ai.VoiceConnected || ai.Busy){await ai.EndVoice();return;}
+        if(ai.VoiceActive){await ai.EndVoice();return;}
+        if(ai.VoiceNeedsChat){app.ShowAssistantChatSettings();return;}
         if(!ai.Options.Enabled || !ai.Setup.Voice.Configured){app.ShowVoiceSettings();return;}
         await ai.StartVoice();
     }
     private void Refresh()
     {
-        if(!IsVisible)return;AssistantControls.SetActionText(primary,ai.VoiceConnected || ai.Busy?"End conversation":!ai.Options.Enabled || !ai.Setup.Voice.Configured?"Set up voice":ai.State==AssistantState.Error?"Try again":"Start conversation");AssistantControls.RefreshConnection(connection,ai,true);privacy.Text=ai.VoiceConnected?(ai.Options.WakeWord.Enabled?Localization.Text("End conversation returns to local wake listening. Stop all microphones from the tray to pause both."):Localization.Text("End conversation turns off the microphone.")):ai.Options.WakeWord.Enabled?ai.WakeStatus:Localization.Text("Your microphone stays off until you start.");privacy.MaxHeight=32*Accessibility.TextScale;privacy.Text=ai.CaptureSummary+"\n"+privacy.Text;privacy.ToolTip=privacy.Text;
-        Accessibility.Announce(phase,ai.WakeListening?Localization.Format("Waiting for “{0}”",ai.Options.WakeWord.Phrase):ai.State switch{AssistantState.Listening=>Localization.Text("Listening"),AssistantState.Speaking=>Localization.Text("Speaking"),AssistantState.Thinking=>ai.Status,AssistantState.Connecting=>Localization.Text("Connecting"),AssistantState.Error=>Localization.Text("Connection needs attention"),_=>Localization.Text("Ready to talk")});phase.TextTrimming=TextTrimming.CharacterEllipsis;phase.TextWrapping=TextWrapping.NoWrap;phase.ToolTip=ai.Status;
-        string answer=ai.VoiceCaption.Length>0 && ai.State==AssistantState.Speaking?ai.VoiceCaption:ai.Conversation.Messages.LastOrDefault(m=>m.Role=="assistant")?.DisplayText??Localization.Text("Speak naturally. Sento will reply.");
+        if(!IsVisible)return;
+        AssistantControls.SetActionText(primary,ai.VoiceAction);
+        primary.IsEnabled=ai.VoiceActive || !ai.Busy && !ai.Speech.Busy && !ai.SpeechCheckBusy;
+        AssistantControls.RefreshConnection(connection,ai,true);
+        privacy.Text=ai.Options.WakeWord.Enabled?ai.WakeStatus:ai.VoiceActive?
+            Localization.Text("End conversation turns off the microphone."):
+            Localization.Text("Your microphone stays off until you start.");
+        Accessibility.Announce(phase,ai.WakeListening?Localization.Format("Waiting for “{0}”",ai.Options.WakeWord.Phrase):
+            ai.VoiceActive?ai.State switch{AssistantState.Listening=>Localization.Text("Listening"),AssistantState.Speaking=>Localization.Text("Speaking"),AssistantState.Thinking=>Localization.Text("Waiting for a reply…"),_=>Localization.Text("Connecting")}:
+            ai.State==AssistantState.Error?Localization.Text("Connection needs attention"):ai.Setup.Voice.Title);
+        phase.TextTrimming=TextTrimming.CharacterEllipsis;phase.TextWrapping=TextWrapping.NoWrap;
+        string answer=ai.VoiceActive?(ai.VoiceCaption.Length>0 && ai.State==AssistantState.Speaking?
+            ai.VoiceCaption:ai.Conversation.Messages.LastOrDefault(m=>m.Role=="assistant")?.DisplayText??Localization.Text("Say a phrase, then pause.")):"";
         answer=AssistantMarkdown.Spoken(answer);if(answer.Length>220)answer=answer[..217]+"…";
-        caption.ToolTip=answer;
+        caption.Visibility=answer.Length==0?Visibility.Collapsed:Visibility.Visible;
         if(caption.Text!=answer){caption.Text=answer;if(Motion.Enabled){caption.Opacity=0;Motion.Fade(caption,1,240);}}
-        var user=ai.Conversation.Messages.LastOrDefault(m=>m.Role=="user");heard.Visibility=user==null?Visibility.Collapsed:Visibility.Visible;heard.Text=user==null?"":user.Text.Length>110?user.Text[..107]+"…":user.Text;
-        error.Text=!ai.Options.Enabled?Localization.Text("Open Voice settings to enable AI and choose a speech connection."):!ai.Setup.Voice.Configured?ai.Setup.Voice.Detail:ai.State is AssistantState.Error or AssistantState.Connecting?ai.Status:ai.VoiceTiming?.Summary??"";error.Visibility=error.Text.Length>0?Visibility.Visible:Visibility.Collapsed;error.ToolTip=!ai.Setup.Voice.Configured?ai.Setup.Voice.Detail:ai.State is AssistantState.Error or AssistantState.Connecting?ai.Status:ai.VoiceTiming?.Detail;InvalidateMeasure();Visual();
+        var user=ai.VoiceActive?ai.Conversation.Messages.LastOrDefault(m=>m.Role=="user"):null;
+        heard.Visibility=user==null?Visibility.Collapsed:Visibility.Visible;heard.Text=user==null?"":user.Text.Length>110?user.Text[..107]+"…":user.Text;
+        error.Text=ai.State==AssistantState.Error && ai.Status.Length>0?ai.Status:
+            ai.SpeechCheckBusy || ai.Speech.Busy?Localization.Text("Wait for the audio check or installation to finish."):
+            ai.VoiceConnected && ai.Status==Localization.Text("No speech recognized. Try the microphone check in Voice settings.")?ai.Status:
+            ai.VoiceActive?"":ai.VoiceSetupHint;
+        error.Visibility=error.Text.Length>0?Visibility.Visible:Visibility.Collapsed;
+        InvalidateMeasure();Visual();
     }
     private void Visual()
     {

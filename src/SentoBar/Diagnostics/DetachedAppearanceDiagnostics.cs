@@ -4,6 +4,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -76,5 +78,75 @@ internal static class DetachedAppearanceDiagnostics
             }
             finally{window.Close();}
         }
+        await CheckIslandPins(app,island,check);
+    }
+
+    private static async Task CheckIslandPins(App app,OverlayWindow island,Action<string,bool> check)
+    {
+        var s=app.Settings;
+        s.CompactLayout=s.HoverPeek=s.HoverFollowsWidgets=true;
+        s.AlwaysTucked=false;
+        s.PanelWidth=300;s.PanelPadding=40;s.PanelScale=1.25;
+        s.PanelNavigationStyle="Dots";
+        app.ChangeSettings();
+        Button[] Pins()=>Diagnostics.Descendants(island).OfType<Button>()
+            .Where(b=>b.IsVisible && UI.Identity(b)=="Detach preview").ToArray();
+        async Task Settle(){await Task.Delay(80);island.UpdateLayout();}
+        async Task OpenPin(string kind,string context)
+        {
+            var pin=Pins().SingleOrDefault();
+            var invoke=pin==null?null:new ButtonAutomationPeer(pin).GetPattern(PatternInterface.Invoke) as IInvokeProvider;
+            check(context+" has a keyboard-accessible pin",pin?.Focusable==true && pin.IsTabStop && invoke!=null);
+            invoke?.Invoke();
+            await Settle();
+            check(context+" opens its own floating window and closes the island",
+                app.Previews.AnyVisible(kind) && !island.IsExpanded && !island.IsPeeking);
+            foreach(var window in Application.Current.Windows.OfType<DetachedPreviewWindow>().ToArray())window.Close();
+        }
+
+        string[] kinds={"media","timer","focus","stopwatch","system","calendar","notes","files"};
+        foreach(string kind in kinds)
+        {
+            island.OpenFeaturePage(kind);
+            await Settle();
+            await OpenPin(kind,"Expanded "+kind);
+        }
+        island.OpenFeaturePage("tasks");
+        await Settle();
+        check("Expanded Tasks has no detachment action",Pins().Length==0);
+
+        foreach(string style in new[]{"Dots","Labels","Icons"})
+        {
+            s.PanelNavigationStyle=style;app.ChangeSettings();island.OpenFeaturePage("system");
+            await Settle();
+            var header=Diagnostics.Descendants(island).OfType<Grid>().Single(g=>Equals(g.Tag,"panel-navigation"));
+            var tabs=Diagnostics.Descendants(header).OfType<ScrollViewer>().Single();
+            var pin=Pins().SingleOrDefault();
+            Rect Bounds(FrameworkElement element)=>element.TransformToAncestor(header).TransformBounds(new Rect(element.RenderSize));
+            bool reachable=pin!=null && island.InputHitTest(pin.TranslatePoint(new Point(pin.ActualWidth/2,pin.ActualHeight/2),island))
+                is DependencyObject hit && (ReferenceEquals(pin,hit) || pin.IsAncestorOf(hit));
+            check("Narrow "+style+" header keeps the System pin and tabs reachable",reachable &&
+                Bounds(pin!).Left>=0 && Bounds(pin!).Right<=Bounds(tabs).Left+.5 && tabs.ViewportWidth>=28);
+        }
+
+        s.DetachablePreviews=false;app.ChangeSettings();await Settle();
+        check("Disabling detachment hides the expanded pin without leaving System",
+            Pins().Length==0 && island.IsExpanded && island.ActivePage=="status");
+        s.DetachablePreviews=true;
+        s.HoverFollowsWidgets=false;
+        s.Widgets.Single(w=>w.Id=="system").Enabled=false;
+        app.ChangeSettings();island.Collapse();island.PreviewActivity();island.SelectPeek("system");
+        await Settle();
+        await OpenPin("system","Mini System with its expanded widget disabled");
+        island.Collapse();island.PreviewActivity();island.SelectPeek("system");island.OpenPeekPage();
+        await Settle();
+        await OpenPin("system","Expanded System opened from a separately enabled mini widget");
+
+        s.CompactLayout=false;
+        s.Widgets.Single(w=>w.Id=="system").Enabled=true;
+        app.ChangeSettings();island.Collapse();island.Reveal(false);await Settle();
+        check("Classic cards give each supported widget a detachment action",Pins().Length==kinds.Length);
+        island.OpenFeaturePage("notes");await Settle();
+        await OpenPin("notes","Classic Notes opened through its full-panel route");
     }
 }

@@ -46,7 +46,7 @@ internal sealed partial class AssistantProviderSettings
     {
         const string name="Let me interrupt Sento while it speaks (use headphones)";
         var body=new StackPanel{Margin=new(0,10,0,0)};
-        var toggle=new CheckBox{Content=Localization.Text(name),IsChecked=ai.Options.VoiceBargeIn,Margin=new(0,4,0,6)};UI.LocalizedName(toggle,name);
+        var toggle=new CheckBox{Content=UI.Caption(name),IsChecked=ai.Options.VoiceBargeIn,Margin=new(0,4,0,6)};UI.LocalizedName(toggle,name);
         toggle.Click+=(_,_)=>
         {
             try

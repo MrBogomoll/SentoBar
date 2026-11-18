@@ -62,11 +62,11 @@ public sealed partial class OverlayWindow
     }
     private bool WidgetOn(string id)=>id==hoverPanelWidget || app.Settings.Widgets.Any(w=>w.Enabled && w.Id==id);
     private IEnumerable<WidgetSetting> PanelWidgets=>app.Settings.Widgets.Where(w=>w.Enabled || w.Id==hoverPanelWidget);
-    private void OpenHoverPanel(string widget,bool activate=true)
+    private void OpenHoverPanel(string widget,bool activate=true,bool openClassicWidget=false)
     {
         LeaveAssistantPanel();
         string page=PageFor(widget);
-        bool hidden=!app.Settings.Widgets.Any(w=>w.Enabled && w.Id==widget) || !app.Settings.CompactLayout && Settings.ToolNames.ContainsKey(widget);
+        bool hidden=!app.Settings.Widgets.Any(w=>w.Enabled && w.Id==widget) || !app.Settings.CompactLayout && (openClassicWidget || Settings.ToolNames.ContainsKey(widget));
         bool leavingMixer=classicMixerOpen;classicMixerOpen=false;
         if(leavingMixer || hoverPanelWidget!=(hidden?widget:null))
         {FlushNotes();hoverPanelWidget=hidden?widget:null;activePage=page;BuildBody();}
@@ -91,7 +91,7 @@ public sealed partial class OverlayWindow
             leaveDelay.Stop();if(!(peeking || TuckRequested) || AssistantReplyVisible || PointerInside() || fileDragActive)return;
             // A drop-down hanging outside the panel keeps it open; collapse once it closes with the pointer outside.
             if(OwnedPopupOpen){leaveDelay.Start();return;}
-            if(!PeekInteractionActive)Collapse();
+            if(!PeekInteractionActive && !(noticeShowing && noticeCard?.IsKeyboardFocusWithin==true))Collapse();
         };
         peekMedia.HorizontalAlignment=HorizontalAlignment.Center;peekMedia.VerticalAlignment=VerticalAlignment.Top;peekMedia.Width=286;peekMedia.Height=100;peekMedia.Margin=new(0);
         // Separate the transport timeline, time labels, and audio wave.
@@ -163,9 +163,12 @@ public sealed partial class OverlayWindow
         navigation.ColumnDefinitions.Add(new(){Width=GridLength.Auto,SharedSizeGroup="PanelHeaderEdge"});
         navigation.ColumnDefinitions.Add(new());
         navigation.ColumnDefinitions.Add(new(){Width=GridLength.Auto,SharedSizeGroup="PanelHeaderEdge"});
+        var leading=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Left};
         var launcher=AssistantLauncher();
-        launcher.Margin=new(0,0,8,0);launcher.HorizontalAlignment=HorizontalAlignment.Left;
-        navigation.Children.Add(launcher);
+        launcher.Margin=new(0,0,8,0);
+        leading.Children.Add(launcher);
+        leading.Children.Add(CreateExpandedDetachButton());
+        navigation.Children.Add(leading);
 
         var settings=Icons.Button("settings",Localization.Text("Settings"),app.ShowSettings,false,28);
         settings.Margin=new(4,0,0,0);
@@ -217,6 +220,7 @@ public sealed partial class OverlayWindow
         FlushNotes();EnsureCompactPage(page);InvalidateSystemMonitor();
         if(activePage!=page){fittedExtent=null;scroll.ScrollToTop();}
         activePage=page;
+        RefreshExpandedDetachButtons();
         if(Settings.ToolNames.ContainsKey(page))
         {
             toolsMode=page;calendarEditing=false;

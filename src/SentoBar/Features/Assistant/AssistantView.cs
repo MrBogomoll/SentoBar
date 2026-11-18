@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -23,7 +24,8 @@ internal sealed partial class AssistantView : UserControl,IDisposable
     private readonly StackPanel messages=new();
     private readonly ScrollViewer transcript;
     private readonly TextBox input=UI.CaptionInput("Message AI companion","");
-    private readonly Button send,share,stop,clear,attach;
+    private readonly Button send,share,stop,historyButton,attach,dictate;
+    private readonly TextBlock dictationFeedback=UI.Caption("",11,UI.Muted);
     private readonly WrapPanel draftFiles=new(){Orientation=Orientation.Horizontal};
     private AssistantAttachment[] shownFiles=Array.Empty<AssistantAttachment>();
     private readonly TextBlock connection;
@@ -33,7 +35,8 @@ internal sealed partial class AssistantView : UserControl,IDisposable
     private readonly Image screenImage=new(){MaxHeight=130,Stretch=Stretch.Uniform,HorizontalAlignment=HorizontalAlignment.Left};
     private Window? hostWindow;
     private ScrollViewer? hostViewport;
-    private bool syncing,subscribed,focusRequested,restoreScroll,followLatest,disposed;
+    private bool syncing,subscribed,focusRequested,restoreScroll,followLatest,disposed,dictatingHere;
+    private string dictationIcon="mic";
     private double savedScrollOffset;
     private int rendered;
     private AssistantMessage? firstRendered;
@@ -57,25 +60,46 @@ internal sealed partial class AssistantView : UserControl,IDisposable
         orb.Width=orb.Height=island?34:40;heading.Children.Add(orb);
         var title=new StackPanel{Margin=new(9,0,0,0),VerticalAlignment=VerticalAlignment.Center};title.Children.Add(UI.Heading(Localization.Text("Sento"),18));context.FontSize=10;context.Margin=new(0,2,0,0);title.Children.Add(context);Grid.SetColumn(title,1);heading.Children.Add(title);
         var headerActions=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
-        stop=IconAction("Stop session and all microphones","stop",ai.StopSession);clear=IconAction("Clear conversation","trash",ai.Clear);headerActions.Children.Add(stop);headerActions.Children.Add(clear);
+        stop=IconAction("Stop session and all microphones","stop",ai.StopSession);headerActions.Children.Add(stop);
+        historyButton=BuildChatHistoryButton();headerActions.Children.Add(historyButton);
         if(island && close!=null){closeButton=IconAction("Back to island","back",close);headerActions.Children.Add(closeButton);}
         Grid.SetColumn(headerActions,2);heading.Children.Add(headerActions);Row(heading,0);
         status.MaxHeight=48;status.TextTrimming=TextTrimming.CharacterEllipsis;statusHost.SetResourceReference(FrameworkElement.StyleProperty,"GlassFieldFrame");var statusBody=new StackPanel();statusBody.Children.Add(status);statusBody.Children.Add(AssistantRecoveryControls.Build(app));statusHost.Child=statusBody;Row(statusHost,1);
         transcript=new ScrollViewer{Content=messages,MinHeight=90,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Padding=new(0,2,0,10)};UI.LocalizedName(transcript,"AI conversation");Row(transcript,2);
         welcomePanel.Children.Add(welcomeTitle);welcomeDescription.Margin=new(0,7,0,14);welcomePanel.Children.Add(welcomeDescription);
         var welcomeActions=new WrapPanel();welcomeActions.Children.Add(Pill(Localization.Text("AI setup"),app.ShowAssistantProviders));welcomeActions.Children.Add(Pill(Localization.Text("Voice mode"),app.OpenVoice));welcomePanel.Children.Add(welcomeActions);
-        input.AcceptsReturn=true;input.TextWrapping=TextWrapping.Wrap;input.MinHeight=36;input.MaxHeight=76;input.Margin=new(0);input.Padding=new(1,7,1,7);input.FontSize=13;input.VerticalContentAlignment=VerticalAlignment.Top;input.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;input.ToolTip=Localization.Text("Enter to send · Shift+Enter for a new line · Escape to stop");
+        input.AcceptsReturn=true;input.TextWrapping=TextWrapping.Wrap;input.MinHeight=36;input.Margin=new(0);input.Padding=new(1,7,1,7);input.FontSize=13;input.VerticalContentAlignment=VerticalAlignment.Top;input.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;input.ToolTip=Localization.Text("Enter to send · Shift+Enter for a new line · Escape to stop");
         input.PreviewKeyDown+=(_,e)=>{if(e.Key==Key.Enter && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)){e.Handled=true;_=Send();}};
         ConfigureClipboard();
         AllowDrop=true;PreviewDragOver+=(_,e)=>{if(e.Data.GetDataPresent(DataFormats.FileDrop)){e.Effects=ai.Busy || ai.ImportingFiles?DragDropEffects.None:DragDropEffects.Copy;e.Handled=true;}};
         PreviewDrop+=(_,e)=>{if(e.Data.GetData(DataFormats.FileDrop) is string[] paths){e.Handled=true;_=ai.AttachFiles(paths);}};
-        send=IconAction("Send","send",()=>_=Send(),true);share=IconAction("Share a window or display","screen",()=>_=ToggleScreen());attach=IconAction("Attach files","paperclip",PickFiles);attach.ToolTip=Localization.Text("Attach images, videos, PDFs and documents · or drop files / paste an image");
+        send=IconAction("Send","send",()=>_=Send(),true);share=IconAction("Share a window or display","screen",()=>_=ToggleScreen());attach=IconAction("Attach files","paperclip",PickFiles);
+        dictate=IconAction("Dictate","mic",()=>_=ToggleDictation());
+        PreviewKeyDown+=(_,e)=>
+        {
+            if(e.Key!=Key.D || Keyboard.Modifiers!=(ModifierKeys.Control|ModifierKeys.Shift))return;
+            e.Handled=true;if(!e.IsRepeat && dictate.IsEnabled)_=ToggleDictation();
+        };
         send.VerticalAlignment=VerticalAlignment.Center;input.BorderThickness=new(0);input.Background=Brushes.Transparent;input.FocusVisualStyle=null;
         var editorHost=new Grid();editorHost.Children.Add(input);var hint=UI.Caption("Message Sento…",13,UI.Muted);hint.Margin=new(1,7,0,0);hint.VerticalAlignment=VerticalAlignment.Top;hint.IsHitTestVisible=false;editorHost.Children.Add(hint);input.TextChanged+=(_,_)=>hint.Visibility=input.Text.Length==0?Visibility.Visible:Visibility.Collapsed;
-        var composer=new Grid();for(int i=0;i<3;i++)composer.RowDefinitions.Add(new(){Height=GridLength.Auto});composer.ColumnDefinitions.Add(new());composer.ColumnDefinitions.Add(new(){Width=GridLength.Auto});Grid.SetColumnSpan(editorHost,2);Grid.SetRow(editorHost,1);composer.Children.Add(editorHost);
-        var attachments=new ScrollViewer{Content=draftFiles,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,MaxHeight=106};Grid.SetColumnSpan(attachments,2);composer.Children.Add(attachments);
-        var bar=new DockPanel{Margin=new(0,3,0,0)};DockPanel.SetDock(send,Dock.Right);bar.Children.Add(send);var tools=new StackPanel{Orientation=Orientation.Horizontal};tools.Children.Add(attach);tools.Children.Add(share);bar.Children.Add(tools);Grid.SetRow(bar,2);Grid.SetColumnSpan(bar,2);composer.Children.Add(bar);
+        var composer=new Grid{Background=Brushes.Transparent};for(int i=0;i<3;i++)composer.RowDefinitions.Add(new(){Height=GridLength.Auto});Grid.SetRow(editorHost,1);composer.Children.Add(editorHost);
+        var attachments=new ScrollViewer{Content=draftFiles,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,MaxHeight=106};composer.Children.Add(attachments);
+        var bar=new DockPanel{Margin=new(0,3,0,0)};
+        DockPanel.SetDock(send,Dock.Right);bar.Children.Add(send);DockPanel.SetDock(dictate,Dock.Right);bar.Children.Add(dictate);
+        var tools=new StackPanel{Orientation=Orientation.Horizontal};tools.Children.Add(attach);tools.Children.Add(share);bar.Children.Add(tools);
+        dictationFeedback.Margin=new(8,0,4,0);dictationFeedback.VerticalAlignment=VerticalAlignment.Center;
+        dictationFeedback.TextWrapping=TextWrapping.Wrap;dictationFeedback.MaxHeight=36*Accessibility.TextScale;
+        Accessibility.Live(dictationFeedback);bar.Children.Add(dictationFeedback);Grid.SetRow(bar,2);composer.Children.Add(bar);
         var composerFrame=new Border{Child=composer,Padding=new(11,4,6,5),Margin=new(0,4,0,3)};
+        composerFrame.PreviewMouseLeftButtonDown+=(_,e)=>
+        {
+            for(var node=e.OriginalSource as DependencyObject;node!=null && node!=composerFrame;node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node))
+            {
+                if(node is ButtonBase or ScrollBar or Thumb)return;
+                if(node==input){input.Focus();return;}
+            }
+            input.Focus();e.Handled=true;
+        };
         composerFrame.SetResourceReference(FrameworkElement.StyleProperty,"GlassFieldFrame");Row(composerFrame,4);
         var session=new StackPanel();
         screenPreview.Content=screenImage;screenPreview.Margin=new(0,3,0,0);screenPreview.Expanded+=(_,_)=>RefreshScreen();session.Children.Add(screenPreview);session.Children.Add(AssistantControls.Connection(app,out connection));Row(session,5);
@@ -113,6 +137,7 @@ internal sealed partial class AssistantView : UserControl,IDisposable
     }
     private void Detach()
     {
+        if(dictatingHere)ai.CancelDictation();
         if(!subscribed)return;
         savedScrollOffset=transcript.VerticalOffset;followLatest=transcript.ScrollableHeight-transcript.VerticalOffset<30;restoreScroll=true;
         subscribed=false;ai.Changed-=QueueRefresh;ai.VisualChanged-=RefreshOrb;app.SettingsChanged-=RefreshOrb;
@@ -139,7 +164,7 @@ internal sealed partial class AssistantView : UserControl,IDisposable
         double height=Math.Max(170,island?(panel.Height-32)/app.Settings.PanelScale:(hostWindow?.ActualHeight>0?hostWindow.ActualHeight:640)-78);
         if(Math.Abs(layout.Height-height)>.5 || double.IsNaN(layout.Height))layout.Height=height;
         transcript.MinHeight=Math.Max(44,height*.2);
-        input.MinHeight=36;
+        input.MaxHeight=Math.Clamp(height*.45,input.MinHeight,280*Accessibility.TextScale);
         double width=island?(panel.Width-app.Settings.PanelPadding*2)/app.Settings.PanelScale:Math.Max(240,(hostWindow?.ActualWidth??600)-64);
         if(width>0 && Math.Abs(layout.Width-width)>.5 || double.IsNaN(layout.Width))layout.Width=Math.Max(180,width);
     }
@@ -148,14 +173,55 @@ internal sealed partial class AssistantView : UserControl,IDisposable
         var button=Icons.Button(icon,name,action,primary,32);button.MinWidth=32;button.Margin=new(3,0,0,0);button.Padding=new(0);button.Content=Icons.Create(icon,18,primary?Brushes.Black:Brushes.White);button.HorizontalContentAlignment=HorizontalAlignment.Center;button.VerticalContentAlignment=VerticalAlignment.Center;button.Tag=new CornerRadius(primary?16:8);if(!primary)button.Background=Brushes.Transparent;return button;
     }
     private async System.Threading.Tasks.Task Send()
-    {string text=input.Text.Trim();if(text.Length==0 && ai.DraftFiles.Count==0 || ai.Busy || ai.ImportingFiles)return;int generation=ai.Conversation.Epoch;input.Clear();bool success=await ai.Send(text);if(!success && generation==ai.Conversation.Epoch && input.Text.Length==0)input.Text=text;}
+    {string text=input.Text.Trim();if(text.Length==0 && ai.DraftFiles.Count==0 || ai.Busy || ai.ImportingFiles || ai.DictationPhase!=AssistantDictationPhase.Idle)return;int generation=ai.Conversation.Epoch;input.Clear();bool success=await ai.Send(text);if(!success && generation==ai.Conversation.Epoch && input.Text.Length==0)input.Text=text;}
+    private async System.Threading.Tasks.Task ToggleDictation()
+    {
+        if(ai.DictationPhase==AssistantDictationPhase.Recording){ai.FinishDictation();return;}
+        if(ai.DictationPhase==AssistantDictationPhase.Transcribing){ai.CancelDictation();return;}
+        if(dictatingHere || ai.VoiceActive || ai.Busy || ai.ImportingFiles)return;
+        if(!ai.DictationAvailable){app.ShowVoiceSettings();return;}
+        int generation=ai.Conversation.Epoch;
+        dictatingHere=true;
+        try
+        {
+            string? text=await ai.StartDictation();
+            if(!disposed && IsVisible && generation==ai.Conversation.Epoch && !string.IsNullOrWhiteSpace(text))InsertDictation(text);
+        }
+        finally{dictatingHere=false;}
+    }
+    internal void InsertDictation(string text)
+    {
+        string phrase=text.Trim();
+        int index=input.CaretIndex;
+        string before=index>0 && !char.IsWhiteSpace(input.Text[index-1])?" ":"";
+        string after=index<input.Text.Length && !char.IsWhiteSpace(input.Text[index])?" ":"";
+        input.Focus();
+        input.BeginChange();
+        try{input.Select(index,0);input.SelectedText=before+phrase+after;input.CaretIndex=index+before.Length+phrase.Length;}
+        finally{input.EndChange();}
+    }
     private void PickFiles()
     {
-        var dialog=new Microsoft.Win32.OpenFileDialog{Title=Localization.Text("Attach files to Sento"),Multiselect=true,CheckFileExists=true,Filter=Localization.Text("Supported attachments|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.tif;*.tiff;*.webp;*.pdf;*.mp4;*.webm;*.mov;*.mkv;*.avi;*.mp3;*.wav;*.m4a;*.ogg;*.flac;*.docx;*.pptx;*.xlsx;*.odt;*.txt;*.md;*.csv;*.tsv;*.json;*.xml;*.py;*.cs;*.js;*.ts;*.log|All files|*.*")};
+        bool plan=ai.Provider?.UsesChatGptPlan==true;
+        var dialog=new Microsoft.Win32.OpenFileDialog{Title=Localization.Text(plan?"Attach images to Sento":"Attach files to Sento"),Multiselect=true,CheckFileExists=true,
+            Filter=Localization.Text(plan?"Images|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.tif;*.tiff;*.webp":"Supported attachments|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.tif;*.tiff;*.webp;*.pdf;*.mp4;*.webm;*.mov;*.mkv;*.avi;*.mp3;*.wav;*.m4a;*.ogg;*.flac;*.docx;*.pptx;*.xlsx;*.odt;*.txt;*.md;*.csv;*.tsv;*.json;*.xml;*.py;*.cs;*.js;*.ts;*.log|All files|*.*")};
         if(dialog.ShowDialog(Window.GetWindow(this))==true)_=ai.AttachFiles(dialog.FileNames);
     }
     private void RefreshSendState()
-    {send.IsEnabled=ai.Options.Enabled && !ai.Busy && !ai.ImportingFiles && (!string.IsNullOrWhiteSpace(input.Text) || ai.DraftFiles.Count>0);attach.IsEnabled=ai.Options.Enabled && !ai.Busy && !ai.ImportingFiles;}
+    {
+        bool active=ai.DictationPhase!=AssistantDictationPhase.Idle;
+        attach.IsEnabled=ai.Options.Enabled && !ai.Busy && !ai.ImportingFiles && !active && !ai.VoiceActive;
+        send.IsEnabled=!active && ai.Options.Enabled && !ai.Busy && !ai.ImportingFiles && (!string.IsNullOrWhiteSpace(input.Text) || ai.DraftFiles.Count>0);
+        dictate.IsEnabled=active || ai.Options.Enabled && !ai.Busy && !ai.ImportingFiles && !ai.VoiceActive && !ai.SpeechCheckBusy && !ai.Speech.Busy;
+        string icon=ai.DictationPhase switch{AssistantDictationPhase.Recording=>"stop-filled",AssistantDictationPhase.Transcribing=>"x",_=>"mic"};
+        string label=ai.DictationPhase switch{AssistantDictationPhase.Recording=>"Finish dictation",AssistantDictationPhase.Transcribing=>"Cancel dictation",_=>ai.DictationAvailable?"Dictate":"Set up dictation"};
+        if(dictationIcon!=icon){dictationIcon=icon;dictate.Content=Icons.Create(icon,18,Brushes.White);}
+        if(active)dictate.SetResourceReference(Control.BackgroundProperty,"GlassEmphasisFill");else dictate.Background=Brushes.Transparent;
+        UI.LocalizedName(dictate,label);
+        dictate.ToolTip=Localization.Text(label)+" · Ctrl+Shift+D";
+        Accessibility.Announce(dictationFeedback,ai.DictationStatus);
+        dictationFeedback.Visibility=string.IsNullOrEmpty(ai.DictationStatus)?Visibility.Collapsed:Visibility.Visible;
+    }
     private async System.Threading.Tasks.Task ToggleScreen()
     {
         if(ai.Desktop.Sharing){ai.StopSharing();return;}
@@ -168,7 +234,14 @@ internal sealed partial class AssistantView : UserControl,IDisposable
         catch(Exception ex){ai.StopSharing();statusHost.Visibility=status.Visibility=Visibility.Visible;Accessibility.Announce(status,ex.Message);}
         finally{share.IsEnabled=ai.Options.Enabled && (!ai.Busy || ai.Desktop.Sharing);}
     }
-    private void RefreshOrb(){if(!IsVisible)return;orb.State=ai.State;orb.Level=ai.Level;orb.Live=ai.VoiceConnected;orb.ReduceMotion=app.Settings.ReduceMotion;}
+    private void RefreshOrb()
+    {
+        if(!IsVisible)return;
+        bool recording=ai.DictationPhase==AssistantDictationPhase.Recording;
+        orb.State=recording?AssistantState.Listening:ai.State;
+        orb.Level=recording?ai.DictationLevel:ai.Level;
+        orb.Live=recording || ai.VoiceConnected;orb.ReduceMotion=app.Settings.ReduceMotion;
+    }
     private void QueueRefresh()
     {
         if(refreshQueued || !subscribed)return;refreshQueued=true;
@@ -180,13 +253,17 @@ internal sealed partial class AssistantView : UserControl,IDisposable
         try
         {
             AssistantControls.RefreshConnection(connection,ai);context.Text=ai.CaptureSummary;context.ToolTip=ai.SetupSummary;
-            status.Visibility=!ai.Options.Enabled || ai.Provider==null || ai.State!=AssistantState.Idle || ai.ImportingFiles?Visibility.Visible:Visibility.Collapsed;
-            statusHost.Visibility=status.Visibility;status.Foreground=Accessibility.HighContrast?SystemColors.WindowTextBrush:ai.State==AssistantState.Error?UI.Brush("#EAB3AD"):UI.Muted;
-            Accessibility.Announce(status,!ai.Options.Enabled?Localization.Text("Enable your companion in Settings → AI."):Localization.Text(ai.Status.Replace("Configure a realtime endpoint and model in Providers.",Localization.Text("Set up voice in Settings → AI.")).Replace("in provider settings","in Settings → AI")));
+            bool historyFailed=ai.ChatHistoryError.Length>0;
+            status.Visibility=historyFailed || !ai.Options.Enabled || ai.Provider==null || ai.State!=AssistantState.Idle || ai.ImportingFiles?Visibility.Visible:Visibility.Collapsed;
+            statusHost.Visibility=status.Visibility;status.Foreground=Accessibility.HighContrast?SystemColors.WindowTextBrush:historyFailed || ai.State==AssistantState.Error?UI.Brush("#EAB3AD"):UI.Muted;
+            Accessibility.Announce(status,historyFailed?ai.ChatHistoryError:!ai.Options.Enabled?Localization.Text("Enable your companion in Settings → AI."):Localization.Text(ai.Status.Replace("Configure a realtime endpoint and model in Providers.",Localization.Text("Set up voice in Settings → AI.")).Replace("in provider settings","in Settings → AI")));
             welcomeDescription.Text=Localization.Text(!ai.Options.Enabled?Localization.Text("Enable your companion in AI setup to begin."):!ai.Setup.Chat.Configured?Localization.Text("Connect your provider or Hermes to start chatting."):Localization.Text("Ask a question, attach a file, or switch to voice."));
-            stop.Visibility=ai.Busy || ai.ImportingFiles || ai.VoiceConnected || ai.WakeArmed || ai.Desktop.Sharing?Visibility.Visible:Visibility.Collapsed;clear.Visibility=ai.Conversation.Messages.Count>0 || ai.DraftFiles.Count>0?Visibility.Visible:Visibility.Collapsed;
+            stop.Visibility=ai.Busy || ai.ImportingFiles || ai.VoiceConnected || ai.WakeArmed || ai.Desktop.Sharing?Visibility.Visible:Visibility.Collapsed;
+            historyButton.IsEnabled=!ai.Busy && !ai.VoiceActive && !ai.ImportingFiles;
             bool plan=ai.Provider?.UsesChatGptPlan==true;
-            attach.Visibility=share.Visibility=plan?Visibility.Collapsed:Visibility.Visible;
+            share.Visibility=plan?Visibility.Collapsed:Visibility.Visible;
+            UI.LocalizedName(attach,plan?"Attach images":"Attach files");
+            attach.ToolTip=Localization.Text(plan?"Choose, paste or drop images":"Attach images, videos, PDFs and documents · or drop files / paste an image");
             RefreshSendState();share.IsEnabled=ai.Options.Enabled && (!ai.Busy || ai.Desktop.Sharing);
             if(!shownFiles.SequenceEqual(ai.DraftFiles)){draftFiles.Children.Clear();shownFiles=ai.DraftFiles.ToArray();foreach(var file in shownFiles)draftFiles.Children.Add(new AssistantAttachmentView(ai,file,true));}
             draftFiles.IsEnabled=!ai.Busy && !ai.ImportingFiles;
@@ -203,11 +280,36 @@ internal sealed partial class AssistantView : UserControl,IDisposable
             for(int i=rendered;i<history.Count;i++)
             {
                 var message=history[i];if(message.Role is not ("user" or "assistant") || string.IsNullOrWhiteSpace(message.Text) && message.Attachments is not {Count:>0} || message.Text.StartsWith("Updated shared screen after"))continue;
-                var body=new StackPanel();if(!string.IsNullOrWhiteSpace(message.Text))body.Children.Add(message.Role=="assistant"?AssistantMarkdown.Render(message.DisplayText):UI.Text(message.Text,13));
-                if(message.Attachments!=null)foreach(var file in message.Attachments)body.Children.Add(new AssistantAttachmentView(ai,file));FrameworkElement text=body;text.Margin=message.Role=="user"?new Thickness(12,9,12,9):new Thickness(2,10,2,10);
-                var menu=new ContextMenu();var copy=new MenuItem{Header=Localization.Text("Copy message")};copy.Click+=(_,_)=>{try{Clipboard.SetText(message.DisplayText);}catch{}};menu.Items.Add(copy);text.ContextMenu=menu;
-                var bubble=new Border{Child=text,CornerRadius=new(12),Background=Brushes.Transparent,Margin=new(message.Role=="user"?42:0,3,message.Role=="user"?0:12,5)};if(message.Role=="user")bubble.SetResourceReference(Border.BackgroundProperty,"ControlFill");messages.Children.Add(bubble);
-                if(IsLoaded && !app.Settings.ReduceMotion && !restoring){bubble.Opacity=0;Motion.Fade(bubble,1,180);}
+                bool outgoing=message.Role=="user";
+                var body=new StackPanel{Margin=outgoing?new Thickness(12,9,12,9):new Thickness(2,10,2,10)};
+                if(!string.IsNullOrWhiteSpace(message.Text))
+                {
+                    if(outgoing)
+                    {
+                        var text=UI.Text(message.Text,13);
+                        text.TextAlignment=TextAlignment.Right;
+                        body.Children.Add(text);
+                    }
+                    else body.Children.Add(AssistantMarkdown.Render(message.DisplayText));
+                }
+                if(message.Attachments!=null)
+                {
+                    foreach(var file in message.Attachments)
+                    {
+                        var attachment=new AssistantAttachmentView(ai,file);
+                        if(outgoing)attachment.HorizontalAlignment=HorizontalAlignment.Right;
+                        body.Children.Add(attachment);
+                    }
+                }
+                var menu=new ContextMenu();var copy=new MenuItem{Header=Localization.Text("Copy message")};copy.Click+=(_,_)=>{try{Clipboard.SetText(message.DisplayText);}catch{}};menu.Items.Add(copy);body.ContextMenu=menu;
+                var row=new Border{Child=body,Background=Brushes.Transparent,Margin=outgoing?new Thickness(42,3,0,5):new Thickness(0,3,12,5)};
+                if(outgoing)
+                {
+                    row.HorizontalAlignment=HorizontalAlignment.Right;
+                    row.MaxWidth=480;
+                }
+                messages.Children.Add(row);
+                if(IsLoaded && !app.Settings.ReduceMotion && !restoring){row.Opacity=0;Motion.Fade(row,1,180);}
             }
             rendered=history.Count;firstRendered=history.FirstOrDefault();renderedHistory=history;restoreScroll=false;
             if(bottom || restoring)Dispatcher.BeginInvoke(()=>{if(IsLoaded){if(bottom)transcript.ScrollToEnd();else transcript.ScrollToVerticalOffset(savedScrollOffset);}});

@@ -15,6 +15,7 @@ internal static class SpeechStorageDiagnostics
 {
     internal static async Task Run(App app,OverlayWindow island,string directory,Action<string,bool> check)
     {
+        app.Settings.UiLanguage="en";Localization.Configure(app.Settings);
         island.Hide();var ai=app.Assistant;var asr=SpeechCatalog.Asr[0];var tts=SpeechCatalog.Tts.First(m=>m.Package==null && m.Id!="windows");
         void Put(string path){Directory.CreateDirectory(Path.GetDirectoryName(path)!);File.WriteAllText(path,"synthetic fixture, not real weights");}
         Put(ai.Speech.AsrPath(asr));Put(ai.Speech.TtsPath(tts));Put(ai.Speech.TtsPath(tts)+".json");Put(ai.Speech.TtsPath(tts)+".MODEL_CARD");
@@ -27,12 +28,24 @@ internal static class SpeechStorageDiagnostics
         {
             window.Show();Diagnostics.NavigateSettings(window,"AI");await Task.Delay(80);
             var editor=(AssistantProviderSettings)typeof(SettingsWindow).GetField("aiSettings",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
-            editor.OpenVoiceSetup();((Action<string>)editor.GetType().GetField("selectVoicePage",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(editor)!)("Models");window.UpdateLayout();await Task.Delay(100);
+            editor.OpenVoiceSetup();await Task.Delay(120);window.UpdateLayout();
+            var setupTitle=Diagnostics.Descendants(window).OfType<TextBlock>().Single(t=>t.IsVisible && t.Text=="Voice models for your PC");
+            await CheckCard("Speech download",setupTitle);
+            await ai.Speech.Scan();await Task.Delay(180);
+            var plan=Diagnostics.Descendants(window).OfType<Expander>().Single(e=>e.Header?.ToString()=="Files and download sizes");
+            plan.IsExpanded=true;plan.BringIntoView();window.UpdateLayout();
+            check("Speech setup exposes the download amount and exact filenames before installing",
+                Diagnostics.Descendants(window).OfType<TextBlock>().Any(t=>t.IsVisible && t.Text.StartsWith("Estimated download: ")) &&
+                plan.Content is TextBlock download && download.Text.Contains(Path.GetFileName(ai.Speech.AsrPath(asr))) && download.Text.Contains("To download"));
+            Capture(window,"speech-download-files",directory);
+            ((Action<string>)editor.GetType().GetField("selectVoicePage",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(editor)!)("Models");window.UpdateLayout();await Task.Delay(100);
             var storage=Diagnostics.Descendants(window).OfType<Expander>().Single(e=>e.Header?.ToString()=="Installed models · manage storage");
             storage.IsExpanded=true;storage.BringIntoView();await Task.Delay(100);window.UpdateLayout();
             Button[] Buttons()=>Diagnostics.Descendants(storage).OfType<Button>().Where(b=>AutomationProperties.GetName(b).StartsWith("Uninstall ") && b.IsVisible).ToArray();
             check("Speech storage lists downloaded ASR and TTS models separately",Buttons().Length==2 && Buttons().All(b=>b.IsEnabled && b.Focusable));
             check("Speech storage marks the currently selected models",Diagnostics.Descendants(storage).OfType<TextBlock>().Count(t=>t.IsVisible && t.Text.Contains("Currently selected"))==2);
+            var installedTitle=Diagnostics.Descendants(storage).OfType<TextBlock>().Single(t=>t.IsVisible && t.Text=="ASR · "+asr.Name);
+            await CheckCard("Installed speech model",installedTitle);
             Capture(window,"speech-storage-wide",directory);
             window.Width=520;window.Height=640;storage.BringIntoView();await Task.Delay(120);window.UpdateLayout();Capture(window,"speech-storage-narrow",directory);
             check("Speech storage remains scrollable and reachable on narrow windows",storage.ActualWidth>200 && Buttons().All(b=>b.ActualWidth>0));
@@ -45,6 +58,27 @@ internal static class SpeechStorageDiagnostics
             check("Speech storage removes TTS independently",await ai.UninstallSpeechModel(tts.Id,true));await Task.Delay(100);window.UpdateLayout();
             check("Speech storage empty state updates after uninstall",Buttons().Length==0 && Diagnostics.Descendants(storage).OfType<TextBlock>().Any(t=>t.IsVisible && t.Text=="No downloaded speech models on this PC."));
             check("Speech storage preserves shared engines, imported files and saved preferences",File.Exists(engine) && File.Exists(external) && File.ReadAllText(Path.Combine(app.Store.DirectoryPath,"assistant.json"))==before);
+
+            async Task CheckCard(string label,TextBlock caption)
+            {
+                var card=(caption.Parent as StackPanel)?.Parent as Border;
+                foreach(string theme in new[]{"Light","Dark"})
+                {
+                    app.Settings.WindowTheme=theme;window.ApplyWindowAppearance();await Task.Delay(60);window.UpdateLayout();
+                    var cardColor=(window.FindResource("SettingsCard") as SolidColorBrush)?.Color;
+                    var text=(caption.Foreground as SolidColorBrush)?.Color;
+                    var canvas=(LinearGradientBrush)window.FindResource("SettingsCanvas");
+                    Color Blend(Color overlay,Color background)
+                    {
+                        double a=overlay.A/255d;
+                        return Color.FromRgb((byte)(overlay.R*a+background.R*(1-a)),(byte)(overlay.G*a+background.G*(1-a)),(byte)(overlay.B*a+background.B*(1-a)));
+                    }
+                    double contrast=text is {} color && cardColor is {} fill?canvas.GradientStops.Min(stop=>SettingsThemeDiagnostics.Contrast(color,Blend(fill,stop.Color))):0;
+                    check($"{theme} {label} card uses readable themed colors ({contrast:0.00}:1)",
+                        (card?.Background as SolidColorBrush)?.Color==cardColor && caption.IsVisible && contrast>=4.5);
+                }
+                app.Settings.WindowTheme="Light";window.ApplyWindowAppearance();
+            }
         }
         finally{window.Close();}
     }

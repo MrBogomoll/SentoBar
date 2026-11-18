@@ -24,27 +24,31 @@ internal sealed partial class AssistantProviderSettings
     {
         var p=new StackPanel();var options=ai.Options.LocalVoice;
         var enabled=AssistantWindow.Pill(ai.Options.Enabled?Localization.Text("AI companion on"):Localization.Text("Enable AI companion"),()=>{});speechEnable=enabled;
-        enabled.Click+=(_,_)=>{ai.Options.Enabled=!ai.Options.Enabled;SaveConfiguration();RefreshEnabled();enabled.Content=ai.Options.Enabled?Localization.Text("AI companion on"):Localization.Text("Enable AI companion");};
+        enabled.Click+=(_,_)=>{ai.Options.Enabled=true;if(!SaveConfiguration())ai.Options.Enabled=false;RefreshEnabled();};
         p.Children.Add(UI.Heading(Localization.Text("How should Sento hear and speak?"),20));
-        var intro=UI.Text(Localization.Text("Choose where your voice is processed. Your chat connection supplies the answers."),13,UI.Muted);intro.Margin=new(0,6,0,16);p.Children.Add(intro);
-        var mode=new ComboBox{ItemsSource=new[]{"Online provider","On this PC","External server","My model files"},SelectedIndex=options.Enabled?(options.Managed?(options.OwnModels?3:1):2):0};speechModePicker=mode;
-        var choices=new Grid{Margin=new(0,0,0,18)};choices.ColumnDefinitions.Add(new());choices.ColumnDefinitions.Add(new());
+        var intro=UI.Text(Localization.Text("For ChatGPT subscriptions, install speech models on this PC. Sento sends only the recognized text to ChatGPT and reads the reply aloud."),13,UI.Muted);intro.Margin=new(0,6,0,12);p.Children.Add(intro);
+        enabled.Visibility=ai.Options.Enabled?Visibility.Collapsed:Visibility.Visible;p.Children.Add(enabled);
+        var mode=new ComboBox{ItemsSource=new[]{"Online provider","On this PC","External server","My model files"},SelectedIndex=options.Enabled?(options.Managed?(options.OwnModels?3:1):2):ai.Setup.Voice.Configured?0:1};speechModePicker=mode;
+        var choices=new WrapPanel();
         var choiceButtons=new System.Collections.Generic.List<Button>();
         string[] titles={"Online provider","On this PC","External server","My model files"};
-        string[] captions={Localization.Text("Use a realtime voice API"),Localization.Text("Install voices matched to your hardware"),Localization.Text("Connect an existing speech service"),Localization.Text("Import models you already have")};
         for(int i=0;i<4;i++)
         {
-            if(i%2==0)choices.RowDefinitions.Add(new(){Height=GridLength.Auto});int index=i;
-            var content=new StackPanel();content.Children.Add(UI.Heading(Localization.Text(titles[i]),15));var caption=UI.Text(captions[i],12,UI.Muted);caption.Margin=new(0,5,0,0);content.Children.Add(caption);
-            var button=UI.CaptionButton(titles[i],()=>mode.SelectedIndex=index);button.SetBinding(IsEnabledProperty,new System.Windows.Data.Binding("IsEnabled"){Source=mode});button.Content=content;button.HorizontalContentAlignment=HorizontalAlignment.Left;button.Padding=new(16);button.MinHeight=84;button.Margin=new(0,0,i%2==0?10:0,10);button.Tag=new CornerRadius(10);choiceButtons.Add(button);Grid.SetRow(button,i/2);Grid.SetColumn(button,i%2);choices.Children.Add(button);
+            int index=i;
+            var button=UI.CaptionButton(titles[i],()=>mode.SelectedIndex=index);
+            button.SetBinding(IsEnabledProperty,new System.Windows.Data.Binding("IsEnabled"){Source=mode});
+            button.Margin=new(0,0,8,6);choiceButtons.Add(button);
+            if(i!=1)choices.Children.Add(button);
         }
-        UI.LocalizedName(choices,"Voice processing location");p.Children.Add(choices);
+        choiceButtons[1].HorizontalAlignment=HorizontalAlignment.Left;
+        p.Children.Add(choiceButtons[1]);
+        p.Children.Add(new Expander{Header=Localization.Text("Other voice connections"),Content=choices,IsExpanded=mode.SelectedIndex!=1,Margin=new(0,4,0,8)});
         var realtimeHelp=new StackPanel();realtimeHelp.Children.Add(UI.Heading(Localization.Text("Online voice"),17));Label(realtimeHelp,"Voice provider",voiceProvider);
         realtimeHelp.Children.Add(UI.Text(Localization.Text("Uses the realtime model and voice saved for this provider. API usage may be billed by your provider."),12,UI.Muted));
         realtimeHelp.Children.Add(AssistantWindow.Pill("Configure provider",()=>{SelectSetupSection("Chat");connectionEditor.IsExpanded=true;}));p.Children.Add(realtimeHelp);
         var automatic=AutomaticSpeechSettings(mode);p.Children.Add(automatic);var own=OwnSpeechSettings(mode);p.Children.Add(own);
         var local=new StackPanel();
-        void SpeechMode(){for(int i=0;i<choiceButtons.Count;i++){bool selected=i==mode.SelectedIndex;choiceButtons[i].SetResourceReference(Control.BackgroundProperty,selected?"SelectionFill":"ControlFill");if(choiceButtons[i].Content is StackPanel card && card.Children[0] is TextBlock heading)heading.Text=Localization.Text(titles[i])+(selected?Localization.Text(" · Selected"):"");System.Windows.Automation.AutomationProperties.SetHelpText(choiceButtons[i],selected?Localization.Text("Selected voice source"):Localization.Text("Choose this voice source"));}own.Visibility=mode.SelectedIndex==3?Visibility.Visible:Visibility.Collapsed;local.Visibility=mode.SelectedIndex==2?Visibility.Visible:Visibility.Collapsed;automatic.Visibility=mode.SelectedIndex==1?Visibility.Visible:Visibility.Collapsed;realtimeHelp.Visibility=mode.SelectedIndex==0?Visibility.Visible:Visibility.Collapsed;}
+        void SpeechMode(){for(int i=0;i<choiceButtons.Count;i++){bool selected=i==mode.SelectedIndex;choiceButtons[i].SetResourceReference(Control.BackgroundProperty,selected?"SelectionFill":"ControlFill");choiceButtons[i].Content=Localization.Text(titles[i])+(selected?Localization.Text(" · Selected"):"");System.Windows.Automation.AutomationProperties.SetHelpText(choiceButtons[i],selected?Localization.Text("Selected voice source"):Localization.Text("Choose this voice source"));}own.Visibility=mode.SelectedIndex==3?Visibility.Visible:Visibility.Collapsed;local.Visibility=mode.SelectedIndex==2?Visibility.Visible:Visibility.Collapsed;automatic.Visibility=mode.SelectedIndex==1?Visibility.Visible:Visibility.Collapsed;realtimeHelp.Visibility=mode.SelectedIndex==0?Visibility.Visible:Visibility.Collapsed;}
         mode.SelectionChanged+=(_,_)=>SpeechMode();SpeechMode();
         var tier=new ComboBox{ItemsSource=new[]{"Light · CPU","Balanced · CPU / GPU","Quality · about 8 GB VRAM"},SelectedItem=options.Tier};Label(local,"Hardware template",tier);
         var info=UI.Text(Localization.Text("Templates are starting points, not hardware guarantees. Speech services run separately and use additional RAM/VRAM. A local chat model shares that budget."),10,UI.Muted);local.Children.Add(info);
@@ -99,9 +103,8 @@ internal sealed partial class AssistantProviderSettings
                 }
                 else if(Type.GetTypeFromProgID("SAPI.SpVoice")==null)throw new IOException(Localization.Text("Install a Windows speech voice, or choose a local TTS service."));
                 speechStatus.Text=Localization.Text("Speech services are reachable. No microphone or speech synthesis was started. Save voice setup, return to Voice mode and choose Start conversation.");
-                app.Notify(Localization.Text("Sento local voice"),Localization.Text("Speech services are reachable. Models and inference still depend on your server setup."));
             }
-            catch(Exception ex){speechStatus.Text=Localization.Text("Local speech connection failed: ")+(ex is HttpRequestException?Localization.Text("Start the local server and check its port."):ex.Message);app.Notify(Localization.Text("Sento local voice"),speechStatus.Text);}
+            catch(Exception ex){speechStatus.Text=Localization.Text("Local speech connection failed: ")+(ex is HttpRequestException?Localization.Text("Start the local server and check its port."):ex.Message);}
         }));
         var saveVoice=AssistantWindow.Pill("Save voice setup",()=>
         {

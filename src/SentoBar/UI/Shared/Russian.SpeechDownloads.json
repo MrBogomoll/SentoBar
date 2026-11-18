@@ -1,0 +1,16 @@
+{
+  "Files and download sizes": "Файлы и объём загрузки",
+  "Listening: {0}\nSpeaking: {1}": "Распознавание: {0}\nОзвучивание: {1}",
+  "Already installed · 0 MB to download": "Уже установлено · загрузка 0 МБ",
+  "Files available on disk · download if verification fails": "Файлы есть на диске · загрузка только при ошибке проверки",
+  "Estimated download: {0}": "Ожидаемый объём загрузки: {0}",
+  "{0:0.#} KB": "{0:0.#} КБ",
+  "{0:0.#} MB": "{0:0.#} МБ",
+  "up to {0}": "до {0}",
+  "Already installed": "Уже установлено",
+  "Cached · verified before use": "В кэше · проверяется перед установкой",
+  "To download": "Будет загружено",
+  "A damaged cached file will be downloaded again.": "Если файл в кэше повреждён, он скачается заново.",
+  "Recognition: {0} · speech synthesis: CPU": "Распознавание: {0} · озвучивание: процессор",
+  "Installed": "Установлено"
+}

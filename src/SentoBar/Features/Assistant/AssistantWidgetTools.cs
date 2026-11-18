@@ -48,7 +48,7 @@ internal sealed partial class AssistantRuntime
             new AssistantTool(NavigateTool,"Open an enabled SentoBar widget page, or move to the next/previous page. Only changes the visible page; never starts a timer, recording, playback, app or computer action.",JsonSerializer.SerializeToElement(new{type="object",properties=new{page=new{type="string",@enum=app.AssistantWidgetPageIds()}},required=new[]{"page"},additionalProperties=false}))};
     }
     private IReadOnlyList<AssistantTool> ChatWidgetTools(AssistantProvider provider)
-    {var tools=provider.Backend=="Hermes"?Array.Empty<AssistantTool>():WidgetTools();provider.Tools=tools.Count>0;return tools;}
+    {var tools=provider.Backend=="Hermes" || provider.UsesChatGptPlan?Array.Empty<AssistantTool>():WidgetTools();provider.Tools=tools.Count>0;return tools;}
     internal async Task<string> ExecuteWidgetTool(AssistantCall call,CancellationToken token)
     {
         if(!app.Dispatcher.CheckAccess())return await app.Dispatcher.InvokeAsync(()=>ExecuteWidgetTool(call,token),System.Windows.Threading.DispatcherPriority.Normal,token).Task.Unwrap();

@@ -178,7 +178,7 @@ internal sealed class SettingsScene : FrameworkElement
             case "Clock":
                 Caption(s.Clock24Hour?"14:35"+(s.ClockSeconds?":08":""):"2:35"+(s.ClockSeconds?":08":"")+" PM",26,18,30,true);Caption(s.ShowDate?"Friday, 16 October":"Date hidden",27,60,12,false,muted);Note("Clock widget format");break;
             case "Monitor details":
-                Caption("CPU · Memory",24,20,14,true);Caption("Always in Overview",24,47,11,false,muted);Text(Localization.Format("Network   {0}",Localization.Text(s.MonitorNetwork?"On":"Off")),244,17,11);Text(Localization.Format("Storage     {0}",Localization.Text(s.MonitorStorage?"On":"Off")),244,39,11);Text(Localization.Format("Processes  {0}",Localization.Text(s.MonitorProcesses?"On":"Off")),244,61,11);Note("Additional details are available in their Status tabs");break;
+                Caption("System display settings",24,20,14,true);Caption("CPU · RAM · GPU",24,49,12,false,muted);Caption("Disks",238,21,12);Caption("Network adapters",238,49,12);break;
             case "Launch display":
                 Caption("Launch",24,18,16,true);Text(Localization.Format("Current style: {0}",Localization.Text(s.LaunchStyle.Replace("IconsLabels","Icons + labels"))),24,50,13);Note("Saved apps and shortcuts use this display style");break;
             case "Shortcuts":

@@ -79,7 +79,52 @@ internal static class ChatGptPlanTests
             var root=json.RootElement;
             Require(!root.GetProperty("store").GetBoolean() && root.GetProperty("stream").GetBoolean() &&
                 root.GetProperty("instructions").GetString()=="Be brief" && root.GetProperty("input").GetArrayLength()==1 &&
-                !root.TryGetProperty("max_output_tokens",out _));
+                !root.TryGetProperty("max_output_tokens",out _) && !root.TryGetProperty("reasoning",out _));
+        }).GetAwaiter().GetResult());
+        test("A ChatGPT plan stream completes when Content-Type is omitted",()=>Task.Run(async()=>
+        {
+            const string events="event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"OK\"}\n\n"+
+                "event: response.completed\ndata: {\"type\":\"response.completed\"}\n\n";
+            using var transport=new AssistantTransport(new StreamFixture(events,mediaType:null));
+            var provider=new AssistantProvider{Backend=ChatGptPlanSession.Backend,Protocol="Responses",Model="gpt-6-luna"};
+            var result=await transport.Complete(provider,"fixture-access",new[]{new AssistantMessage("user","Say OK")},Array.Empty<AssistantTool>(),CancellationToken.None);
+            Require(result.Text=="OK");
+        }).GetAwaiter().GetResult());
+        test("Plan mode sends an attached image along with text without changing the saved provider flags",()=>Task.Run(async()=>
+        {
+            using var fixture=new StreamFixture("data: {\"type\":\"response.output_text.delta\",\"delta\":\"Image reply\"}\n\n"+
+                "data: {\"type\":\"response.completed\"}\n\n");
+            using var transport=new AssistantTransport(fixture);
+            using var conversation=new AssistantConversation(transport);
+            var provider=new AssistantProvider{Backend=ChatGptPlanSession.Backend,Protocol="Responses",Model="gpt-6-luna"};
+            var image=SampleImage();
+            await conversation.Send(provider,"fixture-access","Be concise","What is shown?",null,Array.Empty<AssistantTool>(),
+                (_,_)=>throw new Exception("Plan chat must not use tools."),attachments:new[]{image});
+            using var json=JsonDocument.Parse(fixture.Body);
+            var content=json.RootElement.GetProperty("input")[0].GetProperty("content");
+            Require(!provider.Vision && fixture.Authorized && fixture.Endpoint=="https://api.openai.com/v1/responses");
+            Require(content.GetArrayLength()==2 && content[0].GetProperty("type").GetString()=="input_text" &&
+                content[0].GetProperty("text").GetString()=="What is shown?" &&
+                content[1].GetProperty("type").GetString()=="input_image" &&
+                content[1].GetProperty("image_url").GetString()==image.Source);
+            Require(conversation.Messages[0].Attachments?[0]==image && conversation.Messages[1].Text=="Image reply");
+        }).GetAwaiter().GetResult());
+        test("Plan mode rejects documents and unsolicited screen images before making a request",()=>Task.Run(async()=>
+        {
+            using var fixture=new StreamFixture("");
+            using var transport=new AssistantTransport(fixture);
+            var provider=new AssistantProvider{Backend=ChatGptPlanSession.Backend,Protocol="Responses",Model="gpt-6-luna",Vision=true};
+            var document=new AssistantAttachment("private.txt","text/plain","","private");
+            foreach(var message in new[]{
+                new AssistantMessage("user","Test",Attachments:new[]{document}),
+                new AssistantMessage("user","Test",ImageDataUrl:SampleImage().Source)
+            })
+            {
+                bool rejected=false;
+                try{await transport.Complete(provider,"fixture-access",new[]{message},Array.Empty<AssistantTool>(),CancellationToken.None);}
+                catch(InvalidOperationException){rejected=true;}
+                Require(rejected && fixture.Endpoint=="");
+            }
         }).GetAwaiter().GetResult());
         test("An interrupted ChatGPT stream cannot count as a successful reply",()=>Task.Run(async()=>
         {
@@ -89,7 +134,28 @@ internal static class ChatGptPlanTests
             catch(IOException){return;}
             throw new Exception("The incomplete stream was accepted.");
         }).GetAwaiter().GetResult());
+        test("Local speech can read a ChatGPT plan reply using the text conversation path",()=>Task.Run(async()=>
+        {
+            var fake=new StreamFixture("data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello\"}\n\n"+
+                "data: {\"type\":\"response.completed\"}\n\n");
+            using var transport=new AssistantTransport(fake);
+            using var conversation=new AssistantConversation(transport);
+            var provider=new AssistantProvider{Backend=ChatGptPlanSession.Backend,Protocol="Responses",Model="gpt-6-luna"};
+            var spoken=new StringBuilder();
+            await conversation.Send(provider,"fixture-access","Be brief","Previous image message",null,Array.Empty<AssistantTool>(),
+                (_,_)=>throw new Exception("Plan chat must not use tools."),attachments:new[]{SampleImage()});
+            await conversation.Send(provider,"fixture-access","Speak briefly","Recognized phrase",null,Array.Empty<AssistantTool>(),
+                (_,_)=>throw new Exception("Plan voice must not use tools."),voiceText:(text,_)=>{spoken.Append(text);return Task.CompletedTask;});
+            using var request=JsonDocument.Parse(fake.Body);
+            var input=request.RootElement.GetProperty("input");
+            Require(fake.Authorized && spoken.ToString()=="Hello" && input.GetArrayLength()==3 &&
+                input[0].GetProperty("content").GetString()=="Previous image message" &&
+                input[2].GetProperty("content").GetString()=="Recognized phrase");
+        }).GetAwaiter().GetResult());
     }
+
+    private static AssistantAttachment SampleImage()=>new("sample.png","image/png",
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=");
 
     private static void Require(bool condition)
     {
@@ -145,7 +211,7 @@ internal static class ChatGptPlanTests
             Content=new StringContent(JsonSerializer.Serialize(body),Encoding.UTF8,"application/json")};
     }
 
-    private sealed class StreamFixture(string events) : HttpMessageHandler
+    private sealed class StreamFixture(string events,string? mediaType="text/event-stream") : HttpMessageHandler
     {
         internal string Body="",Endpoint="";
         internal bool Authorized;
@@ -154,7 +220,9 @@ internal static class ChatGptPlanTests
             Endpoint=request.RequestUri!.AbsoluteUri;
             Authorized=request.Headers.Authorization is {Scheme:"Bearer",Parameter:"fixture-access"};
             Body=await request.Content!.ReadAsStringAsync(token);
-            return new(HttpStatusCode.OK){Content=new StringContent(events,System.Text.Encoding.UTF8,"text/event-stream")};
+            var content=new StringContent(events,Encoding.UTF8);
+            content.Headers.ContentType=mediaType==null?null:new(mediaType);
+            return new(HttpStatusCode.OK){Content=content};
         }
     }
 }

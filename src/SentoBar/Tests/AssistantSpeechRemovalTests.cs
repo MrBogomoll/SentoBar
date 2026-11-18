@@ -18,6 +18,21 @@ internal static class AssistantSpeechRemovalTests
             try{using var speech=new AssistantSpeechInstall(new Store(root));action(speech,Path.Combine(root,"local-speech"));}
             finally{if(!root.StartsWith(Path.GetFullPath(Path.GetTempPath()),StringComparison.OrdinalIgnoreCase))throw new Exception("Unsafe fixture cleanup.");if(Directory.Exists(root))Directory.Delete(root,true);}
         });
+        Fixture("download preview distinguishes missing, cached, and installed files",(speech,root)=>
+        {
+            var model=SpeechCatalog.Asr[0] with{Asset=SpeechCatalog.Asr[0].Asset with{Bytes=7}};
+            var voice=SpeechCatalog.TtsById("windows");
+            SpeechDownloadItem Item(string file)=>speech.DownloadPlan(model,voice,false).Single(item=>item.FileName==file);
+            var modelFile=Path.GetFileName(speech.AsrPath(model));
+            Assert(Item(modelFile) is {State:SpeechDownloadState.Required,Bytes:7});
+            var cache=Path.Combine(root,"downloads","whisper-1.8.7-cpu.zip");
+            Directory.CreateDirectory(Path.GetDirectoryName(cache)!);
+            using(var file=File.Create(cache))file.SetLength(SpeechCatalog.Cpu.Bytes);
+            Assert(Item(Path.GetFileName(cache)).State==SpeechDownloadState.Cached);
+            Put(speech.AsrPath(model));Put(speech.WhisperExe(false));
+            File.WriteAllText(Path.Combine(speech.EngineFolder(false),"installed.txt"),Path.Combine("Release","whisper-server.exe"));
+            Assert(Item(modelFile).State==SpeechDownloadState.Installed && Item(Path.GetFileName(cache)).State==SpeechDownloadState.Installed);
+        });
         Fixture("every ASR model removes weights and cache while preserving sibling models and engines",(speech,root)=>
         {
             string keep=Path.Combine(root,"engines","keep.txt"),sibling=Path.Combine(root,"models","keep.txt");Put(keep);Put(sibling);

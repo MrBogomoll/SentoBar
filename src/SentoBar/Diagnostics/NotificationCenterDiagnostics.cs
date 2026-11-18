@@ -15,8 +15,11 @@ internal static class NotificationCenterDiagnostics
 {
     internal static async Task Run(App app,OverlayWindow island,string directory,Action<string,bool> check)
     {
+        if(Environment.GetCommandLineArgs().Contains("--stage4-only"))
+            check("Regular startup does not add a welcome notification",app.Notifications.History.Count==0);
         var s=app.Settings;s.ReduceMotion=true;s.HideFullscreen=s.HideMaximized=s.AlwaysTucked=false;s.CompactLayout=true;app.ChangeSettings();
         T Field<T>(string name)=>(T)typeof(OverlayWindow).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(island)!;
+        Button? NoticeButton(string action)=>Diagnostics.Descendants(Field<Border>("noticeCard")).OfType<Button>().FirstOrDefault(b=>AutomationProperties.GetAutomationId(b)==action);
         void Capture(string name)
         {
             island.UpdateLayout();var bitmap=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(island.ActualWidth)),Math.Max(1,(int)Math.Ceiling(island.ActualHeight)),96,96,PixelFormats.Pbgra32);bitmap.Render(island);
@@ -25,7 +28,7 @@ internal static class NotificationCenterDiagnostics
         }
         app.Notifications.Clear();app.Notifications.ClearHistory();
         island.OpenNotificationCenter();await Task.Delay(400);Capture("notification-center-empty");
-        check("Empty center explains what will appear",Diagnostics.Descendants(Field<Border>("noticeCard")).OfType<TextBlock>().Any(t=>t.Text=="No notifications yet"));
+        check("Empty center explains what will appear",Diagnostics.Descendants(Field<Border>("noticeCard")).OfType<TextBlock>().Any(t=>t.Text==Localization.Text("No notifications yet")));
         island.Collapse();await Task.Delay(100);
         var fixture=new Settings{NotificationDelivery="Notch"};var now=DateTimeOffset.UtcNow;
         app.Notifications.Post(fixture,new("updates","Update ready to install","Open Settings > Application to install and restart when ready."),false,_=>{},now.AddHours(-3));
@@ -46,11 +49,23 @@ internal static class NotificationCenterDiagnostics
         check("Center lists every alert newest first",Diagnostics.Descendants(card).OfType<Border>().Where(b=>AutomationProperties.GetName(b).Length>0).Select(b=>AutomationProperties.GetName(b)).Take(4).SequenceEqual(new[]{"Timer finished","Focus complete","Weather unavailable","Update ready to install"}));
         app.Notifications.Post(fixture,new("timer","Second timer","Another one."),false,_=>{},DateTimeOffset.UtcNow);await Task.Delay(100);
         check("New alerts join the open center instead of replacing it",island.NotificationCenterOpen && Diagnostics.Descendants(Field<Border>("noticeCard")).OfType<Border>().Any(b=>AutomationProperties.GetName(b)=="Second timer"));
-        Diagnostics.Descendants(Field<Border>("noticeCard")).OfType<Button>().First(b=>AutomationProperties.GetAutomationId(b)=="Remove notification").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(100);
+        NoticeButton("Remove notification")?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(100);
         check("Removing one entry keeps the rest",app.Notifications.History.Count==4 && app.Notifications.History.All(e=>e.Notice.Title!="Second timer"));
+        var timer=NoticeButton("Open timer");
+        timer?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(150);
+        check("The focusable timer history card opens the timer",timer?.Focusable==true && island.IsExpanded && island.ActivePage=="timer");
         island.Collapse();await Task.Delay(100);
         check("Closing the center returns the dock",!island.NotificationCenterOpen && !island.IsPeeking);
+        app.Notifications.Clear();
         app.Notifications.ClearHistory();
+        string download=Path.Combine(directory,"notification-download.txt");File.WriteAllText(download,"Download fixture");
+        app.Notifications.Post(fixture,new("downloads","Download ready","Download fixture",new[]{download}),false,_=>{},now);
+        app.Notifications.Clear();island.OpenNotificationCenter();await Task.Delay(150);
+        NoticeButton("Download details")?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(150);
+        check("A historical download opens its own actions after its popup is gone",NoticeButton("Show in folder")!=null && NoticeButton("Add to shelf")!=null && app.Notifications.Count==0);
+        NoticeButton("Back to notifications")?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(150);
+        check("Back returns to history and keeps the download entry",island.NotificationCenterOpen && app.Notifications.History.Count==1);
+        island.Collapse();app.Notifications.ClearHistory();
         // Alerts mirrored from other Windows apps.
         var external=new Settings{NotificationDelivery="Notch",ExternalNotifications=true};
         app.Notifications.Post(external,new("external","Unigram","Rina: are we still on for tonight?",null,"Unigram","Unigram.App"),false,_=>{},DateTimeOffset.UtcNow.AddMinutes(-3));
@@ -78,8 +93,23 @@ internal static class NotificationCenterDiagnostics
         check($"The banner folds back and the next alert follows (open {island.NoticeBannerOpen}, peeking {island.IsPeeking}, queue {app.Notifications.Count}, current {app.Notifications.Current?.Title}, timer {bannerTimerOn})",island.NoticeBannerOpen && Diagnostics.Descendants(Field<Border>("noticeCard")).OfType<TextBlock>().Any(t=>t.Text=="Your answer is ready"));
         await Task.Delay(4600);
         check("After the last banner the dock returns, alerts stay in the center",!island.NoticeBannerOpen && !island.IsPeeking && app.Notifications.History.Count==2);
-        app.SendTestNotification();await Task.Delay(500);Capture("test-banner");
+        s.CompactLayout=false;app.ChangeSettings();
+        app.Notifications.Post(fixture,new("focus","Focus complete","The break is ready."),false,_=>{},DateTimeOffset.UtcNow);
+        await Task.Delay(300);
+        var focus=NoticeButton("Open focus");
+        focus?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(150);
+        check("The focus banner opens the matching widget in classic layout",focus?.Focusable==true && island.IsExpanded && island.ActivePage=="focus" && Diagnostics.Descendants(island).OfType<Button>().Any(b=>b.IsVisible && AutomationProperties.GetAutomationId(b)=="focus-primary"));
+        island.Collapse();app.Notifications.Clear();s.CompactLayout=true;app.ChangeSettings();
+        s.ExternalNotificationText=false;
+        app.Notifications.Post(external,new("external","Private alert","Private text",null,"Unigram","Unigram.App"),false,_=>{},DateTimeOffset.UtcNow);
+        await Task.Delay(300);
+        NoticeButton("View notification")?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(150);
+        check("Clicking an external banner keeps the message private and offers an explicit Open app action",!island.NoticeBannerOpen && island.IsPeeking && NoticeButton("Open app")!=null && !Diagnostics.Descendants(Field<Border>("noticeCard")).OfType<TextBlock>().Any(t=>t.Text=="Private text"));
+        island.Collapse();app.Notifications.Clear();s.ExternalNotificationText=true;
+        s.NotificationsSnoozedUntil=DateTimeOffset.UtcNow.AddMinutes(5);
+        app.SendTestNotification();await Task.Delay(1300);Capture("test-banner");
         check("Send test notification opens a banner even in quiet hours",island.NoticeBannerOpen && app.Notifications.History.Any(e=>e.Notice.Kind=="test"));
+        s.NotificationsSnoozedUntil=null;
         island.Collapse();await Task.Delay(100);app.Notifications.Clear();
         app.Notifications.Post(external,new("external","SentoBar workspace review","build passed 573/573 tests; banner feature installed & ready to try",null,"Claude","Claude.App"),false,_=>{},DateTimeOffset.UtcNow);
         app.Notifications.Post(new Settings{NotificationDelivery="Notch"},new("failure","Downloads unavailable","This folder has too many files to monitor safely (limit 10,000)."),false,_=>{},DateTimeOffset.UtcNow);

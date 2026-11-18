@@ -38,6 +38,8 @@ internal static class UI
         foreach(var entry in new[]{("ControlFill",settings.ControlFill),("ControlBorder",settings.ControlBorder),("SelectionFill",settings.SelectionFill.Equals("#34373E",StringComparison.OrdinalIgnoreCase)?"#303B4D":settings.SelectionFill)})ResourceBrush(entry.Item1,Brush(entry.Item2));ResourceBrush("ControlText",ContrastText(settings.ControlFill));ResourceBrush("SelectionText",ContrastText(settings.SelectionFill));ResourceBrush("CheckedText",Brush(settings.ControlFill)); }
     public static readonly Brush Muted=Brush("#A6ABB4");
     internal static bool IsMuted(TextBlock text)=>ReferenceEquals(text.Foreground,Muted) || ReferenceEquals(text.Foreground,text.TryFindResource("MutedText"));
+    internal static void SetStatusForeground(TextBlock text,bool error=false,bool success=false)
+        =>text.SetResourceReference(TextBlock.ForegroundProperty,error?"StatusErrorText":success?"StatusSuccessText":"StatusInfoText");
     public static TextBlock Text(string text,double size=13,Brush? color=null)
     {
         var label=new TextBlock{Text=text,FontSize=size,Foreground=color ?? Brush("#F2F3F5"),VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap};

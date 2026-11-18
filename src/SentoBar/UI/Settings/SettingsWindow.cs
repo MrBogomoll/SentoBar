@@ -37,6 +37,8 @@ public sealed partial class SettingsWindow : Window
     internal void OpenAiSettings(){Navigate("AI");aiSettings?.OpenSetupOverview();}
     internal void OpenAiHermesSettings(){Navigate("AI");Dispatcher.BeginInvoke(()=>aiSettings?.OpenHermesSetup());}
     internal void OpenAiVoiceSettings(){Navigate("AI");Dispatcher.BeginInvoke(()=>aiSettings?.OpenVoiceSetup());}
+    internal void OpenAiChatSettings(){Navigate("AI");Dispatcher.BeginInvoke(()=>aiSettings?.OpenChatSetup());}
+    internal void OpenAiPersonalization(){Navigate("AI");Dispatcher.BeginInvoke(()=>aiSettings?.OpenPersonalization());}
     private void AiSettings(){if(aiSettings==null){aiSettings=new(app);aiSettings.FeedbackChanged+=SetSaveFeedback;}page.Children.Add(aiSettings);}
 
     private readonly TextBlock frameStatus=UI.Caption("",11,UI.Muted);
@@ -92,7 +94,7 @@ public sealed partial class SettingsWindow : Window
         var rail=new Border{Child=previewExpander,Margin=new(24,10,36,0)};form.Children.Add(rail);Grid.SetRow(rail,0);
         sectionIndexHost.Visibility=Visibility.Collapsed;column.Children.Add(sectionIndexHost);column.Children.Add(page);
         var saveRow=new DockPanel();var done=UI.CaptionButton("Done with settings",Close);done.MinHeight=26;done.Padding=new(12,3,12,3);done.Margin=new(8,0,0,0);done.FontSize=11;DockPanel.SetDock(done,Dock.Right);saveRow.Children.Add(done);undoSettings.MinHeight=24;undoSettings.Padding=new(8,3,8,3);undoSettings.FontSize=11;undoSettings.Background=Brushes.Transparent;undoSettings.Visibility=Visibility.Collapsed;undoSettings.Click+=(_,_)=>UndoSettings();DockPanel.SetDock(undoSettings,Dock.Right);saveRow.Children.Add(undoSettings);retrySave.Visibility=Visibility.Collapsed;retrySave.HorizontalAlignment=HorizontalAlignment.Right;retrySave.Click+=(_,_)=>CommitSettings();DockPanel.SetDock(retrySave,Dock.Right);saveRow.Children.Add(retrySave);
-        var savedDot=new System.Windows.Shapes.Ellipse{Width=6,Height=6,Fill=SettingsTheme.Lime,Margin=new(0,0,9,0),VerticalAlignment=VerticalAlignment.Center};saveRow.Children.Add(savedDot);status.VerticalAlignment=VerticalAlignment.Center;status.Foreground=SettingsTheme.Quiet;saveRow.Children.Add(status);
+        var savedDot=new System.Windows.Shapes.Ellipse{Width=6,Height=6,Fill=SettingsTheme.Lime,Margin=new(0,0,9,0),VerticalAlignment=VerticalAlignment.Center};saveRow.Children.Add(savedDot);status.VerticalAlignment=VerticalAlignment.Center;UI.SetStatusForeground(status);saveRow.Children.Add(status);
         var footer=new Border{Padding=new(40,10,26,12),BorderBrush=SettingsTheme.LineSoft,BorderThickness=new(0,1,0,0),Background=Accessibility.HighContrast?SystemColors.WindowBrush:SettingsTheme.Void,Child=saveRow};
         footer.CornerRadius=new(14);footer.Margin=new(6,2,12,6);footer.BorderThickness=new(0);footer.SetResourceReference(Border.BackgroundProperty,"SettingsFooter");
         void Responsive()
@@ -179,13 +181,13 @@ public sealed partial class SettingsWindow : Window
         savedSettings=System.Text.Json.JsonSerializer.SerializeToElement(app.Settings);
         SetSaveFeedback(summary);
     }
-    private void SetSaveFeedback(string text,bool error=false)
+    private void SetSaveFeedback(string text,bool error=false,bool success=false)
     {
         retrySave.Visibility=error && current!="AI"?Visibility.Visible:Visibility.Collapsed;
-        if(error)status.Foreground=Accessibility.HighContrast?SystemColors.WindowTextBrush:UI.Brush(app.Settings.WindowTheme=="Light"?"#9A2525":"#F0B8B2");else status.SetResourceReference(TextBlock.ForegroundProperty,"SettingsQuiet");
+        UI.SetStatusForeground(status,error,success);
         Accessibility.Announce(status,Localization.Text(text));status.ToolTip=Localization.Text(text);
     }
-    private void Save() {previewRevision++;InvalidateExamples(System.Windows.Input.Keyboard.FocusedElement as DependencyObject??System.Windows.Input.Mouse.DirectlyOver as DependencyObject);RefreshPreview();Accessibility.Announce(status,Localization.Text("Saving changes…"));saveTimer.Stop();saveTimer.Start();}
+    private void Save() {previewRevision++;InvalidateExamples(System.Windows.Input.Keyboard.FocusedElement as DependencyObject??System.Windows.Input.Mouse.DirectlyOver as DependencyObject);RefreshPreview();UI.SetStatusForeground(status);Accessibility.Announce(status,Localization.Text("Saving changes…"));saveTimer.Stop();saveTimer.Start();}
     private void SettingsApplied(){ApplyWindowAppearance();ApplyMaterial();preview.Resources=SettingsTheme.PreviewResources();if(applyingSettings)return;ReportPreferenceSave();previewRevision++;InvalidateExamples(null);RefreshPreview();}
     private void InvalidateExamples(DependencyObject? source)
     {
@@ -204,6 +206,7 @@ public sealed partial class SettingsWindow : Window
     private void Navigate(string name)
     {
         if(searchResultsHost!=null)searchResultsHost.Visibility=Visibility.Collapsed;
+        UI.SetStatusForeground(status);
         Accessibility.Announce(status,Localization.Text(name=="AI"?"Connection fields use Save provider. Voice and wake word changes use their Save buttons.":"Changes save automatically on this device."));previewHelp.Text=Localization.Text(name=="AI"?"Preview only. Apply connection edits with Save provider.":"Changes apply automatically. The preview uses your current shape, size and colors.");
         bool same=name==current && page.Children.Count>0;double offset=settingsScroll.VerticalOffset;int revision=++navigationRevision;
         var expanded=SettingTree(page).OfType<Expander>().Where(e=>e.IsExpanded).Select(e=>e.Header?.ToString()).ToHashSet();

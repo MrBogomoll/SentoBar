@@ -76,6 +76,9 @@ internal static class SettingsPalette
         Add("SettingsCard",light?"#C8FFFFFF":"#24FFFFFF");Add("SettingsRaised",light?"#F4F4F4":"#424242");
         Add("SettingsLine",light?"#D9FFFFFF":"#70FFFFFF");Add("SettingsLineSoft",light?"#80FFFFFF":"#3AFFFFFF");
         Add("ControlText",light?"#171717":"#F5F5F5");Add("SettingsQuiet",light?"#505050":"#CBCBCB");
+        Add("StatusInfoText",light?"#373737":"#DEDEDE");
+        Add("StatusSuccessText",light?"#17462E":"#C1E9CD");
+        Add("StatusErrorText",light?"#741F26":"#FFC8C2");
         d["MutedText"]=d["SettingsQuiet"];
         d["BodyText"]=d["ControlText"];
         Add("Accent",light?"#101010":"#F2F2F2");Add("AccentText",light?"#FFFFFF":"#151515");
@@ -108,6 +111,7 @@ internal static class SettingsPalette
         {
             foreach(string key in new[]{"SettingsVoid","SettingsSidebar","SettingsCard","SettingsRaised","SettingsCanvas","SettingsCaption","ControlFill"})d[key]=SystemColors.WindowBrush;
             foreach(string key in new[]{"ControlText","BodyText","SettingsQuiet","MutedText","SettingsLine","SettingsLineSoft","ControlBorder"})d[key]=SystemColors.WindowTextBrush;
+            d["StatusInfoText"]=d["StatusSuccessText"]=d["StatusErrorText"]=SystemColors.WindowTextBrush;
             d["Accent"]=d["CheckedFill"]=d["SettingsSelected"]=d["SelectionFill"]=SystemColors.HighlightBrush;
             d["SettingsPrimaryFill"]=SystemColors.HighlightBrush;d["SettingsPrimaryText"]=SystemColors.HighlightTextBrush;d["SettingsPrimaryBorder"]=SystemColors.WindowTextBrush;d["SettingsMapFill"]=SystemColors.WindowBrush;d["SettingsMapGuide"]=SystemColors.WindowTextBrush;
             d["AccentText"]=d["CheckedText"]=d["SettingsSelectedText"]=d["SelectionText"]=SystemColors.HighlightTextBrush;

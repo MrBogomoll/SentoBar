@@ -1,0 +1,20 @@
+{
+  "System display settings": "Показатели системы",
+  "Used {0} of {1}": "Занято {0} из {1}",
+  "Disk activity": "Нагрузка дисков",
+  "Network · total traffic": "Сеть · приём + отправка",
+  "Last 60 seconds · sampled every 2 seconds": "Последние 60 секунд · замер каждые 2 секунды",
+  "Choose readings for the expanded panel, mini panel and separate window. A dash means the default display.": "Выберите показатели для развёрнутой панели, мини-панели и отдельного окна. Черта означает стандартный режим.",
+  "Processor (CPU)": "Процессор (CPU)",
+  "Memory (RAM)": "Оперативная память (RAM)",
+  "Graphics (GPU)": "Видеокарты (GPU)",
+  "Disks": "Диски",
+  "Disks · free / total": "Диски · свободно / всего",
+  "Network adapters": "Сетевые адаптеры",
+  "All devices": "Все устройства",
+  "{0} (unavailable)": "{0} (недоступно)",
+  "Graphics adapter {0}": "Видеоадаптер {0}",
+  "No devices selected": "Устройства не выбраны",
+  "Utilization uses the busiest GPU engine.": "Загрузка определяется по самому занятому движку GPU.",
+  "No system readings selected": "Показатели не выбраны"
+}

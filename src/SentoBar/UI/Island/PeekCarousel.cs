@@ -220,23 +220,82 @@ public sealed partial class OverlayWindow
     }
     private void PromotePeek()
     {if(!peeking || assistantPeeking)return;detailDelay.Stop();peekDetailed=true;automaticPreview=false;activityDismiss.Stop();double height=PeekExpandedHeight;if(Height<height)Height=height;ApplyPeekGeometry();UpdateToolPeeks();motion.Go(surface,IslandSurface.SurfaceHeightProperty,height,app.Settings.AnimationMs);}
-    internal void SelectPeek(string id)
-    {if(noticeShowing || !peeking || assistantPeeking || !PeekPages().Contains(id))return;RememberPanel(id);ClearPeekClockEditor();PromotePeek();var ids=PeekPages();int old=Array.IndexOf(ids,peekId),next=Array.IndexOf(ids,id);double start=(next-old)*PeekWidth;if(Math.Abs(next-old)>1){peekId=id;LayoutPeek(0,false);peekViews[id].Opacity=.65;Motion.Fade(peekViews[id],1,160);UpdatePeekDeck();return;}if(next==old){LayoutPeek(0,true);UpdatePeekDeck();return;}peekId=id;LayoutPeek(start,false);UpdatePeekDeck();LayoutPeek(0,true);WakeLiveRendering();}
-    internal void NavigatePeek(int direction,bool wheel=false)
-    {var ids=PeekPages();int index=Array.IndexOf(ids,peekId);if(ids.Length>0)SelectPeek(ids[WheelTabNavigation.Target(index,direction,ids.Length,wheel && app.Settings.WheelWrapTabs)]);}
-    private void LayoutPeek(double offset,bool animate)
+    internal void SelectPeek(string id)=>SelectPeek(id,0);
+
+    private void SelectPeek(string id,int direction)
     {
-        var ids=PeekPages();int index=Array.IndexOf(ids,peekId);
+        if(noticeShowing || !peeking || assistantPeeking)return;
+        var ids=PeekPages();
+        int next=Array.IndexOf(ids,id);
+        if(next<0)return;
+        RememberPanel(id);
+        ClearPeekClockEditor();
+        PromotePeek();
+
+        string previous=peekId;
+        int step=next-Array.IndexOf(ids,previous);
+        if(step==0){UpdatePeekDeck();return;}
+        bool wraps=direction is -1 or 1 && step==-direction*(ids.Length-1);
+        if(wraps)step=direction;
+        peekId=id;
+        if(Math.Abs(step)>1)
+        {
+            LayoutPeek(0,false);
+            peekViews[id].Opacity=.65;
+            Motion.Fade(peekViews[id],1,160);
+            UpdatePeekDeck();
+            return;
+        }
+
+        // Keep the outgoing page beside the incoming one across the end of the deck.
+        (string Id,int RelativeIndex)? wrappedPage=wraps?(previous,-direction):null;
+        LayoutPeek(step*peekViewport.Width,false,wrappedPage);
+        UpdatePeekDeck();
+        LayoutPeek(0,true,wrappedPage);
+        WakeLiveRendering();
+    }
+
+    internal void NavigatePeek(int direction,bool wheel=false)
+    {
+        var ids=PeekPages();
+        int index=Array.IndexOf(ids,peekId);
+        int target=WheelTabNavigation.Target(index,direction,ids.Length,!wheel || app.Settings.WheelWrapTabs);
+        if(target>=0)SelectPeek(ids[target],direction);
+    }
+
+    private void LayoutPeek(double offset,bool animate,(string Id,int RelativeIndex)? wrappedPage=null)
+    {
+        var ids=PeekPages();
+        int index=Array.IndexOf(ids,peekId);
         EnsurePeekView(peekId);
-        int neighbor=index+(offset>0?-1:1);if(Math.Abs(offset)>.01 && neighbor>=0 && neighbor<ids.Length)EnsurePeekView(ids[neighbor]);
+        int neighbor=index+(offset>0?-1:1);
+        if(Math.Abs(offset)>.01 && neighbor>=0 && neighbor<ids.Length)EnsurePeekView(ids[neighbor]);
+        double width=peekViewport.Width;
         foreach(var pair in peekViews)
         {
-            int i=Array.IndexOf(ids,pair.Key);double x=(i-index)*PeekWidth+offset;pair.Value.Visibility=i>=0 && (Math.Abs(x)<PeekWidth-.1 || (animate && Math.Abs(peekMoves[pair.Key].X)<PeekWidth-.1))?Visibility.Visible:Visibility.Collapsed;pair.Value.IsHitTestVisible=pair.Key==peekId;KeyboardNavigation.SetTabNavigation(pair.Value,pair.Key==peekId?KeyboardNavigationMode.Continue:KeyboardNavigationMode.None);if(pair.Key!=peekId && pair.Value.IsKeyboardFocusWithin)peekPanel.Focus();
-            if(animate && pair.Value.Visibility==Visibility.Visible)Motion.To(peekMoves[pair.Key],TranslateTransform.XProperty,x,300,0,()=>{if(pair.Key!=peekId)pair.Value.Visibility=Visibility.Collapsed;});else{peekMoves[pair.Key].BeginAnimation(TranslateTransform.XProperty,null);peekMoves[pair.Key].X=x;}
+            int i=Array.IndexOf(ids,pair.Key);
+            int relativeIndex=wrappedPage is {} edge && pair.Key==edge.Id?edge.RelativeIndex:i-index;
+            double x=relativeIndex*width+offset;
+            var move=peekMoves[pair.Key];
+            bool selected=pair.Key==peekId;
+            bool visible=i>=0 && (Math.Abs(x)<width-.1 || animate && Math.Abs(move.X)<width-.1);
+            pair.Value.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
+            pair.Value.IsHitTestVisible=selected;
+            KeyboardNavigation.SetTabNavigation(pair.Value,selected?KeyboardNavigationMode.Continue:KeyboardNavigationMode.None);
+            if(!selected && pair.Value.IsKeyboardFocusWithin)peekPanel.Focus();
+            if(animate && visible)
+                Motion.To(move,TranslateTransform.XProperty,x,300,0,()=>{if(pair.Key!=peekId)pair.Value.Visibility=Visibility.Collapsed;});
+            else
+            {
+                move.BeginAnimation(TranslateTransform.XProperty,null);
+                move.X=x;
+            }
         }
         UpdatePeekFooter();
         UpdatePeekTabs(ids);
-        peekPageName.Text=PeekName(peekId);peekPrevious.IsEnabled=index>0;peekNext.IsEnabled=index<ids.Length-1;peekPrevious.Opacity=peekPrevious.IsEnabled?1:.25;peekNext.Opacity=peekNext.IsEnabled?1:.25;
+        peekPageName.Text=PeekName(peekId);
+        peekPrevious.IsEnabled=peekNext.IsEnabled=ids.Length>1;
+        peekPrevious.Opacity=peekNext.Opacity=ids.Length>1?1:.25;
     }
     private (string Style,string Widget,double Width,string Deck)? peekTabLayout;
     private void UpdatePeekTabs(string[] ids)
@@ -258,9 +317,9 @@ public sealed partial class OverlayWindow
     }
 
     internal void DragPeek(double distance)
-    {var ids=PeekPages();int index=Array.IndexOf(ids,peekId);peekOffset=Math.Clamp(distance,-PeekWidth,PeekWidth);if((index==0 && distance>0)||(index==ids.Length-1 && distance<0))peekOffset*=.22;LayoutPeek(Motion.Enabled?peekOffset:0,false);}
+    {var ids=PeekPages();int index=Array.IndexOf(ids,peekId);peekOffset=Math.Clamp(distance,-peekViewport.Width,peekViewport.Width);if((index==0 && distance>0)||(index==ids.Length-1 && distance<0))peekOffset*=.22;LayoutPeek(Motion.Enabled?peekOffset:0,false);}
     internal void FinishPeekSwipe(double offset)
-    {var ids=PeekPages();int index=Array.IndexOf(ids,peekId);int next=Math.Clamp(index+(offset < -app.Settings.SwipeDistance?1:offset>app.Settings.SwipeDistance?-1:0),0,Math.Max(0,ids.Length-1));if(ids.Length==0)return;peekId=ids[next];RememberPanel(peekId);LayoutPeek(offset+(next-index)*PeekWidth,false);UpdatePeekDeck();LayoutPeek(0,true);peekOffset=0;WakeLiveRendering();if(!DiagnosticRun && !PointerInside() && !PeekInteractionActive)leaveDelay.Start();}
+    {var ids=PeekPages();int index=Array.IndexOf(ids,peekId);int next=Math.Clamp(index+(offset < -app.Settings.SwipeDistance?1:offset>app.Settings.SwipeDistance?-1:0),0,Math.Max(0,ids.Length-1));if(ids.Length==0)return;peekId=ids[next];RememberPanel(peekId);LayoutPeek(offset+(next-index)*peekViewport.Width,false);UpdatePeekDeck();LayoutPeek(0,true);peekOffset=0;WakeLiveRendering();if(!DiagnosticRun && !PointerInside() && !PeekInteractionActive)leaveDelay.Start();}
     private void EndPeekGesture(){CancelPeekSeek();peekDown=null;peekDragging=peekTouching=false;peekOffset=0;peekWheel.Reset();if(peekViewport.IsMouseCaptured)peekViewport.ReleaseMouseCapture();}
     internal bool RoutePeekWheel(int delta,bool horizontal,DependencyObject? source,bool? scrollContent=null)
     {
@@ -274,7 +333,7 @@ public sealed partial class OverlayWindow
     private void UpdatePeekFooter()
     {
         bool canDetach=app.Previews?.CanOpen(peekId)==true;
-        bool showPageName=app.Settings.PanelNavigationStyle=="Dots" && peekPanel.Width>=270 && peekId is not ("timer" or "focus");
+        bool showPageName=app.Settings.PanelNavigationStyle=="Dots";
         peekPageName.Visibility=showPageName?Visibility.Visible:Visibility.Collapsed;
         peekDetachButton.Visibility=canDetach?Visibility.Visible:Visibility.Hidden;
     }
@@ -299,6 +358,8 @@ public sealed partial class OverlayWindow
             pair.Value.Width=safe.Width;
             pair.Value.Height=contentHeight;
             pair.Value.VerticalAlignment=VerticalAlignment.Top;
+            if(pair.Value is WeatherGlance weather)weather.SetCompactLayout(!peekDetailed);
+            if(pair.Value is SystemPeekView system)system.SetCompactLayout(!peekDetailed);
             if(peekClocks.TryGetValue(pair.Key,out var countdown))
                 countdown.Status.Visibility=safe.Width>=320?Visibility.Visible:Visibility.Collapsed;
             if(pair.Value is Panel page)foreach(FrameworkElement child in page.Children)
@@ -551,8 +612,7 @@ public sealed partial class OverlayWindow
         }
         app.SaveSession();
     }
-    private FrameworkElement BuildPeekSystem()
-    {var page=PeekSummary("system");peekSystem.Margin=new(0,7,0,0);page.Children.Add(peekSystem);return page;}
+    private FrameworkElement BuildPeekSystem()=>peekSystem=new SystemPeekView(PeekName("system"));
     private FrameworkElement BuildPeekCalendar()
     {
         var page=new StackPanel();peekEventTime.Margin=new(0,3,0,9);page.Children.Add(peekEventTime);peekEventTitle.MaxHeight=43;peekEventTitle.TextWrapping=TextWrapping.NoWrap;peekEventTime.TextWrapping=TextWrapping.NoWrap;peekEventTime.TextTrimming=TextTrimming.CharacterEllipsis;peekShelfCount.TextWrapping=TextWrapping.NoWrap;peekShelfCount.TextTrimming=TextTrimming.CharacterEllipsis;peekEventTitle.TextTrimming=TextTrimming.CharacterEllipsis;page.Children.Add(peekEventTitle);
@@ -602,7 +662,7 @@ public sealed partial class OverlayWindow
         ApplyPeekSeek();
         if(peekVolume!=null && !peekVolume.IsMouseCaptureWithin && !peekVolume.IsKeyboardFocusWithin){bool previous=updating;updating=true;try{peekVolume.Value=app.Audio.Volume*100;}finally{updating=previous;}}
         peekMute.IsEnabled=peekOutput.IsEnabled=peekVolume!.IsEnabled=app.Audio.Available;Motion.Icon(peekMute,app.Audio.Muted?"muted":"volume",14);peekTrackPrevious.IsEnabled=app.Media.CanPrevious;peekTrackNext.IsEnabled=app.Media.CanNext;peekTrackPrevious.Opacity=peekTrackPrevious.IsEnabled?1:.3;peekTrackNext.Opacity=peekTrackNext.IsEnabled?1:.3;
-        UpdateExtraPeek();UpdateToolPeeks();var now=app.UpdateSampleTime;peekSystem.Text=Localization.Format("CPU  {0:0}%\nRAM  {1:0.0} / {2:0.0} GB",app.Usage.cpu,app.Usage.used,app.Usage.total);
+        UpdateExtraPeek();UpdateToolPeeks();RefreshPeekSystem();var now=app.UpdateSampleTime;
         if(peekClocks.TryGetValue(peekId,out var fields))
         {
             bool timer=peekId=="timer";

@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace SentoBar;
@@ -45,6 +45,7 @@ public sealed partial class OverlayWindow
         centerUnseen=app.Notifications.History.Where(e=>!e.Read).ToHashSet();
         // Header and actions stay put; only the list scrolls.
         var content=new Grid();for(int row=0;row<4;row++)content.RowDefinitions.Add(new(){Height=row==2?new GridLength(1,GridUnitType.Star):GridLength.Auto});
+        KeyboardNavigation.SetTabNavigation(content,KeyboardNavigationMode.Cycle);
         var header=new DockPanel{Margin=new(0,0,0,4)};
         centerClear=UI.CaptionButton("Clear all",()=>app.Notifications.ClearHistory());centerClear.FontSize=11;centerClear.MinHeight=28;centerClear.Padding=new(10,3,10,3);centerClear.VerticalAlignment=VerticalAlignment.Center;DockPanel.SetDock(centerClear,Dock.Right);header.Children.Add(centerClear);
         var badge=new Border{Width=30,Height=30,CornerRadius=new(15),Background=UI.Brush("#19FFFFFF"),Margin=new(0,0,10,0),Child=Icons.Create("bell",15)};header.Children.Add(badge);
@@ -53,14 +54,14 @@ public sealed partial class OverlayWindow
         centerSummary=UI.Text("",11,UI.Muted);centerSummary.Margin=new(40,0,0,12);Grid.SetRow(centerSummary,1);content.Children.Add(centerSummary);
         centerList=new StackPanel();
         var footer=new WrapPanel{Margin=new(0,8,0,0)};
-        foreach(var action in new[]{UI.CaptionButton("Send test",()=>{Collapse();app.SendTestNotification();}),UI.CaptionButton("Notification settings",()=>{Collapse();app.ShowSettings(Localization.Text("Notifications"));}),UI.CaptionButton("Close",Collapse)})
+        foreach(var action in new[]{UI.CaptionButton("Send test",()=>{Collapse();app.SendTestNotification();}),UI.CaptionButton("Notification settings",()=>{Collapse();app.ShowSettings("Notifications");}),UI.CaptionButton("Close",Collapse)})
         {action.FontSize=11;action.MinHeight=30;action.Padding=new(10,4,10,4);action.Margin=new(0,0,6,0);footer.Children.Add(action);}
         Grid.SetRow(footer,3);content.Children.Add(footer);
         var screen=Native.ChooseScreen(app.Settings);double scale=Native.Scale(screen);
         // Panel width and Maximum panel height from Position & size; the host window is sized to them.
         Dimensions();if(Width<WindowHostWidth)Width=WindowHostWidth;if(Height<HostHeight)Height=HostHeight;
         double width=Math.Clamp(app.Settings.PanelWidth,300,Math.Max(300,WindowHostWidth));
-        centerViewport=new ScrollViewer{Content=centerList,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
+        centerViewport=new ScrollViewer{Content=centerList,Focusable=true,IsTabStop=false,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};
         UI.LocalizedName(centerViewport,"Notification center");Grid.SetRow(centerViewport,2);content.Children.Add(centerViewport);
         content.MaxHeight=Math.Max(160,HostHeight-40);centerFrame=content;
         noticeCard=new(){Child=content,Width=width-(surface.Notch?64:32),Margin=new(0,16,0,0),VerticalAlignment=VerticalAlignment.Top,HorizontalAlignment=HorizontalAlignment.Center};
@@ -72,8 +73,8 @@ public sealed partial class OverlayWindow
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,new Action(()=>{if(NotificationCenterOpen)ResizeNotificationCenter();}));
         ControlFeedback.Notice(noticeCard,app.Settings.NotificationAnimation);
         // Opening from the tray or a shortcut: take focus so Esc and clicking elsewhere close it.
-        if(!DiagnosticRun)Activate();
         app.Notifications.MarkAllRead();
+        if(!DiagnosticRun){Activate();centerViewport.Focus();}
     }
     private void ResizeNotificationCenter()
     {
@@ -100,8 +101,7 @@ public sealed partial class OverlayWindow
         var now=DateTimeOffset.UtcNow;
         foreach(var entry in history)centerList.Children.Add(NotificationRow(entry,centerUnseen.Contains(entry),now));
     }
-    // One alert: sender and time on top, title, two lines of text. The whole row opens the
-    // sender (or its folder / update page); the remove button appears on hover.
+    // The card button and remove button are separate controls so either can be used with the keyboard.
     private Border NotificationRow(NoticeEntry entry,bool fresh,DateTimeOffset now)
     {
         var notice=entry.Notice;
@@ -117,23 +117,14 @@ public sealed partial class OverlayWindow
         var title=UI.Text(notice.Title,13);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.NoWrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.Margin=new(0,3,0,0);text.Children.Add(title);
         if(notice.Detail.Length>0){var detail=UI.Text(notice.Detail,12,UI.Muted);detail.MaxHeight=34;detail.LineHeight=17;detail.LineStackingStrategy=LineStackingStrategy.BlockLineHeight;detail.TextTrimming=TextTrimming.CharacterEllipsis;detail.Margin=new(0,2,0,0);detail.ToolTip=notice.Detail;text.Children.Add(detail);}
         grid.Children.Add(text);
-        var remove=Icons.Button("x",Localization.Text("Remove notification"),()=>app.Notifications.Remove(entry),false,24);remove.Background=Brushes.Transparent;remove.Margin=new(6,-2,-2,0);remove.VerticalAlignment=VerticalAlignment.Top;remove.Opacity=0;Grid.SetColumn(remove,2);grid.Children.Add(remove);
-        string[] files=(notice.Files??Array.Empty<string>()).Where(File.Exists).ToArray();
-        Action? open=null;string hint="";
-        if(notice.Kind=="external" && !string.IsNullOrEmpty(notice.AppId)){open=()=>{Collapse();ExternalAppLauncher.Open(notice.AppId);};hint=Localization.Text("Click to open the app");}
-        else if(files.Length>0){open=()=>{try{var info=new System.Diagnostics.ProcessStartInfo("explorer.exe"){UseShellExecute=false};info.ArgumentList.Add("/select,");info.ArgumentList.Add(files[0]);System.Diagnostics.Process.Start(info);}catch(Exception ex){app.Store.Log(ex);}};hint=Localization.Text("Click to show in folder");}
-        else if(notice.Kind=="updates"){open=()=>{Collapse();app.ShowSettings("Application");};hint=Localization.Text("Click to open updates");}
-        var idle=UI.Brush(fresh?"#17FFFFFF":"#0DFFFFFF");var hover=UI.Brush("#24FFFFFF");
-        var row=new Border{Child=grid,Background=idle,CornerRadius=new(14),Padding=new(12,11,8,11),Margin=new(0,0,0,6)};
-        row.MouseEnter+=(_,_)=>{row.Background=hover;remove.Opacity=.8;};row.MouseLeave+=(_,_)=>{row.Background=idle;remove.Opacity=0;};
-        remove.GotKeyboardFocus+=(_,_)=>remove.Opacity=.8;remove.LostKeyboardFocus+=(_,_)=>remove.Opacity=0;
-        if(open!=null)
-        {
-            row.Cursor=System.Windows.Input.Cursors.Hand;row.ToolTip=Localization.Text(hint);
-            row.MouseLeftButtonUp+=(_,e)=>{if(e.OriginalSource is DependencyObject source && IsInside(source,remove))return;e.Handled=true;open();};
-            // Keyboard: the row's action is also reachable as a button for screen readers.
-            var action=UI.CaptionButton(notice.Kind=="external"?Localization.Text("Open app"):files.Length>0?Localization.Text("Show in folder"):Localization.Text("Open updates"),open);action.Width=1;action.Height=1;action.MinHeight=1;action.Padding=new(0);action.Margin=new(0);action.Opacity=0;action.HorizontalAlignment=HorizontalAlignment.Left;action.VerticalAlignment=VerticalAlignment.Top;Grid.SetColumn(action,1);grid.Children.Add(action);
-        }
+        var arrow=Icons.Create("chevron-right",12,UI.Muted);arrow.Margin=new(6,0,2,0);arrow.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(arrow,2);grid.Children.Add(arrow);
+        var action=NoticeActionButton(notice,grid,true);action.Padding=new(12,11,4,11);
+        var remove=Icons.Button("x","Remove notification",()=>app.Notifications.Remove(entry),false,24);remove.Background=Brushes.Transparent;remove.Margin=new(0,8,6,0);remove.VerticalAlignment=VerticalAlignment.Top;remove.Opacity=0;
+        var card=new Grid();card.ColumnDefinitions.Add(new());card.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
+        card.Children.Add(action);Grid.SetColumn(remove,1);card.Children.Add(remove);
+        var row=new Border{Child=card,Background=UI.Brush(fresh?"#17FFFFFF":"#0DFFFFFF"),CornerRadius=new(14),Margin=new(0,0,0,6)};
+        void RevealRemove()=>remove.Opacity=row.IsMouseOver || row.IsKeyboardFocusWithin ? .8 : 0;
+        row.MouseEnter+=(_,_)=>RevealRemove();row.MouseLeave+=(_,_)=>RevealRemove();row.IsKeyboardFocusWithinChanged+=(_,_)=>RevealRemove();
         System.Windows.Automation.AutomationProperties.SetName(row,notice.Title);
         return row;
     }
@@ -141,7 +132,7 @@ public sealed partial class OverlayWindow
     private FrameworkElement NotificationBell(double size)
     {
         var host=new Grid{Width=size,Height=size};
-        var bell=Icons.Button("bell",Localization.Text("Notifications"),OpenNotificationCenter,false,size);bell.Margin=new(0);bell.Background=Brushes.Transparent;host.Children.Add(bell);
+        var bell=Icons.Button("bell","Notifications",OpenNotificationCenter,false,size);bell.Margin=new(0);bell.Background=Brushes.Transparent;host.Children.Add(bell);
         var dot=new Border{Width=7,Height=7,CornerRadius=new(3.5),Background=UI.Brush(app.Settings.Accent),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,Margin=new(0,3,3,0),IsHitTestVisible=false};
         host.Children.Add(dot);bellBadges.Add(new(dot));UpdateBellBadges();
         return host;

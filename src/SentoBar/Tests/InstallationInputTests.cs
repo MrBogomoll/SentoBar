@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SentoBar;
 
@@ -10,6 +12,13 @@ internal static class InstallationInputTests
     {
         static void Check(bool value){if(!value)throw new Exception("Assertion failed");}
         static void Reject(Action action){try{action();}catch(IOException){return;}catch(InvalidDataException){return;}throw new Exception("Unsafe input accepted");}
+        test("Local speech worker accepts the private pipe name created by the parent",()=>
+        {
+            using var worker=new AssistantSpeechWorker();
+            Check(AssistantSpeechWorker.IsPipeName(worker.PipeName));
+            Check(!AssistantSpeechWorker.IsPipeName(worker.PipeName+"0"));
+            Check(!AssistantSpeechWorker.IsPipeName("SentoBar-tts-"+new string('z',32)));
+        });
         test("Installed icon uses the current embedded artwork at small and large sizes",()=>
         {
             string root=Path.Combine(Path.GetTempPath(),"SentoBar-brand-icon-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
@@ -52,6 +61,28 @@ internal static class InstallationInputTests
             var waiting=System.Threading.Tasks.Task.Run(()=>stream.Read(new byte[4],0,4));stream.Dispose();
             Check(waiting.Wait(3000) && waiting.Result==0);
         });
+        test("Wake recognizer supports optional Russian without changing the automatic or previously selected engine",()=>
+        {
+            var installed=new[]{("other","de-DE"),("english","en-US"),("russian","ru-RU")};
+            const string russian=AssistantWakeWord.RussianRecognizerSelection;
+            Check(AssistantWakeWord.ResolveRecognizerId("",installed)=="english");
+            Check(AssistantWakeWord.ResolveRecognizerId("other",installed)=="other");
+            Check(AssistantWakeWord.ResolveRecognizerId(russian,installed)=="russian");
+            Check(AssistantWakeWord.ResolveRecognizerId(russian,installed[..2])==null);
+            Check(AssistantWakeWord.ResolveRecognizerId("",installed[..1])=="other");
+            Check(AssistantWakeWord.ResolveRecognizerId("removed",installed)==null);
+            Check(AssistantWakeWord.EffectiveSelection("","Привет Сенто")==russian);
+            Check(AssistantWakeWord.EffectiveSelection("other","Сенто")=="other");
+            Check(LocalAssistantVoice.MatchesWakePhrase("Привет, Сенто!","привет сенто"));
+            Check(LocalAssistantVoice.MatchesWakePhrase("Привет, Сента!", "Привет Сенто"));
+            Check(LocalAssistantVoice.MatchesWakePhrase("Сента.", "Sento"));
+            Check(!LocalAssistantVoice.MatchesWakePhrase("Не говори привет Сенто","Привет Сенто"));
+            Check(RussianSpeechNumbers.Speak("1/60 часа, −0,05 и 22%.")=="одна шестидесятая часа, минус ноль целых пять сотых и двадцать два процента.");
+            Check(RussianSpeechNumbers.Speak("2 минуты и 1 003 секунды")=="две минуты и одна тысяча три секунды");
+            Check(AssistantWakeWord.ResolveRecognizerId("",Array.Empty<(string,string)>())==null);
+            var saved=JsonSerializer.Deserialize<AssistantWakeOptions>(JsonSerializer.Serialize(new AssistantWakeOptions{RecognizerId=russian,Phrase="Привет Сенто"}))!;
+            Check(!saved.Enabled && saved.RecognizerId==russian && AssistantWakeWord.Phrase(saved.Phrase)=="Привет Сенто");
+        });
         test("Installer rollback copies the verified legacy binary in place without accepting corrupt bytes",()=>
         {
             string root=Path.Combine(Path.GetTempPath(),"SentoBar-restore-fixture-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
@@ -83,6 +114,79 @@ internal static class InstallationInputTests
             var saved=JsonSerializer.Deserialize<AssistantOptions>(JsonSerializer.Serialize(new AssistantOptions{MicrophoneId="usb-a"}))!;
             Check(saved.MicrophoneId=="usb-a" && new AssistantOptions().MicrophoneId=="");
         });
+        test("Microphone playback starts after capture and runs to completion with the original PCM",()=>Task.Run(async()=>
+        {
+            byte[] phrase={0x00,0x20,0x00,0xE0,0x00,0x00};
+            var captured=new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var playing=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var played=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            int calls=0;
+            var check=AssistantAudioCheck.Replay(_=>captured.Task,async (audio,token)=>
+            {
+                Check(captured.Task.IsCompletedSuccessfully);
+                Check(audio.WaveFormat.SampleRate==16000 && audio.WaveFormat.BitsPerSample==16 && audio.WaveFormat.Channels==1);
+                var received=new byte[phrase.Length];audio.ReadExactly(received);
+                Check(received.AsSpan().SequenceEqual(phrase) && audio.ReadByte()==-1);
+                calls++;playing.SetResult();await played.Task.WaitAsync(token);
+            },_=>{},CancellationToken.None);
+            Check(calls==0 && !check.IsCompleted);
+            captured.SetResult(phrase);
+            try{await playing.Task.WaitAsync(TimeSpan.FromSeconds(3));Check(!check.IsCompleted);}
+            finally{played.TrySetResult();}
+            Check((await check).StartsWith("Recording played",StringComparison.Ordinal) && calls==1);
+        }).GetAwaiter().GetResult());
+        test("Microphone playback skips silent audio and cancelled recording",()=>Task.Run(async()=>
+        {
+            var silence=await AssistantAudioCheck.Replay(_=>Task.FromResult(new byte[320]),(_,_)=>throw new Exception("Silence was replayed"),_=>{},CancellationToken.None);
+            Check(silence.StartsWith("No microphone signal",StringComparison.Ordinal));
+            using var cancelled=new CancellationTokenSource();
+            try
+            {
+                await AssistantAudioCheck.Replay(_=>{cancelled.Cancel();return Task.FromResult(new byte[]{0,0x40});},(_,_)=>throw new Exception("Cancelled recording was replayed"),_=>{},cancelled.Token);
+            }
+            catch(OperationCanceledException){return;}
+            throw new Exception("Cancellation was ignored");
+        }).GetAwaiter().GetResult());
+        test("Microphone playback reports a speaker failure after recording audio",()=>Task.Run(async()=>
+        {
+            var outputError=new IOException("Removed device");
+            try
+            {
+                await AssistantAudioCheck.Replay(_=>Task.FromResult(new byte[]{0,0x40}),(_,_)=>Task.FromException(outputError),_=>{},CancellationToken.None);
+            }
+            catch(IOException error) when(ReferenceEquals(error.InnerException,outputError)){return;}
+            throw new Exception("The failed output device was reported as successful playback");
+        }).GetAwaiter().GetResult());
+        test("Chat dictation waits for the recording and transcribes the captured audio once",()=>Task.Run(async()=>
+        {
+            var captured=new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            byte[] spoken={0,0x40,0,0};
+            int calls=0;
+            var pending=AssistantDictation.Transcribe(_=>captured.Task,(pcm,_)=>{
+                Check(pcm.AsSpan().SequenceEqual(spoken));calls++;return Task.FromResult("  Привет, Сенто!  ");
+            },CancellationToken.None);
+            Check(calls==0 && !pending.IsCompleted);
+            captured.SetResult(spoken);
+            Check(await pending=="Привет, Сенто!" && calls==1);
+        }).GetAwaiter().GetResult());
+        test("Chat dictation never submits silence or returns a cancelled transcription",()=>Task.Run(async()=>
+        {
+            try
+            {
+                await AssistantDictation.Transcribe(_=>Task.FromResult(new byte[320]),(_,_)=>throw new Exception("Silence reached the recognizer"),CancellationToken.None);
+                throw new Exception("Silence produced a transcript");
+            }
+            catch(IOException error) when(error.Message==AssistantAudioCheck.NoSignal){}
+            using var cancellation=new CancellationTokenSource();
+            try
+            {
+                await AssistantDictation.Transcribe(_=>Task.FromResult(new byte[]{0,0x40}),(_,_)=>{
+                    cancellation.Cancel();return Task.FromResult("Discarded");
+                },cancellation.Token);
+            }
+            catch(OperationCanceledException){return;}
+            throw new Exception("Cancelled dictation returned a transcript");
+        }).GetAwaiter().GetResult());
         test("Rename migration recognizes marked historical fork builds and their own startup command",()=>
         {
             foreach(string version in new[]{"2.26.1-ru.1","1.0.0+revision","1.0.0_b.9","1.1.6","1.2.0","1.2.0_b.14+revision"})

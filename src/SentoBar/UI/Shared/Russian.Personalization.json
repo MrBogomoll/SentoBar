@@ -1,0 +1,9 @@
+{
+  "Personalization": "Персонализация",
+  "About me": "О себе",
+  "How to answer": "Как отвечать",
+  "Sento includes these preferences in requests to your selected model in chat and voice.": "Сенто добавляет эти сведения к запросам выбранной модели в чате и голосовом режиме.",
+  "Save personalization": "Сохранить персонализацию",
+  "Personalization saved.": "Персонализация сохранена.",
+  "Could not save personalization.": "Не удалось сохранить персонализацию."
+}

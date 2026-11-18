@@ -1,0 +1,14 @@
+{
+  "Set up local speech recognition in Voice settings to use dictation.": "Для диктовки настройте локальное распознавание речи в разделе «Голос».",
+  "Finish the current audio or chat operation before dictating.": "Перед диктовкой завершите текущую операцию со звуком или чатом.",
+  "Install or select a listening model in Voice settings to use dictation.": "Для диктовки установите или выберите модель распознавания в настройках голоса.",
+  "Opening the microphone…": "Подключение микрофона…",
+  "Wake listening paused while you dictate.": "Распознавание фразы активации приостановлено на время диктовки.",
+  "Dictating · click the microphone to finish ({0} seconds max).": "Идёт диктовка. Нажмите микрофон для завершения. До {0} секунд.",
+  "Recognizing your speech…": "Распознавание речи…",
+  "No words recognized. Try again.": "Не удалось распознать слова. Попробуйте ещё раз.",
+  "Dictation cancelled.": "Диктовка отменена.",
+  "Dictation timed out. Check the microphone or the local speech model.": "Время диктовки истекло. Проверьте микрофон или локальную модель распознавания.",
+  "Dictation failed. Check the microphone and Voice settings.": "Диктовка завершилась с ошибкой. Проверьте микрофон и настройки голоса.",
+  "The microphone stopped recording. Reconnect it and try again.": "Микрофон перестал записывать. Подключите его заново и повторите попытку."
+}

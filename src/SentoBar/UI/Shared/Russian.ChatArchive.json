@@ -1,0 +1,8 @@
+{
+  "Could not read saved chats on this device. The original history was kept.": "Не удалось открыть историю чатов на этом устройстве. Исходный файл сохранён.",
+  "Saved chats are out of space. Delete an old chat to free up local history.": "Хранилище чатов заполнено. Удалите один из старых чатов, чтобы освободить место.",
+  "Could not save Sento chat history on this device.": "Не удалось сохранить историю чатов Сенто на этом устройстве.",
+  "New chat.": "Новый чат.",
+  "Saved chat opened.": "Сохранённый чат открыт.",
+  "Saved chat deleted.": "Чат удалён из истории."
+}

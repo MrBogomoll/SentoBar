@@ -24,7 +24,7 @@ public sealed partial class OverlayWindow
     private readonly CoverGesture coverGesture=new();
     private readonly DispatcherTimer coverHold=new(){Interval=TimeSpan.FromMilliseconds(500)};
     private Point coverDown;
-    private readonly TextBlock peekSystem=UI.Text("",17);
+    private SystemPeekView? peekSystem;
     private TextBox? mainNoteEditor,mainNoteTitleEditor;
     private bool syncingNote;
     private void InitializeInteractionFeatures()

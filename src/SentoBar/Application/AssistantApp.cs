@@ -23,5 +23,13 @@ public sealed partial class App
     {
         ShowSettings();settingsWindow?.OpenAiVoiceSettings();
     }
+    internal void ShowAssistantChatSettings()
+    {
+        ShowSettings();settingsWindow?.OpenAiChatSettings();
+    }
+    internal void ShowAssistantPersonalization()
+    {
+        ShowSettings();settingsWindow?.OpenAiPersonalization();
+    }
     internal void HideAssistant(){Assistant?.StopSession();assistantWindow?.Hide();}
 }

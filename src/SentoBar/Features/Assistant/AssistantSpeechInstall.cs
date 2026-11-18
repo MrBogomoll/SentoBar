@@ -218,7 +218,7 @@ internal sealed partial class AssistantSpeechInstall : IDisposable
     {
         if(Ready(folder,executable))return;
         bool tar=asset.Url.EndsWith(".tar.bz2",StringComparison.OrdinalIgnoreCase);
-        string archive=Path.Combine(root,"downloads",Path.GetFileName(folder)+(tar?".tar.bz2":".zip"));await Download(asset,archive,title,token);
+        string archive=RuntimeArchive(asset,folder);await Download(asset,archive,title,token);
         Report(Localization.Text("Installing ")+title+"…");string staging=folder+".staging-"+Guid.NewGuid().ToString("N");
         try
         {
@@ -244,6 +244,8 @@ internal sealed partial class AssistantSpeechInstall : IDisposable
         }
         finally{if(Directory.Exists(staging))Directory.Delete(staging,true);}
     }
+    private string RuntimeArchive(SpeechAsset asset,string folder)
+        =>Path.Combine(root,"downloads",Path.GetFileName(folder)+(asset.Url.EndsWith(".tar.bz2",StringComparison.OrdinalIgnoreCase)?".tar.bz2":".zip"));
     private static async Task ExtractTar(string archive,string staging,CancellationToken token)
     {
         string tar=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"tar.exe");if(!File.Exists(tar))throw new IOException(Localization.Text("These new model packs require the tar component included with current Windows. Update Windows, or use a Whisper/Piper pack."));
