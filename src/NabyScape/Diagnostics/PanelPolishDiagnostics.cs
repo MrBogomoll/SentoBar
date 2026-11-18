@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 
@@ -259,7 +260,10 @@ internal static class PanelPolishDiagnostics
         island.SelectPeek("battery");await Settle();Named<Button>("Power settings");capture("mini-battery");
         check("Mini Battery explicitly identifies the charge level or its availability",Field<TextBlock>("peekBatteryValue").Text.Length>0);
         island.SelectPeek("shortcuts");await Settle();
-        check("Mini Shortcuts show Explorer as a launch tile",Named<Button>("File Explorer").Content is Border);
+        check("Mini Shortcuts show Explorer as an outlined tile with a centered icon",
+            Named<Button>("File Explorer").Content is DockPanel shortcut &&
+            shortcut.Children.OfType<Grid>().First().VerticalAlignment==VerticalAlignment.Center &&
+            Named<Button>("File Explorer").BorderThickness.Left>0);
         capture("mini-shortcuts");
 
         island.SelectPeek("awake");await Settle();
@@ -319,6 +323,24 @@ internal static class PanelPolishDiagnostics
                 !Overlap(pause,more) && Bounds(more).Right<=(island.ActualWidth+island.PaintedWidth)/2-10);
             capture("clipboard-"+width);
         }
+
+        async Task VerifyMouseScrollbar(ScrollViewer viewer,string caption)
+        {
+            viewer.ScrollToTop();
+            await Settle();
+            var bar=(ScrollBar)viewer.Template.FindName("PART_VerticalScrollBar",viewer);
+            var track=(Track)bar.Template.FindName("PART_Track",bar);
+            bool visible=bar.IsVisible && bar.Opacity>.9 && track.Thumb.IsHitTestVisible && viewer.ScrollableHeight>0;
+            string page=island.ActivePage;
+            track.Thumb.RaiseEvent(new DragDeltaEventArgs(0,28){RoutedEvent=Thumb.DragDeltaEvent});
+            await Settle();
+            check(caption+" has a visible draggable scroll thumb",
+                visible && viewer.VerticalOffset>0 && island.ActivePage==page);
+        }
+        await VerifyMouseScrollbar(Field<ScrollViewer>("clipboardScroll"),"Clipboard");
+        for(int i=0;i<12;i++)app.Productivity.AddTask("Scrollbar fixture "+i);
+        island.SelectPage("tasks");await Settle();
+        await VerifyMouseScrollbar(Field<ScrollViewer>("taskViewport"),"Tasks");
 
         island.SelectPage("access");await Settle();
         var commandLauncher=Named<Button>("Search commands  ·  Ctrl+K");

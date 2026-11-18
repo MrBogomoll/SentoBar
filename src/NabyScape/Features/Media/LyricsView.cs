@@ -33,7 +33,7 @@ internal sealed class LyricsView : Grid
         var verse=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
         verse.Children.Add(previous);verse.Children.Add(line);verse.Children.Add(next);
         var reading=new Grid();reading.Children.Add(verse);
-        Children.Add(new ScrollViewer{Content=reading,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+        Children.Add(new ScrollViewer{Content=reading,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
         var footer=new StackPanel{Margin=new(0,8,0,0)};
         retry=UI.Button(Localization.Text("Retry lyrics"),()=>{app.Lyrics.Retry();Refresh();});
         var sources=new LyricsSourcesControl(app,()=>{app.Lyrics.Retry();Refresh();},()=>{credit.Text=LyricsFiles.Import(app,Window.GetWindow(this));});

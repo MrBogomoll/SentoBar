@@ -33,6 +33,7 @@ public sealed partial class OverlayWindow : Window
     private Border? batteryCard;
     private OutsideClick? outside;
     private bool expanded,userHidden,environmentHidden,updating,positioning;
+    private const double PanelScrollGutter=14;
     private double expandedWidth=452,expandedHeight=634,bodyWidth=388;
     private (string Page,double Width,double Scale,double Height)? fittedExtent;
     private bool fitQueued;
@@ -63,7 +64,7 @@ public sealed partial class OverlayWindow : Window
         UI.Named(compact,Localization.Text("Open or close island"));compact.ToolTip=Localization.Text("Click to open · Esc to close");
         Motion.Button(compact);
         compact.Click+=(_,_)=> {if(app.Notifications.Current!=null && !expanded){OpenNotice();return;}if(expanded)Collapse();else{LeaveAssistantPanel();Reveal();}};
-        scroll=UI.Scroll(body);scroll.VerticalScrollBarVisibility=ScrollBarVisibility.Hidden;scroll.HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled;scroll.VerticalAlignment=VerticalAlignment.Top;scroll.HorizontalAlignment=HorizontalAlignment.Center;scroll.Visibility=Visibility.Collapsed;scroll.Opacity=0;scroll.RenderTransform=bodySlide;
+        scroll=UI.Scroll(body);scroll.HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled;scroll.VerticalAlignment=VerticalAlignment.Top;scroll.HorizontalAlignment=HorizontalAlignment.Center;scroll.Visibility=Visibility.Collapsed;scroll.Opacity=0;scroll.RenderTransform=bodySlide;
         scroll.ScrollChanged+=ObserveExpandedExtent;
         root.RenderTransform=tuckSlide;root.MouseLeftButtonDown+=(_,e)=>{if(TuckRequested && !expanded && e.OriginalSource==surface){Reveal();e.Handled=true;}};root.Children.Add(surface);root.Children.Add(visuals);visuals.Children.Add(compact);visuals.Children.Add(scroll);dockHost.Children.Add(root);dockHost.Clip=dockBoundary;Content=dockHost;
         InitializeAssistantIsland(header);Grid.SetColumnSpan(idleDate,header.ColumnDefinitions.Count);header.Children.Add(idleDate);idleDockReady=true;InitializeDockEditing();
@@ -164,7 +165,7 @@ public sealed partial class OverlayWindow : Window
             if(fitPage)
             {
                 if(fittedExtent is {} last && last.Page==activePage &&
-                   Math.Abs(last.Width-(expandedWidth-app.Settings.PanelPadding*2))<.5 && last.Scale==app.Settings.PanelScale)
+                   Math.Abs(last.Width-(expandedWidth-app.Settings.PanelPadding*2+PanelScrollGutter))<.5 && last.Scale==app.Settings.PanelScale)
                     measuredHeight=Math.Max(measuredHeight,last.Height+PanelFramePadding);
                 desired=Math.Max(app.Settings.PanelAutoHeight?184:desired,Math.Ceiling(measuredHeight)+1);
             }
@@ -172,7 +173,7 @@ public sealed partial class OverlayWindow : Window
         }
         expandedHeight=Math.Max(app.Settings.Height,Math.Min(desired,available));
         if(expanded && Height<expandedHeight)Height=expandedHeight;
-        scroll.Width=expandedWidth-app.Settings.PanelPadding*2;scroll.Height=Math.Max(0,expandedHeight-PanelFramePadding);scroll.Margin=new(0,PanelFramePadding==44?20:10,0,0);
+        scroll.Width=expandedWidth-app.Settings.PanelPadding*2+PanelScrollGutter;scroll.Height=Math.Max(0,expandedHeight-PanelFramePadding);scroll.Margin=new(0,PanelFramePadding==44?20:10,-PanelScrollGutter,0);
         SizeVoiceViewport();
     }
     private void ApplySettings()

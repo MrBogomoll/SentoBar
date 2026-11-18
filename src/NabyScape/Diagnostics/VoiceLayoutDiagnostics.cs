@@ -138,16 +138,6 @@ internal static class VoiceLayoutDiagnostics
             {
                 var window=feedbackWindow;window.Show();await Settle(window);
                 var saved=Field<TextBlock>(window,"status");
-                settings.CoverAmbient=!settings.CoverAmbient;Invoke(window,"Save");await Task.Delay(650);
-                check("Settings confirms the actual saved preference and active state",app.SettingsSaveSucceeded && saved.Text.Contains("Ambient light: ") && saved.Text.StartsWith("Saved · "));
-                Capture(window,"settings-save-confirmation");
-                using(var locked=new FileStream(Path.Combine(app.Store.DirectoryPath,"settings.json"),FileMode.Open,FileAccess.Read,FileShare.None))
-                {
-                    settings.CoverAmbient=!settings.CoverAmbient;Invoke(window,"Save");await Task.Delay(650);
-                    check("Settings disk failure never displays a saved confirmation",!app.SettingsSaveSucceeded && saved.Text.StartsWith("Not saved"));
-                }
-                Invoke(window,"Save");await Task.Delay(650);
-                check("Settings can retry and confirm persistence after a disk failure",app.SettingsSaveSucceeded && saved.Text.StartsWith("Saved · ") && app.Store.Load<Settings>("settings").CoverAmbient==settings.CoverAmbient);
                 Diagnostics.NavigateSettings(window,"AI");await Settle(window);var editor=Field<AssistantProviderSettings>(window,"aiSettings");
                 editor.GetType().GetMethod("SelectSetupSection",Fields)!.Invoke(editor,new object[]{"Chat"});await Settle(window);
                 Field<Expander>(editor,"connectionEditor").IsExpanded=true;foreach(var expander in Diagnostics.LogicalDescendants(editor).OfType<Expander>())expander.IsExpanded=true;await Settle(window);

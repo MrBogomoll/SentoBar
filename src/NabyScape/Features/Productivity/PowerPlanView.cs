@@ -24,9 +24,25 @@ internal sealed class PowerPlanView : StackPanel
     internal PowerPlanView(Action reflow)
     {
         this.reflow=reflow;
-        Children.Add(UI.Heading(Localization.Text("Power plan"),19));Children.Add(UI.Text(Localization.Text("Choose from the power plans available on this PC."),12,UI.Muted));
+        var heading=UI.Heading(Localization.Text("Power plan"),19);
+        heading.TextAlignment=TextAlignment.Center;
+        Children.Add(heading);
+        var description=UI.Text(Localization.Text("Choose from the power plans available on this PC."),12,UI.Muted);
+        description.TextAlignment=TextAlignment.Center;
+        description.Margin=new(0,4,0,0);
+        Children.Add(description);
         UI.Named(choices,Localization.Text("Available Windows power plans"));Children.Add(choices);
-        apply=UI.Button(Localization.Text("Apply power plan"),async()=>await Apply());refresh=UI.Button(Localization.Text("Refresh plans"),async()=>await Refresh());Children.Add(apply);Children.Add(refresh);Children.Add(status);
+        apply=UI.Button(Localization.Text("Apply power plan"),async()=>await Apply());
+        refresh=UI.Button(Localization.Text("Refresh plans"),async()=>await Refresh());
+        foreach(var button in new[]{apply,refresh})
+        {
+            button.HorizontalAlignment=HorizontalAlignment.Center;
+            button.Margin=new(0,3,0,3);
+            Children.Add(button);
+        }
+        status.TextAlignment=TextAlignment.Center;
+        status.Margin=new(0,6,0,0);
+        Children.Add(status);
         Loaded+=async(_,_)=>{lifetime=new();await Refresh();};Unloaded+=(_,_)=>{lifetime?.Cancel();};
     }
     internal static PowerPlan[] Parse(string text)

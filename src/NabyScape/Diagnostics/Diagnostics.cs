@@ -122,6 +122,8 @@ internal static class Diagnostics
             overlay.DiagnosticRun=true;app.Settings.SmartActivities=false;
             // Keep real endpoint limiters from injecting unrelated feedback into fixtures.
             if(Environment.GetCommandLineArgs().Contains("--isolated-diagnostics"))overlay.IsolateDiagnosticFeedback();
+            if(Environment.GetCommandLineArgs().Contains("--settings-persistence-reload")){SettingsPersistenceDiagnostics.CheckReload(app,Check);return;}
+            if(Environment.GetCommandLineArgs().Contains("--settings-persistence-only")){await SettingsPersistenceDiagnostics.Run(app,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--settings-themes-only")){await SettingsThemeDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--russian-ui-only")){await RussianUiDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--lyrics-language-live-only")){await LyricsPopoverDiagnostics.RunLanguageLive(app,directory);return;}
@@ -539,7 +541,7 @@ internal static class Diagnostics
 
             var chrome=outerScroll.Template.FindName("PART_VerticalScrollBar",outerScroll) as System.Windows.Controls.Primitives.ScrollBar;
 
-            Check("Scrollable tools preserve hidden-chrome policy",chrome!=null && outerScroll.ScrollableHeight>0 && outerScroll.VerticalScrollBarVisibility==ScrollBarVisibility.Hidden && Descendants(outerScroll).OfType<ScrollContentPresenter>().First().ActualWidth<=outerScroll.ActualWidth+.5);
+            Check("Scrollable tools show a scrollbar",chrome!=null && outerScroll.ScrollableHeight>0 && chrome.IsVisible && chrome.Opacity>0 && Descendants(outerScroll).OfType<ScrollContentPresenter>().First().ActualWidth<=outerScroll.ActualWidth+.5);
 
             overlay.ShowTools("clips",false);await Task.Delay(150);Check("Clipboard remains opt-in with an explicit enable action",!app.Productivity.ClipboardEnabled && Descendants(overlay).OfType<Button>().Any(b=>b.Content?.ToString()=="Enable history"));CaptureContour("tools-clips");
 

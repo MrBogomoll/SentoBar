@@ -134,11 +134,15 @@ public sealed partial class App : Application
         openWait=ThreadPool.RegisterWaitForSingleObject(openEvent,(_,_)=>Dispatcher.BeginInvoke(ShowSettings),null,Timeout.Infinite,false);
         exitWait=ThreadPool.RegisterWaitForSingleObject(exitEvent,(_,_)=>Dispatcher.BeginInvoke(Quit),null,Timeout.Infinite,false);
         ShutdownMode=ShutdownMode.OnExplicitShutdown;
+        SessionEnding+=(_,_)=>FlushPendingPreferences();
         Resources.MergedDictionaries.Add(new ResourceDictionary{Source=new Uri("/NabyScape;component/Theme.xaml",UriKind.Relative)});
         var diagnosticIndex=Array.IndexOf(e.Args,"--diagnostics");
         var diagnosticPath=diagnosticIndex>=0 && diagnosticIndex+1<e.Args.Length ? e.Args[diagnosticIndex+1] : null;
         diagnosticMode=diagnosticPath!=null;
-        Store=new(diagnosticPath==null ? null : Path.Combine(diagnosticPath,"test-profile"));bool existingProfile=File.Exists(Path.Combine(Store.DirectoryPath,"settings.json"));Settings=diagnosticPath==null?Store.Load<Settings>("settings"):new Settings();
+        Store=new(diagnosticPath==null ? null : Path.Combine(diagnosticPath,"test-profile"));
+        bool existingProfile=File.Exists(Path.Combine(Store.DirectoryPath,"settings.json"));
+        bool reloadFixture=isolatedFixture && Array.Exists(e.Args,a=>a=="--settings-persistence-reload");
+        Settings=diagnosticPath==null || reloadFixture?Store.Load<Settings>("settings"):new Settings();
         if(diagnosticPath==null)RussianBuildProfile.Initialize(Store,Settings);
         Settings.Normalize();Localization.Configure(Settings);Settings.AutoStart=StartupService.Enabled();
         if(assistantFixture || isolatedFixture){Settings.HotkeyEnabled=Settings.VisibilityHotkeyEnabled=Settings.TuckHotkeyEnabled=false;Settings.HideFullscreen=Settings.HideMaximized=false;}
@@ -281,14 +285,35 @@ public sealed partial class App : Application
     internal void OpenMixer()=>overlay?.OpenMixer();
     public void SaveSession() { try { Session.Stopwatch.Checkpoint();Store.Save("session",Session); } catch(Exception ex) { Store.Log(ex);Notify(Localization.Text("Not saved yet"), Localization.Text("Could not save the timer state.")); } ScheduleCountdownUpdate();PublishUpdate(RuntimeChange.Countdown); }
     internal bool SettingsSaveSucceeded {get;private set;}
+    internal bool SettingsNeedSave {get;private set;}
     public void ChangeSettings()
     {
         Settings.Normalize();Media.SetEnabled(MediaFeaturesWanted);Brightness.Start(!diagnosticMode && Settings.ReactiveFeedback && Settings.BrightnessFeedback);Audio.SpectrumEnabled=Settings.WaveformSource=="Spectrum";UI.ResourceBrush("Accent",UI.Brush(Settings.Accent));UI.ApplyControlTheme(Settings);Motion.Configure(Settings);
         Productivity?.SetClipboardEnabled(Settings.ClipboardHistory);
-        SettingsSaveSucceeded=false;
-        try { Store.Save("settings",Settings);SettingsSaveSucceeded=true; } catch(Exception ex) { Store.Log(ex);Notify(Localization.Text("Not saved yet"),Localization.Text("These settings will apply until you close the app.")); }
+        PersistSettings();
         ConfigureDownloads();if(Settings.NotificationDelivery is "Off" or "Windows" || NotificationPolicy.Quiet(Settings,DateTimeOffset.UtcNow))Notifications.Clear();
         Previews?.ApplySettings();SettingsChanged?.Invoke();PublishUpdate(RuntimeChange.Settings);
+    }
+    private void PersistSettings()
+    {
+        SettingsSaveSucceeded=false;
+        try
+        {
+            Store.Save("settings",Settings);
+            SettingsSaveSucceeded=true;
+            SettingsNeedSave=false;
+        }
+        catch(Exception ex)
+        {
+            SettingsNeedSave=true;
+            Store.Log(ex);
+            Notify(Localization.Text("Not saved yet"),Localization.Text("These settings will apply until you close the app."));
+        }
+    }
+    private void FlushPendingPreferences()
+    {
+        if(settingsWindow!=null)settingsWindow.FlushPendingSettings();
+        else if(SettingsNeedSave)PersistSettings();
     }
     internal void ShowSettings(string category){ShowSettings();settingsWindow?.OpenCategory(category);}
     public void ShowSettings()
@@ -301,7 +326,12 @@ public sealed partial class App : Application
     public void Notify(string title,string text)
     { PostNotice(new("failure",title,text)); }
     public void Quit()
-    { quitting=true;Shutdown(); }
+    {
+        if(quitting)return;
+        FlushPendingPreferences();
+        quitting=true;
+        Shutdown();
+    }
     protected override void OnExit(ExitEventArgs e)
     {
         DisposeRuntimeRecovery();

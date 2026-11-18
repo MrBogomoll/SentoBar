@@ -15,6 +15,7 @@ public sealed partial class OverlayWindow
         heading.MinHeight=23;
         var open=GlassPeekButton("Open all "+id,clipboard?"Open clipboard":"All tasks",()=>ShowTools(id));
         open.FontSize=11;
+        open.HorizontalAlignment=HorizontalAlignment.Center;
         open.Margin=new(0,4,0,0);
         if(clipboard)
         {

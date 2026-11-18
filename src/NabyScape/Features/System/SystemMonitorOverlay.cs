@@ -74,8 +74,6 @@ public sealed partial class OverlayWindow
         }
         panel.Children.Add(tabs);
         monitorDetailScroll=UI.Scroll(monitorRows);
-        monitorDetailScroll.VerticalScrollBarVisibility=ScrollBarVisibility.Hidden;
-        ScrollChrome.SetEnabled(monitorDetailScroll,false);
         monitorDetailScroll.Padding=new(0,0,2,0);
         UI.Named(monitorDetailScroll,Localization.Text("System details · scroll or use Page Down"));
         var viewport=monitorDetailScroll;

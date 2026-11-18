@@ -23,13 +23,13 @@ public sealed partial class OverlayWindow
     private FrameworkElement BuildVolumePage()
     {
         var page=new StackPanel();
-        var label=UI.Heading(Localization.Text("Volume"),17);
+        var label=UI.Heading(Localization.Text("Volume"),17);label.TextAlignment=TextAlignment.Center;
         page.Children.Add(label);
         var slider=new Slider{Minimum=0,Maximum=100,Margin=new(0,8,0,8)};
         UI.Named(slider,Localization.Text("Windows volume"));
         page.Children.Add(slider);
         var toggle=UI.CaptionButton("Mute or unmute",()=>{app.Audio.ToggleMute();Update();});
-        var actions=new WrapPanel();
+        var actions=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center};
         actions.Children.Add(toggle);
         actions.Children.Add(UI.CaptionButton("Audio devices and microphone",OpenAudioMenu));
         actions.Children.Add(UI.CaptionButton("Volume mixer",OpenMixer));

@@ -21,6 +21,8 @@ public sealed partial class SettingsWindow : Window
     private int navigationRevision,previewRevision;
     private int? previewBuildKey;
     private bool applyingSettings;
+    private const string PreferenceSaveFailure="Not saved · changes are active for this session only. Choose Retry save.";
+    private string? preferenceSaveError;
     private string chosenPreviewMode="Closed",chosenPreviewContent="Music";
     private readonly Button retrySave=UI.CaptionButton("Retry save",()=>{});
     private System.Text.Json.JsonElement savedSettings;
@@ -41,7 +43,7 @@ public sealed partial class SettingsWindow : Window
     private readonly TextBlock hotkeyState=UI.Caption("",11,UI.Muted);
     public SettingsWindow(App app)
     {
-        this.app=app;savedSettings=System.Text.Json.JsonSerializer.SerializeToElement(app.Settings);UI.LocalizedName(status,"Settings status");Accessibility.Live(status);Title=Localization.Text("NabyScape · Settings");Width=1100;Height=780;MinWidth=480;MinHeight=300;WindowStartupLocation=WindowStartupLocation.Manual;
+        this.app=app;preferenceSaveError=app.SettingsNeedSave?PreferenceSaveFailure:null;savedSettings=System.Text.Json.JsonSerializer.SerializeToElement(app.Settings);UI.LocalizedName(status,"Settings status");Accessibility.Live(status);Title=Localization.Text("NabyScape · Settings");Width=1100;Height=780;MinWidth=480;MinHeight=300;WindowStartupLocation=WindowStartupLocation.Manual;
         InitializeWindowAppearance();Background=Brushes.Transparent;Foreground=Accessibility.HighContrast?SystemColors.WindowTextBrush:SettingsTheme.Bone;FontFamily=SettingsTheme.Body;FontSize=13;
         Icon=System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/Assets/island.ico"));
         Resources[typeof(CheckBox)]=FindResource("SettingsSwitch");
@@ -128,8 +130,29 @@ public sealed partial class SettingsWindow : Window
         app.Updates.Changed+=UpdateControls;
         app.SettingsChanged+=SettingsApplied;app.Updated+=UpdateFrameStatus;
         bool closeApproved=false,closePrompt=false;
-        Closing+=async(_,e)=>{if(closeApproved || aiSettings?.HasProviderDraft!=true)return;e.Cancel=true;if(closePrompt)return;closePrompt=true;try{if(await aiSettings.ConfirmProviderChanges()){closeApproved=true;_ =Dispatcher.BeginInvoke(new Action(()=>{if(IsLoaded)Close();}));}}finally{closePrompt=false;}};
-        Closed+=(_,_)=>{aiSettings?.ClearSecrets();if(saveTimer.IsEnabled)CommitSettings();app.Updates.Changed-=UpdateControls;app.SettingsChanged-=SettingsApplied;app.Updated-=UpdateFrameStatus;};InitializeHomeStatuses();Navigate("Home");RefreshPreview();appearanceKey=null;ApplyWindowAppearance();
+        Closing+=async(_,e)=>
+        {
+            if(app.Quitting)return;
+            if(closeApproved || aiSettings?.HasProviderDraft!=true){FlushPendingSettings();return;}
+            e.Cancel=true;
+            if(closePrompt)return;
+            closePrompt=true;
+            try
+            {
+                if(await aiSettings.ConfirmProviderChanges())
+                {
+                    closeApproved=true;
+                    _=Dispatcher.BeginInvoke(new Action(()=>{if(IsLoaded)Close();}));
+                }
+            }
+            finally{closePrompt=false;}
+        };
+        Closed+=(_,_)=>{aiSettings?.ClearSecrets();saveTimer.Stop();app.Updates.Changed-=UpdateControls;app.SettingsChanged-=SettingsApplied;app.Updated-=UpdateFrameStatus;};InitializeHomeStatuses();Navigate("Home");RefreshPreview();appearanceKey=null;ApplyWindowAppearance();
+    }
+    internal void FlushPendingSettings()
+    {
+        if(IsKeyboardFocusWithin)System.Windows.Input.Keyboard.ClearFocus();
+        if(saveTimer.IsEnabled || app.SettingsNeedSave || preferenceSaveError!=null)CommitSettings();
     }
     private void CommitSettings()
     {
@@ -137,14 +160,24 @@ public sealed partial class SettingsWindow : Window
         try
         {
             applyingSettings=true;app.ChangeSettings();
-            if(!app.SettingsSaveSucceeded){SetSaveFeedback("Not saved · changes are active for this session only. Choose Retry save.",true);return;}
-            CaptureSettingsUndo(savedSettings);
-            string summary=SettingsChangeFeedback.Describe(savedSettings,app.Settings);
-            savedSettings=System.Text.Json.JsonSerializer.SerializeToElement(app.Settings);
-            SetSaveFeedback(summary);
+            ReportPreferenceSave();
         }
-        catch(Exception ex){SetSaveFeedback("Could not save changes. Choose Retry save.",true);app.Store.Log(ex);}
+        catch(Exception ex){preferenceSaveError="Could not save changes. Choose Retry save.";SetSaveFeedback(preferenceSaveError,true);app.Store.Log(ex);}
         finally{applyingSettings=false;}
+    }
+    private void ReportPreferenceSave()
+    {
+        if(!app.SettingsSaveSucceeded)
+        {
+            preferenceSaveError=PreferenceSaveFailure;
+            SetSaveFeedback(preferenceSaveError,true);
+            return;
+        }
+        preferenceSaveError=null;
+        CaptureSettingsUndo(savedSettings);
+        string summary=SettingsChangeFeedback.Describe(savedSettings,app.Settings);
+        savedSettings=System.Text.Json.JsonSerializer.SerializeToElement(app.Settings);
+        SetSaveFeedback(summary);
     }
     private void SetSaveFeedback(string text,bool error=false)
     {
@@ -153,7 +186,7 @@ public sealed partial class SettingsWindow : Window
         Accessibility.Announce(status,Localization.Text(text));status.ToolTip=Localization.Text(text);
     }
     private void Save() {previewRevision++;InvalidateExamples(System.Windows.Input.Keyboard.FocusedElement as DependencyObject??System.Windows.Input.Mouse.DirectlyOver as DependencyObject);RefreshPreview();Accessibility.Announce(status,Localization.Text("Saving changes…"));saveTimer.Stop();saveTimer.Start();}
-    private void SettingsApplied(){ApplyWindowAppearance();ApplyMaterial();preview.Resources=SettingsTheme.PreviewResources();if(applyingSettings)return;if(app.SettingsSaveSucceeded){CaptureSettingsUndo(savedSettings);SetSaveFeedback(SettingsChangeFeedback.Describe(savedSettings,app.Settings));savedSettings=System.Text.Json.JsonSerializer.SerializeToElement(app.Settings);}else SetSaveFeedback("Not saved · changes are active for this session only. Choose Retry save.",true);previewRevision++;InvalidateExamples(null);RefreshPreview();}
+    private void SettingsApplied(){ApplyWindowAppearance();ApplyMaterial();preview.Resources=SettingsTheme.PreviewResources();if(applyingSettings)return;ReportPreferenceSave();previewRevision++;InvalidateExamples(null);RefreshPreview();}
     private void InvalidateExamples(DependencyObject? source)
     {
         for(var node=source;node!=null;node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node))
@@ -175,7 +208,10 @@ public sealed partial class SettingsWindow : Window
         bool same=name==current && page.Children.Count>0;double offset=settingsScroll.VerticalOffset;int revision=++navigationRevision;
         var expanded=SettingTree(page).OfType<Expander>().Where(e=>e.IsExpanded).Select(e=>e.Header?.ToString()).ToHashSet();
         string focused=System.Windows.Input.Keyboard.FocusedElement is DependencyObject oldFocus?UI.Identity(oldFocus):"";
-        previewRevision++;settingExamples.Clear();current=name;categoryHeading.Text=CategoryTitle(name);categoryEyebrow.Text=CategoryEyebrow(name);categoryDescription.Text=Localization.Text(Category(name).Description);if(categorySelector!=null && categorySelector.SelectedItem?.ToString()!=CategoryTitle(name))categorySelector.SelectedItem=CategoryTitle(name);previewContent="Music";previewMode="Closed";if(name=="Launch"){previewContent="Launch";previewMode="Panel";}if(name=="Content"){previewContent="Navigation";previewMode="Panel";}if(name=="Controls"){previewContent="Music";previewMode="Hover";}if(name=="System"){previewContent="System";previewMode="Panel";}if(name=="Audio"){previewContent="Music";previewMode="Panel";}if(name=="AI"){previewContent="AI";previewMode="Panel";}if(name=="Application"){previewContent="Startup";previewMode="Panel";}if(!same)settingsScroll.ScrollToTop();page.Children.Clear();
+        previewRevision++;settingExamples.Clear();current=name;
+        if(preferenceSaveError!=null)SetSaveFeedback(preferenceSaveError,true);
+        else if(saveTimer.IsEnabled)Accessibility.Announce(status,Localization.Text("Saving changes…"));
+        categoryHeading.Text=CategoryTitle(name);categoryEyebrow.Text=CategoryEyebrow(name);categoryDescription.Text=Localization.Text(Category(name).Description);if(categorySelector!=null && categorySelector.SelectedItem?.ToString()!=CategoryTitle(name))categorySelector.SelectedItem=CategoryTitle(name);previewContent="Music";previewMode="Closed";if(name=="Launch"){previewContent="Launch";previewMode="Panel";}if(name=="Content"){previewContent="Navigation";previewMode="Panel";}if(name=="Controls"){previewContent="Music";previewMode="Hover";}if(name=="System"){previewContent="System";previewMode="Panel";}if(name=="Audio"){previewContent="Music";previewMode="Panel";}if(name=="AI"){previewContent="AI";previewMode="Panel";}if(name=="Application"){previewContent="Startup";previewMode="Panel";}if(!same)settingsScroll.ScrollToTop();page.Children.Clear();
         StyleNavigationSelection(name);
         switch(SettingsRoot(name)){case "Home":SettingsHome();break;case "Widgets":WidgetsSettings();break;case "Notes":NotesSettings();break;case "Tasks":TasksSettings();break;case "Timers":TimersSettings();break;case "Weather":WeatherSettingsPage();break;case "Appearance":DockAppearance();break;case "ClosedDock":ClosedDockSettings();break;case "WindowAppearance":WindowThemeControls();break;case "Ambience":AmbientSettings();break;case "Motion":MotionSettings();break;case "Visibility":VisibilitySettings();break;case "Layout":LayoutSettings();break;case "Content":ContentSettings();break;case "Launch":LaunchSettings();break;case "Controls":Interactions();break;case "Audio":AudioSettings();break;case "System":SystemSettings();break;case "AI":AiSettings();break;default:General();break;}FilterSettingsCategory(name);if(PreferenceReset.Categories.TryGetValue(current,out var resetKeys) && resetKeys.Length>0)page.Children.Add(UI.CaptionButton("Reset this category",()=>ResetPreferences(current)));RefreshNavigationMode();OrganizeSettings();if(same){foreach(var group in SettingTree(page).OfType<Expander>())group.IsExpanded=expanded.Contains(group.Header?.ToString());page.UpdateLayout();settingsScroll.ScrollToVerticalOffset(offset);Dispatcher.BeginInvoke(DispatcherPriority.Loaded,()=>{if(revision!=navigationRevision)return;var replacement=SettingTree(page).OfType<Control>().FirstOrDefault(c=>focused.Length>0 && UI.Identity(c)==focused);replacement?.Focus();settingsScroll.ScrollToVerticalOffset(offset);});}refreshSettingsLayout?.Invoke();RefreshPreview();SettingsPalette.BindTree(this);
     }
