@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
@@ -41,7 +42,6 @@ public sealed partial class OverlayWindow
     private readonly Dictionary<string,FrameworkElement> peekViews=new();
     private readonly Dictionary<string,TranslateTransform> peekMoves=new();
     private readonly Dictionary<string,Button> peekDots=new();
-    private readonly TextBlock peekPageName=UI.Text(Localization.Text("Music"),10,UI.Muted);
     private readonly Dictionary<string,(TextBlock Time,TextBlock Heading,TextBlock Status,Button Toggle,Button Edit,Button Reset,ProgressBar Progress)> peekClocks=new();
     private (ProgressBar Bar,DateTimeOffset Deadline,double Duration,int FrameRate)? peekCountdownAnimation;
     private readonly TextBlock peekEventTitle=UI.Text("",16),peekEventTime=UI.Text("",11,UI.Muted),peekShelfName=UI.Text("",14),peekShelfCount=UI.Text("",11,UI.Muted);
@@ -96,14 +96,12 @@ public sealed partial class OverlayWindow
         // Keep the current hover stage when liking a track.
         favorite.PreviewMouseDown+=(_,_)=>detailDelay.Stop();favorite.PreviewTouchDown+=(_,_)=>detailDelay.Stop();Grid.SetColumn(favorite,4);controls.Children.Add(favorite);
         peekVolume=new Slider{Minimum=0,Maximum=100,Height=26,Margin=new(7,0,9,0),VerticalAlignment=VerticalAlignment.Center};UI.Named(peekVolume,Localization.Text("Preview volume"));peekVolume.ValueChanged+=(_,_)=>{if(!updating){app.Audio.SetVolume(peekVolume.Value/100);}};Grid.SetColumn(peekVolume,3);controls.Children.Add(peekVolume);Grid.SetColumn(output,5);controls.Children.Add(output);var mixerButton=PeekIcon("mixer",Localization.Text("Open mixer from preview"),OpenMixer);Grid.SetColumn(mixerButton,6);controls.Children.Add(mixerButton);Grid.SetRow(controls,4);Grid.SetColumnSpan(controls,3);peekMedia.Children.Add(controls);AddPeekView("media",peekMedia);
-        peekPageName.TextWrapping=TextWrapping.NoWrap;peekPageName.TextTrimming=TextTrimming.CharacterEllipsis;peekPageName.VerticalAlignment=VerticalAlignment.Center;
         var footer=peekFooter=new Grid{Margin=new(0,2,0,2)};
         footer.ColumnDefinitions.Add(new(){Width=new(PeekFooterEndWidth)});
         footer.ColumnDefinitions.Add(new());
         footer.ColumnDefinitions.Add(new(){Width=new(PeekArrowWidth)});
         footer.ColumnDefinitions.Add(new(){Width=new(DetachSlotWidth)});
         footer.ColumnDefinitions.Add(new(){Width=new(PeekSettingsWidth)});
-        peekPageName.Margin=new(0,0,PeekArrowWidth+3,0);footer.Children.Add(peekPageName);
         peekTabStrip=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
         peekTabScroll=new ScrollViewer{Content=peekTabStrip,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,
             VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,PanningMode=PanningMode.HorizontalOnly};
@@ -293,7 +291,6 @@ public sealed partial class OverlayWindow
         }
         UpdatePeekFooter();
         UpdatePeekTabs(ids);
-        peekPageName.Text=PeekName(peekId);
         peekPrevious.IsEnabled=peekNext.IsEnabled=ids.Length>1;
         peekPrevious.Opacity=peekNext.Opacity=ids.Length>1?1:.25;
     }
@@ -333,8 +330,6 @@ public sealed partial class OverlayWindow
     private void UpdatePeekFooter()
     {
         bool canDetach=app.Previews?.CanOpen(peekId)==true;
-        bool showPageName=app.Settings.PanelNavigationStyle=="Dots";
-        peekPageName.Visibility=showPageName?Visibility.Visible:Visibility.Collapsed;
         peekDetachButton.Visibility=canDetach?Visibility.Visible:Visibility.Hidden;
     }
 

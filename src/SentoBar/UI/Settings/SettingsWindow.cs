@@ -12,7 +12,8 @@ public sealed partial class SettingsWindow : Window
 {
     private readonly App app;
     private readonly StackPanel page=new(){Margin=new(28,20,28,28)};
-    private readonly TextBlock status=UI.Caption("Changes save automatically on this device.",11,UI.Muted);
+    private readonly TextBlock status=UI.Caption("",11,UI.Muted);
+    private readonly DockPanel settingsFeedback=new(){Visibility=Visibility.Collapsed,Margin=new(0,4,8,4),HorizontalAlignment=HorizontalAlignment.Center};
     private readonly Border preview;
     private readonly Border previewStage;
     private readonly DispatcherTimer saveTimer=new(){Interval=TimeSpan.FromMilliseconds(180)};
@@ -63,13 +64,17 @@ public sealed partial class SettingsWindow : Window
         var compactBar=new Grid{Margin=new(16,50,16,8),Visibility=Visibility.Collapsed};compactBar.ColumnDefinitions.Add(new());
         var categories=new ComboBox{Margin=new(0,0,8,0),ItemsSource=SettingsCategories.Select(c=>Localization.Text(c.Title)).ToArray(),SelectedItem=CategoryTitle(current)};categorySelector=categories;UI.LocalizedName(categories,"Settings category");compactBar.Children.Add(categories);
         categories.SelectionChanged+=(_,_)=>{if(categories.SelectedItem is string name && CategoryId(name)!=current)Navigate(CategoryId(name));};RefreshNavigationMode();Grid.SetColumnSpan(compactBar,2);compactBar.Resources=chromeResources;root.Children.Add(compactBar);
-        var main=new Grid{Resources=chromeResources};Grid.SetColumn(main,1);Grid.SetRowSpan(main,2);Grid.SetRowSpan(navBorder,2);root.Children.Add(main);main.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});main.RowDefinitions.Add(new(){Height=GridLength.Auto});
+        var main=new Grid{Resources=chromeResources};Grid.SetColumn(main,1);Grid.SetRowSpan(main,2);Grid.SetRowSpan(navBorder,2);root.Children.Add(main);main.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});
         var workspace=new Grid();Grid.SetRow(workspace,0);main.Children.Add(workspace);
-        var form=new Grid();form.RowDefinitions.Add(new(){Height=GridLength.Auto});form.RowDefinitions.Add(new());workspace.Children.Add(form);
+        var form=new Grid();
+        form.RowDefinitions.Add(new(){Height=GridLength.Auto});
+        form.RowDefinitions.Add(new(){Height=GridLength.Auto});
+        form.RowDefinitions.Add(new());
+        workspace.Children.Add(form);
         var column=new StackPanel{HorizontalAlignment=HorizontalAlignment.Center};
         var pageHeader=new StackPanel{Margin=new(0,0,0,20)};categoryEyebrow.FontFamily=SettingsTheme.Display;categoryEyebrow.FontWeight=FontWeights.Bold;categoryEyebrow.FontSize=11;categoryEyebrow.Foreground=SettingsTheme.Lime;categoryEyebrow.Margin=new(0,0,0,6);pageHeader.Children.Add(categoryEyebrow);
         categoryHeading.FontFamily=SettingsTheme.Body;categoryHeading.FontWeight=FontWeights.Normal;categoryHeading.Foreground=SettingsTheme.Bone;pageHeader.Children.Add(categoryHeading);categoryDescription.Foreground=SettingsTheme.Quiet;categoryDescription.Margin=new(0,6,0,0);pageHeader.Children.Add(categoryDescription);column.Children.Add(pageHeader);
-        var scroll=UI.Scroll(column);scroll.Padding=new(0,0,8,0);form.Children.Add(scroll);Grid.SetRow(scroll,1);settingsScroll=scroll;
+        var scroll=UI.Scroll(column);scroll.Padding=new(0,0,8,0);form.Children.Add(scroll);Grid.SetRow(scroll,2);settingsScroll=scroll;
         InitializeSettingsSearch(main,workspace,sidebarSearchHost);
         preview=new Border{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Top};preview.SetValue(SettingsPalette.PreserveProperty,true);preview.Resources=SettingsTheme.PreviewResources();
         var previewColumn=new StackPanel{Margin=new(4,12,12,12),VerticalAlignment=VerticalAlignment.Center};
@@ -93,15 +98,22 @@ public sealed partial class SettingsWindow : Window
         ControlFeedback.SetEnabled(previewExpander,false);
         var rail=new Border{Child=previewExpander,Margin=new(24,10,36,0)};form.Children.Add(rail);Grid.SetRow(rail,0);
         sectionIndexHost.Visibility=Visibility.Collapsed;column.Children.Add(sectionIndexHost);column.Children.Add(page);
-        var saveRow=new DockPanel();var done=UI.CaptionButton("Done with settings",Close);done.MinHeight=26;done.Padding=new(12,3,12,3);done.Margin=new(8,0,0,0);done.FontSize=11;DockPanel.SetDock(done,Dock.Right);saveRow.Children.Add(done);undoSettings.MinHeight=24;undoSettings.Padding=new(8,3,8,3);undoSettings.FontSize=11;undoSettings.Background=Brushes.Transparent;undoSettings.Visibility=Visibility.Collapsed;undoSettings.Click+=(_,_)=>UndoSettings();DockPanel.SetDock(undoSettings,Dock.Right);saveRow.Children.Add(undoSettings);retrySave.Visibility=Visibility.Collapsed;retrySave.HorizontalAlignment=HorizontalAlignment.Right;retrySave.Click+=(_,_)=>CommitSettings();DockPanel.SetDock(retrySave,Dock.Right);saveRow.Children.Add(retrySave);
-        var savedDot=new System.Windows.Shapes.Ellipse{Width=6,Height=6,Fill=SettingsTheme.Lime,Margin=new(0,0,9,0),VerticalAlignment=VerticalAlignment.Center};saveRow.Children.Add(savedDot);status.VerticalAlignment=VerticalAlignment.Center;UI.SetStatusForeground(status);saveRow.Children.Add(status);
-        var footer=new Border{Padding=new(40,10,26,12),BorderBrush=SettingsTheme.LineSoft,BorderThickness=new(0,1,0,0),Background=Accessibility.HighContrast?SystemColors.WindowBrush:SettingsTheme.Void,Child=saveRow};
-        footer.CornerRadius=new(14);footer.Margin=new(6,2,12,6);footer.BorderThickness=new(0);footer.SetResourceReference(Border.BackgroundProperty,"SettingsFooter");
+        undoSettings.Visibility=Visibility.Collapsed;
+        undoSettings.Click+=(_,_)=>UndoSettings();
+        retrySave.Visibility=Visibility.Collapsed;
+        retrySave.Click+=(_,_)=>CommitSettings();
+        DockPanel.SetDock(retrySave,Dock.Right);
+        settingsFeedback.Children.Add(retrySave);
+        status.VerticalAlignment=VerticalAlignment.Center;
+        status.Margin=new(0,4,8,4);
+        UI.SetStatusForeground(status);
+        settingsFeedback.Children.Add(status);
+        Grid.SetRow(settingsFeedback,1);
+        form.Children.Add(settingsFeedback);
         void Responsive()
         {
             bool narrow=ActualWidth<1100,compactNav=ActualWidth<760,shortScreen=ActualHeight<600,veryShort=ActualHeight<340;
             compactBar.Margin=new Thickness(16,veryShort?4:10,16,veryShort?3:8);
-            footer.Padding=veryShort?new Thickness(20,4,20,6):new Thickness(compactNav?20:40,6,26,6);
             root.ColumnDefinitions[0].Width=compactNav?new GridLength(0):new GridLength(SidebarWidth);
             navBorder.Visibility=compactNav?Visibility.Collapsed:Visibility.Visible;compactBar.Visibility=compactNav?Visibility.Visible:Visibility.Collapsed;categories.Visibility=compactBar.Visibility;
             if(settingsSearchHeader!=null && titleSearchHost!=null){var host=titleSearchHost;if(settingsSearchHeader.Parent!=host){if(settingsSearchHeader.Parent is Border old)old.Child=null;host.Child=settingsSearchHeader;}}
@@ -120,6 +132,7 @@ public sealed partial class SettingsWindow : Window
             // Leave room for the vertical scrollbar so card borders are never clipped.
             double available=workspace.ActualWidth-side*2-28;
             column.Width=Math.Max(240,Math.Min(MaxContentWidth,available));
+            settingsFeedback.Width=column.Width;
             page.Width=column.Width;page.Margin=new Thickness(0);
             rail.HorizontalAlignment=HorizontalAlignment.Center;rail.Width=column.Width;rail.Margin=new Thickness(0,10,8,0);
         }
@@ -127,7 +140,7 @@ public sealed partial class SettingsWindow : Window
         UI.LocalizedName(previewExpander,"Settings live preview");UI.LocalizedName(scroll,"Settings form viewport");UI.LocalizedName(rail,"Settings preview rail");UI.LocalizedName(navBorder,"Settings navigation");
         SizeChanged+=(_,_)=>Responsive();workspace.SizeChanged+=(_,_)=>Responsive();Loaded+=(_,_)=>Responsive();
         page.HorizontalAlignment=HorizontalAlignment.Left;
-        Grid.SetRow(footer,1);main.Children.Add(footer);Content=SettingsFrame(root);InitializePreviewMotion(previewAdvancedContent);InitializeAmbientPreview();
+        Content=SettingsFrame(root);InitializePreviewMotion(previewAdvancedContent);InitializeAmbientPreview();
         saveTimer.Tick+=(_,_)=>CommitSettings();
         app.Updates.Changed+=UpdateControls;
         app.SettingsChanged+=SettingsApplied;app.Updated+=UpdateFrameStatus;
@@ -179,11 +192,13 @@ public sealed partial class SettingsWindow : Window
         CaptureSettingsUndo(savedSettings);
         string summary=SettingsChangeFeedback.Describe(savedSettings,app.Settings);
         savedSettings=System.Text.Json.JsonSerializer.SerializeToElement(app.Settings);
-        SetSaveFeedback(summary);
+        settingsFeedback.Visibility=retrySave.Visibility=Visibility.Collapsed;
+        Accessibility.Announce(status,summary);
     }
     private void SetSaveFeedback(string text,bool error=false,bool success=false)
     {
-        retrySave.Visibility=error && current!="AI"?Visibility.Visible:Visibility.Collapsed;
+        settingsFeedback.Visibility=string.IsNullOrWhiteSpace(text)?Visibility.Collapsed:Visibility.Visible;
+        retrySave.Visibility=error && preferenceSaveError!=null?Visibility.Visible:Visibility.Collapsed;
         UI.SetStatusForeground(status,error,success);
         Accessibility.Announce(status,Localization.Text(text));status.ToolTip=Localization.Text(text);
     }
@@ -207,7 +222,7 @@ public sealed partial class SettingsWindow : Window
     {
         if(searchResultsHost!=null)searchResultsHost.Visibility=Visibility.Collapsed;
         UI.SetStatusForeground(status);
-        Accessibility.Announce(status,Localization.Text(name=="AI"?"Connection fields use Save provider. Voice and wake word changes use their Save buttons.":"Changes save automatically on this device."));previewHelp.Text=Localization.Text(name=="AI"?"Preview only. Apply connection edits with Save provider.":"Changes apply automatically. The preview uses your current shape, size and colors.");
+        settingsFeedback.Visibility=retrySave.Visibility=Visibility.Collapsed;previewHelp.Text=Localization.Text(name=="AI"?"Preview only. Apply connection edits with Save provider.":"Changes apply automatically. The preview uses your current shape, size and colors.");
         bool same=name==current && page.Children.Count>0;double offset=settingsScroll.VerticalOffset;int revision=++navigationRevision;
         var expanded=SettingTree(page).OfType<Expander>().Where(e=>e.IsExpanded).Select(e=>e.Header?.ToString()).ToHashSet();
         string focused=System.Windows.Input.Keyboard.FocusedElement is DependencyObject oldFocus?UI.Identity(oldFocus):"";
@@ -245,7 +260,7 @@ public sealed partial class SettingsWindow : Window
         void Arrange(){bool fits=row.ActualWidth<=0 || row.ActualWidth>=380;if(inline==fits)return;inline=fits;Grid.SetRow(slider,fits?0:1);Grid.SetColumn(slider,fits?1:0);Grid.SetColumnSpan(slider,fits?1:4);slider.Width=fits?190:double.NaN;slider.Margin=fits?new Thickness(0,0,12,0):new Thickness(0,8,0,4);}
         Arrange();row.SizeChanged+=(_,_)=>Arrange();UI.LocalizedName(slider,label);slider.ValueChanged+=(_,_)=>{if(!number.IsKeyboardFocusWithin)number.Text=slider.Value.ToString("0.##",System.Globalization.CultureInfo.InvariantCulture);change(slider.Value);Save();};
 
-        void Commit(){if(double.TryParse(number.Text,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out double n) && double.IsFinite(n)){slider.Value=Math.Clamp(Math.Round(n/step)*step,min,max);number.Text=slider.Value.ToString("0.##",System.Globalization.CultureInfo.InvariantCulture);}else{number.Text=slider.Value.ToString("0.##",System.Globalization.CultureInfo.InvariantCulture);Accessibility.Announce(status,Localization.Format("Enter a number from {0} to {1} {2}.",min.ToString("0.##"),max.ToString("0.##"),Localization.Text(unit.Trim())));}}
+        void Commit(){if(double.TryParse(number.Text,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out double n) && double.IsFinite(n)){slider.Value=Math.Clamp(Math.Round(n/step)*step,min,max);number.Text=slider.Value.ToString("0.##",System.Globalization.CultureInfo.InvariantCulture);}else{number.Text=slider.Value.ToString("0.##",System.Globalization.CultureInfo.InvariantCulture);SetSaveFeedback(Localization.Format("Enter a number from {0} to {1} {2}.",min.ToString("0.##"),max.ToString("0.##"),Localization.Text(unit.Trim())),true);}}
         number.LostKeyboardFocus+=(_,_)=>Commit();number.KeyDown+=(_,e)=>{if(e.Key==System.Windows.Input.Key.Enter){Commit();e.Handled=true;}};string help=SettingDescription(label);if(help.Length>0){var hint=UI.Caption(help,11,UI.Muted);hint.Margin=new(0,-2,0,10);target.Children.Add(hint);}
     }
     private CheckBox Check(string name,bool value,Action<bool> change)
@@ -318,8 +333,6 @@ public sealed partial class SettingsWindow : Window
         FeatureResourceSettings();
         page.Children.Add(Section("Clipboard history",Check("Save text & image history locally",s.ClipboardHistory,v=>s.ClipboardHistory=v),UI.Caption("Pause capture and pin items in the clipboard widget.",12,UI.Muted)));
     }
-    private void Move<T>(System.Collections.Generic.List<T> list,int index,int delta)
-    {int to=index+delta;if(to<0 || to>=list.Count)return;(list[index],list[to])=(list[to],list[index]);Save();Navigate(current);}
     private void LaunchSettings()
     {
         var s=app.Settings;
@@ -328,25 +341,17 @@ public sealed partial class SettingsWindow : Window
         shortcuts.Children.Add(UI.Caption("Drop a file or folder on the Shortcuts tab to add a shortcut.",12,UI.Muted));
         shortcuts.Children.Add(UI.CaptionButton("Add installed app",()=>new AppPicker(this,shortcut=>
         {
-            if(s.Shortcuts.Count>=ShortcutService.MaximumShortcuts){Accessibility.Announce(status,Localization.Text("You can add up to 40 shortcuts."));return;}
+            if(s.Shortcuts.Count>=ShortcutService.MaximumShortcuts){SetSaveFeedback("You can add up to 40 shortcuts.",true);return;}
             s.Shortcuts.Add(shortcut);Save();Navigate(current);
         }).ShowDialog()));
-        for(int i=0;i<s.Shortcuts.Count;i++)
-        {
-            var index=i;var shortcut=s.Shortcuts[i];
-            var row=new DockPanel{Margin=new(0,0,0,8)};
-            var up=UI.CaptionButton("↑",()=>Move(s.Shortcuts,index,-1));UI.LocalizedName(up,"Move up");var down=UI.CaptionButton("↓",()=>Move(s.Shortcuts,index,1));UI.LocalizedName(down,"Move down");var buttons=UI.Row(up,down,UI.CaptionButton("Remove",()=> {s.Shortcuts.RemoveAt(index);Save();Navigate(current);}));
-            ((Button)buttons.Children[0]).IsEnabled=i>0;((Button)buttons.Children[1]).IsEnabled=i<s.Shortcuts.Count-1;
-            DockPanel.SetDock(buttons,Dock.Right);row.Children.Add(buttons);
-            var detail=new StackPanel();detail.Children.Add(UI.Text(shortcut.Name));var target=UI.Text(shortcut.Target,10,UI.Muted);target.TextWrapping=TextWrapping.NoWrap;target.TextTrimming=TextTrimming.CharacterEllipsis;detail.Children.Add(target);row.Children.Add(detail);shortcuts.Children.Add(row);
-        }
+        shortcuts.Children.Add(ShortcutOrder());
         var name=UI.Input("Shortcut name","",Localization.Text("e.g. Browser"));var targetInput=UI.Input("Shortcut destination","",Localization.Text("Application path, folder, or https:// URL"));UI.LocalizedName(name,"Shortcut name");UI.LocalizedName(targetInput,"Shortcut destination");
         shortcuts.Children.Add(UI.Caption("Shortcut name",12,UI.Muted));shortcuts.Children.Add(name);shortcuts.Children.Add(UI.Caption("Application, folder, or URL",12,UI.Muted));shortcuts.Children.Add(targetInput);
         shortcuts.Children.Add(UI.Row(UI.CaptionButton("Choose file",()=> {var dialog=new Microsoft.Win32.OpenFileDialog{Filter=Localization.Text("Applications & files|*.*")};if(dialog.ShowDialog(this)==true){targetInput.Text=dialog.FileName;if(string.IsNullOrWhiteSpace(name.Text))name.Text=System.IO.Path.GetFileNameWithoutExtension(dialog.FileName);}}),UI.CaptionButton("Choose folder",()=> {var dialog=new Microsoft.Win32.OpenFolderDialog();if(dialog.ShowDialog(this)==true){targetInput.Text=dialog.FolderName;if(string.IsNullOrWhiteSpace(name.Text))name.Text=System.IO.Path.GetFileName(dialog.FolderName);}})));
         shortcuts.Children.Add(UI.CaptionButton("Add shortcut",()=>
         {
-            if(string.IsNullOrWhiteSpace(name.Text) || string.IsNullOrWhiteSpace(targetInput.Text)){Accessibility.Announce(status,Localization.Text("Enter a name and destination first."));return;}
-            if(s.Shortcuts.Count>=ShortcutService.MaximumShortcuts){Accessibility.Announce(status,Localization.Text("You can add up to 40 shortcuts."));return;}
+            if(string.IsNullOrWhiteSpace(name.Text) || string.IsNullOrWhiteSpace(targetInput.Text)){SetSaveFeedback("Enter a name and destination first.",true);return;}
+            if(s.Shortcuts.Count>=ShortcutService.MaximumShortcuts){SetSaveFeedback("You can add up to 40 shortcuts.",true);return;}
             s.Shortcuts.Add(new(){Name=name.Text.Trim(),Target=targetInput.Text.Trim()});Save();Navigate(current);
         },true));page.Children.Add(Section("Shortcuts",shortcuts));
     }

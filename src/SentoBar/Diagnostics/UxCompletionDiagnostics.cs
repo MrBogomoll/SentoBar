@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -24,14 +25,48 @@ internal static class UxCompletionDiagnostics
         async Task Settle(){await Task.Delay(100);window.UpdateLayout();}
         try
         {
-            window.Show();Diagnostics.NavigateSettings(window,"AI");await Settle();var editor=Field<AssistantProviderSettings>(window,"aiSettings");
+            window.Show();
+            Diagnostics.NavigateSettings(window,"Widgets");await Settle();
+            var cards=Field<StackPanel>(window,"page").Children.OfType<UniformGrid>().Single();
+            var widgetCards=cards.Children.OfType<Button>().ToArray();
+            check("Widget overview contains only cards that lead to other pages",
+                widgetCards.Length>0 && widgetCards.All(b=>UI.Identity(b)!="Widgets"));
+            widgetCards.Single(b=>UI.Identity(b)=="Widget selection")
+                .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            await Settle();
+            check("Widget selection card opens its settings",Diagnostics.CurrentSettingsCategory(window)=="Content");
+            Diagnostics.NavigateSettings(window,"AI");await Settle();var editor=Field<AssistantProviderSettings>(window,"aiSettings");
             check("UX goal setup offers chat, talk and Hermes with an explicit pipeline",Diagnostics.Descendants(editor).OfType<Button>().Any(b=>b.Content?.ToString()=="Set up voice") && ai.SetupSummary.Contains("AI replies:") && ai.SetupSummary.Contains("Listening:") && ai.SetupSummary.Contains("Speaking:"));
             editor.GetType().GetMethod("SelectSetupSection",Hidden)!.Invoke(editor,new object[]{"Chat"});await Settle();
             var name=Field<TextBox>(editor,"name");var list=Field<ComboBox>(editor,"list");name.Text="Draft name";check("UX provider draft is detected without saving",editor.HasProviderDraft && first.Name=="Fixture first");
-            async Task Pick(string action)
+            async Task Pick(string action,Action<Window>? afterClick=null)
             {
-                var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(40)};timer.Tick+=(_,_)=>{var prompt=Application.Current.Windows.OfType<Window>().FirstOrDefault(w=>w.Title=="Unsaved provider changes");if(prompt==null)return;timer.Stop();Button(prompt,action).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));};timer.Start();list.SelectedItem=second;await Task.Delay(180);timer.Stop();
+                var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(40)};
+                timer.Tick+=(_,_)=>
+                {
+                    var prompt=Application.Current.Windows.OfType<Window>().FirstOrDefault(w=>w.Title==Localization.Text("Unsaved provider changes"));
+                    if(prompt==null)return;
+                    timer.Stop();
+                    Diagnostics.Descendants(prompt).OfType<Button>().Single(b=>UI.Identity(b)==action)
+                        .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+                    afterClick?.Invoke(prompt);
+                };
+                timer.Start();list.SelectedItem=second;await Task.Delay(180);timer.Stop();
             }
+            var model=Field<ComboBox>(editor,"model");
+            model.Text="";
+            await Pick("Save",prompt=>
+            {
+                check("Invalid provider draft keeps the save dialog open and explains the missing model",
+                    prompt.IsVisible && Diagnostics.Descendants(prompt).OfType<TextBlock>().Any(t=>
+                        t.IsVisible && UI.Identity(t)=="Connection save error" && t.Text.Contains(Localization.Text("Enter a chat model or realtime model ID."))));
+                if(prompt.IsVisible)
+                    Diagnostics.Descendants(prompt).OfType<Button>().Single(b=>UI.Identity(b)=="Keep editing")
+                        .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            });
+            check("Failed provider save leaves the original connection and the draft intact",
+                list.SelectedItem==first && first.Model=="fixture" && model.Text.Length==0 && editor.HasProviderDraft);
+            model.Text=first.Model;
             await Pick("Keep editing");check("UX keep editing preserves draft and original provider selection",list.SelectedItem==first && name.Text=="Draft name" && editor.HasProviderDraft);
             await Pick("Discard");check("UX discard switches provider without persisting draft",list.SelectedItem==second && first.Name=="Fixture first" && !editor.HasProviderDraft);
             list.SelectedItem=first;await Settle();name.Text="Saved fixture";await Pick("Save");check("UX save persists draft before switching provider",first.Name=="Saved fixture" || ai.Options.Providers.Single(p=>p.Id==first.Id).Name=="Saved fixture");

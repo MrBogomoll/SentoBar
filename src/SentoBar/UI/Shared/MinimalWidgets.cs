@@ -57,17 +57,45 @@ internal sealed class ProgressRing : ProgressBar
     private static readonly DependencyProperty VisualValueProperty=DependencyProperty.Register("VisualValue",typeof(double),typeof(ProgressRing),new FrameworkPropertyMetadata(0d,FrameworkPropertyMetadataOptions.AffectsRender));
     private static readonly Pen track=new(UI.Brush("#343840"),2.3);
     private Pen active=new(Brushes.White,2.3){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};
+    private (DateTimeOffset Deadline,double Duration,int FrameRate)? countdownAnimation;
     internal ProgressRing()
     {
         Minimum=0;Maximum=1;MinHeight=112;MaxHeight=154;Height=128;IsHitTestVisible=false;
         Template=new ControlTemplate(typeof(ProgressBar)){VisualTree=new FrameworkElementFactory(typeof(Grid))};
-        ValueChanged+=(_,_)=>
+        IsVisibleChanged+=(_,_)=>{if(!IsVisible)StopCountdownAnimation();};
+        Unloaded+=(_,_)=>StopCountdownAnimation();
+    }
+
+    internal void UpdateCountdown(Countdown countdown,DateTimeOffset now)
+    {
+        Value=countdown.DurationSeconds>0 || countdown.Remaining(now)>0?countdown.Progress(now):0;
+        if(IsVisible && IsLoaded && Motion.Enabled && countdown.Deadline is {} deadline)
         {
-            double before=(double)GetValue(VisualValueProperty);BeginAnimation(VisualValueProperty,null);SetValue(VisualValueProperty,Value);
-            if(!Motion.Enabled || !IsVisible || !IsLoaded || Math.Abs(before-Value)<.00001)return;
-            var animation=new DoubleAnimation(before,Value,TimeSpan.FromMilliseconds(220)){EasingFunction=new CubicEase{EasingMode=EasingMode.EaseOut},FillBehavior=FillBehavior.Stop};Timeline.SetDesiredFrameRate(animation,Math.Clamp(Motion.FrameLimit,30,240));BeginAnimation(VisualValueProperty,animation);
-        };
-        Unloaded+=(_,_)=>{BeginAnimation(VisualValueProperty,null);SetValue(VisualValueProperty,Value);};
+            double duration=countdown.DurationSeconds>0?countdown.DurationSeconds:countdown.RemainingSeconds;
+            var run=(deadline,duration,Motion.FrameLimit);
+            if(countdownAnimation==run)return;
+
+            var startedAt=DateTimeOffset.UtcNow;
+            double remaining=countdown.Remaining(startedAt);
+            if(remaining>0)
+            {
+                SetValue(VisualValueProperty,1d);
+                var animation=new DoubleAnimation(countdown.Progress(startedAt),1d,TimeSpan.FromSeconds(remaining))
+                    {FillBehavior=FillBehavior.Stop};
+                Timeline.SetDesiredFrameRate(animation,run.FrameLimit);
+                BeginAnimation(VisualValueProperty,animation);
+                countdownAnimation=run;
+                return;
+            }
+        }
+        StopCountdownAnimation();
+    }
+
+    private void StopCountdownAnimation()
+    {
+        if(countdownAnimation!=null)BeginAnimation(VisualValueProperty,null);
+        countdownAnimation=null;
+        SetValue(VisualValueProperty,Value);
     }
     internal void Accent(bool focus){var brush=focus?UI.Brush("#DCC7AE"):Brushes.White;if(active.Brush==brush)return;active=new(brush,2.3){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};InvalidateVisual();}
     protected override void OnRender(DrawingContext dc)

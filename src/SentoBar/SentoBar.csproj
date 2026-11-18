@@ -10,9 +10,9 @@
     <ApplicationIcon>Assets\island.ico</ApplicationIcon>
     <AssemblyName>SentoBar</AssemblyName>
     <RootNamespace>SentoBar</RootNamespace>
-    <Version>2.1.1</Version>
-    <FileVersion>2.1.1.0</FileVersion>
-    <InformationalVersion>2.1.1</InformationalVersion>
+    <Version>2.1.2</Version>
+    <FileVersion>2.1.2.0</FileVersion>
+    <InformationalVersion>2.1.2</InformationalVersion>
     <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <Title>SentoBar</Title>
     <Product>SentoBar</Product>

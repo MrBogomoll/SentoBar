@@ -7,16 +7,62 @@ internal sealed partial class AssistantProviderSettings
 {
     private bool switchingProvider;
     internal bool HasProviderDraft=>Selected is {UsesChatGptPlan:false} saved && !loadingProvider && (key.Password.Length>0 || ReadDraftIdentity()!=ReadSavedIdentity(saved));
-    internal async Task<bool> ConfirmProviderChanges()
+    internal Task<bool> ConfirmProviderChanges()
     {
-        if(!HasProviderDraft)return true;
-        var dialog=new Window{Title=Localization.Text("Unsaved provider changes"),Width=420,SizeToContent=SizeToContent.Height,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=Window.GetWindow(this),Background=UI.Brush("#16191F"),Foreground=System.Windows.Media.Brushes.White};
-        var panel=new StackPanel{Margin=new(22)};panel.Children.Add(UI.Heading(Localization.Text("Keep your connection changes?"),18));panel.Children.Add(UI.Text(Localization.Text("Save this provider before continuing, discard its changes, or keep editing."),12,UI.Muted));
-        string choice="edit";var actions=new WrapPanel{Margin=new(0,16,0,0)};
-        foreach(string label in new[]{"Save","Discard","Keep editing"}){string action=label;actions.Children.Add(AssistantWindow.Pill(label,()=>{choice=action;dialog.Close();},label=="Save"));}panel.Children.Add(actions);dialog.Content=panel;dialog.ShowDialog();
-        if(choice=="Save")return await SaveProvider();
-        if(choice=="Discard"){syncing=true;list.SelectedItem=editorProvider;syncing=false;LoadSelected();return true;}
-        return false;
+        if(!HasProviderDraft)return Task.FromResult(true);
+
+        var dialog=new Window
+        {
+            Title=Localization.Text("Unsaved provider changes"),Width=420,SizeToContent=SizeToContent.Height,
+            ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,
+            Owner=Window.GetWindow(this),Background=UI.Brush("#16191F"),Foreground=System.Windows.Media.Brushes.White
+        };
+        var panel=new StackPanel{Margin=new(22)};
+        panel.Children.Add(UI.Heading(Localization.Text("Keep your connection changes?"),18));
+        panel.Children.Add(UI.Text(Localization.Text("Save this provider before continuing, discard its changes, or keep editing."),12,UI.Muted));
+
+        var failure=UI.Text("",12);
+        failure.Margin=new(0,12,0,0);
+        failure.Visibility=Visibility.Collapsed;
+        UI.SetStatusForeground(failure,error:true);
+        UI.LocalizedName(failure,"Connection save error");
+        panel.Children.Add(failure);
+
+        bool saved=false,discarded=false;
+        var actions=new WrapPanel{Margin=new(0,16,0,0)};
+        async Task SaveDraft()
+        {
+            if(!actions.IsEnabled)return;
+            actions.IsEnabled=false;
+            try
+            {
+                saved=await SaveProvider(message=>
+                {
+                    failure.Visibility=Visibility.Visible;
+                    Accessibility.Announce(failure,message);
+                });
+                if(saved)dialog.Close();
+            }
+            finally{actions.IsEnabled=true;}
+        }
+        var save=AssistantWindow.Pill("Save",()=>_=SaveDraft(),true);
+        save.IsDefault=true;
+        actions.Children.Add(save);
+        actions.Children.Add(AssistantWindow.Pill("Discard",()=>{discarded=true;dialog.Close();}));
+        actions.Children.Add(AssistantWindow.Pill("Keep editing",dialog.Close));
+        panel.Children.Add(actions);
+        dialog.Content=panel;
+        dialog.ShowDialog();
+
+        if(discarded)
+        {
+            syncing=true;
+            list.SelectedItem=editorProvider;
+            syncing=false;
+            LoadSelected();
+        }
+        else if(!saved)connectionEditor.IsExpanded=true;
+        return Task.FromResult(saved || discarded);
     }
     private async Task ChangeEditedProvider()
     {

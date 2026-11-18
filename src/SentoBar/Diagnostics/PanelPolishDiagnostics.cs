@@ -112,6 +112,42 @@ internal static class PanelPolishDiagnostics
         check("Expanded Focus and Break controls fit",Visible<DurationPicker>().Count()==2 && outer.ScrollableHeight<=1);
         capture("expanded-focus");
 
+        bool reduceMotion=s.ReduceMotion;
+        var visualProgress=(DependencyProperty)typeof(ProgressRing).GetField("VisualValueProperty",BindingFlags.NonPublic|BindingFlags.Static)!.GetValue(null)!;
+        s.ReduceMotion=false;
+        Motion.Configure(s);
+        foreach(var (pageId,phase) in new[]{("timer",""),("focus","work"),("focus","break")})
+        {
+            island.SelectPage(pageId,false);
+            await Settle();
+            var ring=Visible<ProgressRing>().Single();
+            var clock=pageId=="timer"?app.Session.Timer:app.Session.Focus;
+            string scenario=phase==""?pageId:phase;
+            check(scenario+" ring is empty when ready",(double)ring.GetValue(visualProgress)==0);
+            clock.Start(20,DateTimeOffset.UtcNow,phase);
+            app.SaveSession();
+            var arcSamples=new List<(string Second,double Right)>();
+            for(int i=0;i<6;i++)
+            {
+                await Task.Delay(75);
+                var arc=VisualTreeHelper.GetDrawing(ring)?.Children.OfType<GeometryDrawing>()
+                    .FirstOrDefault(drawing=>drawing.Geometry is StreamGeometry);
+                if(arc!=null)arcSamples.Add((clock.Display(DateTimeOffset.UtcNow),arc.Bounds.Right));
+            }
+            check(scenario+" paints multiple advancing arcs within one second",
+                arcSamples.GroupBy(sample=>sample.Second).Any(group=>group.Select(sample=>sample.Right).Distinct().Count()>=3 &&
+                    group.Last().Right>group.First().Right+1));
+            clock.Pause(DateTimeOffset.UtcNow);app.SaveSession();
+            var paused=(double)ring.GetValue(visualProgress);
+            await Task.Delay(120);
+            check(scenario+" ring holds its position while paused",
+                Math.Abs((double)ring.GetValue(visualProgress)-paused)<.001 &&
+                !DependencyPropertyHelper.GetValueSource(ring,visualProgress).IsAnimated);
+            clock.Reset();app.SaveSession();
+        }
+        s.ReduceMotion=reduceMotion;
+        Motion.Configure(s);
+
         island.Collapse();island.PreviewActivity();island.SelectPeek("timer");await Settle();
         Click("Edit timer");await Settle();
         var seconds=Visible<TextBox>().Single(t=>UI.Identity(t)=="timer Seconds");
@@ -425,6 +461,16 @@ internal static class PanelPolishDiagnostics
         try
         {
             settings.Show();
+            settings.OpenCategory("Widgets");
+            await Settle();
+            var widgetTiles=Diagnostics.Descendants(settings).OfType<UniformGrid>()
+                .SelectMany(grid=>grid.Children.OfType<Button>()).Where(button=>button.IsVisible).ToArray();
+            check("Widget overview links to widget settings without a link back to itself",
+                widgetTiles.Any(button=>UI.Identity(button)=="Notes") &&
+                !widgetTiles.Any(button=>UI.Identity(button)=="Widgets"));
+            check("Settings has neither a permanent autosave message nor a footer close button",
+                !Diagnostics.Descendants(settings).OfType<TextBlock>().Any(text=>text.IsVisible && text.Text==Localization.Text("Changes save automatically on this device.")) &&
+                !Diagnostics.Descendants(settings).OfType<Button>().Any(button=>button.IsVisible && UI.Identity(button)=="Done with settings"));
             settings.OpenCategory("Ambience");
             await Settle();
             var controls=Diagnostics.LogicalDescendants(settings).OfType<CheckBox>().Where(c=>c.IsVisible).ToArray();

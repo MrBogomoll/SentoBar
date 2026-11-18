@@ -32,11 +32,12 @@ public sealed partial class SettingsWindow
                 if(property?.CanWrite==true)property.SetValue(app.Settings,JsonSerializer.Deserialize(item.Value.GetRawText(),property.PropertyType));
             }
             app.ChangeSettings();
-            if(!app.SettingsSaveSucceeded){SetSaveFeedback("Undo is active for this session but could not be saved. Choose Retry save.",true);return;}
+            if(!app.SettingsSaveSucceeded){preferenceSaveError="Undo is active for this session but could not be saved. Choose Retry save.";SetSaveFeedback(preferenceSaveError,true);return;}
+            preferenceSaveError=null;
             savedSettings=JsonSerializer.SerializeToElement(app.Settings);undoValues.Clear();undoSettings.Visibility=Visibility.Collapsed;
             if(current!="AI")Navigate(current);SetSaveFeedback("Undone · your previous appearance, layout or widget choices are saved.");
         }
-        catch(Exception ex){app.Store.Log(ex);SetSaveFeedback("Could not undo this change. Choose Retry save.",true);}
+        catch(Exception ex){app.Store.Log(ex);preferenceSaveError="Could not undo this change. Choose Retry save.";SetSaveFeedback(preferenceSaveError,true);}
         finally{applyingSettings=false;}
     }
 }

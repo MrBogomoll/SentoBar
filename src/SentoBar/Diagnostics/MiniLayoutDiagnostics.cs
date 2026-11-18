@@ -127,12 +127,11 @@ internal static class MiniLayoutDiagnostics
                         var bounds=action.TransformToAncestor(viewport).TransformBounds(new Rect(action.RenderSize));
                         check(scenario+" aligns the action with the left content edge",Math.Abs(bounds.Left)<.75);
                     }
+                    check(scenario+" has only the previous arrow in the left footer slot",
+                        footer.Children.Cast<UIElement>().Where(child=>Grid.GetColumn(child)==0)
+                            .SequenceEqual(new UIElement[]{Field<Button>("peekPrevious")}));
                     if(style=="Dots")
                     {
-                        var pageName=Field<TextBlock>("peekPageName");
-                        check(scenario+" shows the current label on the left",
-                            pageName.IsVisible && pageName.Text==UI.Identity(tabs[id]) &&
-                            Math.Abs(pageName.TranslatePoint(new Point(0,0),footer).X)<.5);
                         double center=strip.TranslatePoint(new Point(strip.ActualWidth/2,0),footer).X;
                         var positions=island.HoverDeckIds.Select(page=>tabs[page].TranslatePoint(new Point(tabs[page].ActualWidth/2,0),footer).X).ToArray();
                         dotPositions??=positions;

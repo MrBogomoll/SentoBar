@@ -13,7 +13,7 @@ public sealed partial class SettingsWindow
     private void WidgetsSettings()
     {
         var tiles=new System.Windows.Controls.Primitives.UniformGrid{Columns=2,Margin=new(-5,0,-5,0)};
-        foreach(var item in SettingsCategories.Where(c=>c.Group=="Features"))
+        foreach(var item in SettingsCategories.Where(c=>c.Group=="Features" && c.Id!="Widgets"))
         {
             var category=item;
             var body=new StackPanel();var title=UI.Caption(category.Title,15);title.FontWeight=FontWeights.SemiBold;body.Children.Add(title);

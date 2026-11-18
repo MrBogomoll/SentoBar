@@ -127,16 +127,28 @@ Label(providerLibrary,"Saved connection to edit",list);chatPage.Children.Add(new
         {if(!Uri.TryCreate(candidate.RealtimeUrl,UriKind.Absolute,out var endpoint) || endpoint.Scheme is not ("wss" or "ws") || endpoint.UserInfo.Length>0 || endpoint.Fragment.Length>0)throw new InvalidOperationException(Localization.Text("Enter a valid realtime WebSocket URL."));var validation=new UriBuilder(endpoint){Scheme=endpoint.Scheme=="wss"?"https":"http"};AssistantTransport.ValidateEndpoint(validation.Uri.AbsoluteUri);}
         return candidate;
     }
-    private async System.Threading.Tasks.Task<bool> SaveProvider()
+    private async System.Threading.Tasks.Task<bool> SaveProvider(Action<string>? showFailure=null)
     {
-        if(providerBusy){ConnectionResult(Localization.Text("Finish or cancel the current check before saving."));return false;}
+        void ReportFailure(string message)
+        {
+            if(showFailure!=null)showFailure(message);
+            else Feedback(message,true);
+        }
+
+        if(providerBusy)
+        {
+            ReportFailure(Localization.Text("Finish or cancel the current check before saving."));
+            return false;
+        }
         try
         {
-            if(model.Text.Trim().Length==0 && realtimeModel.Text.Trim().Length==0 && !await EnsureModel())return false;
+            // The confirmation dialog must report validation itself. The model picker belongs to the editor.
+            if(showFailure==null && model.Text.Trim().Length==0 && realtimeModel.Text.Trim().Length==0 &&
+                !await EnsureModel())return false;
             var original=Selected!;var candidate=ReadFields();
             string savedId=ai.SaveProvider(original.Id,candidate,key.Password);key.Clear();Reload(savedId);Feedback(Localization.Text("Provider saved · image input ")+(candidate.Vision?Localization.Text("On"):Localization.Text("Off"))+" · "+(candidate.Backend=="Hermes"?Localization.Text("image replies managed in Hermes"):candidate.ImageOutput?Localization.Text("image replies On"):Localization.Text("image replies Off"))+Localization.Text(". Test connection to check API access."));return true;
         }
-        catch(Exception ex){Feedback(Localization.Text("Not saved · ")+ex.Message,true);return false;}
+        catch(Exception ex){ReportFailure(Localization.Text("Not saved · ")+ex.Message);return false;}
     }
     private void Check(){try{ReadFields();status.Text=Localization.Text("Configuration looks valid. No network request was sent; model support is checked by your provider when you use it.");}catch(Exception ex){Feedback(Localization.Text("Not saved · ")+ex.Message,true);}}
     private void ForgetKey(){try{if(Selected is { } selected){ai.Keys.Remove(selected.Id);ai.ForgetConnectionCheck(selected.Id);key.Clear();keyStatus.Text=Localization.Text("Key removed from Windows Credential Manager.");}}catch(Exception ex){Feedback(Localization.Text("Not saved · ")+ex.Message,true);}}

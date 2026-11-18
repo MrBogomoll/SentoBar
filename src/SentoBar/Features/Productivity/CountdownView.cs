@@ -81,7 +81,7 @@ internal sealed class CountdownView : StackPanel
         string action=Localization.Text(state.Running?"Pause":active?"Resume":"Start");
         if(AutomationProperties.GetItemStatus(primary)!=action){primary.Content=Icons.Create(state.Running?"pause":"play",17,Brushes.Black);AutomationProperties.SetItemStatus(primary,action);}
         UI.Named(primary,Localization.Text(state.Running?(focus?"Pause focus":"Pause timer"):active?(focus?"Resume focus":"Resume timer"):(focus?"Start focus":"Start")));
-        primary.IsEnabled=active || valid;reset.IsEnabled=active || complete;progress.Value=active || complete?state.Progress(now):0;progress.Accent(focus && state.Phase!="break");
+        primary.IsEnabled=active || valid;reset.IsEnabled=active || complete;progress.UpdateCountdown(state,now);progress.Accent(focus && state.Phase!="break");
         hint.Text=!active && !valid?Localization.Text("Set a duration of at least one second."):complete?Localization.Text("Time is up."):focus?Localization.Format("Break after focus: {0}",Countdown.FormatSeconds(rest.Seconds)):"";
     }
 }

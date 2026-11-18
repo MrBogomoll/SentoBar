@@ -21,6 +21,12 @@ public sealed partial class SettingsWindow
         void FitCaption(){bool compact=ActualWidth<900;((FrameworkElement)caption.Children[1]).Visibility=compact?Visibility.Collapsed:Visibility.Visible;caption.Margin=new(compact?16:26,0,0,0);titleSearchHost.Width=Math.Clamp(ActualWidth-320,170,300);}
         SizeChanged+=(_,_)=>FitCaption();Loaded+=(_,_)=>FitCaption();
         var actions=new StackPanel{Orientation=Orientation.Horizontal};Grid.SetColumn(actions,2);bar.Children.Add(actions);
+        undoSettings.MinHeight=30;
+        undoSettings.Margin=new(0,0,6,0);
+        undoSettings.Padding=new(8,3,8,3);
+        undoSettings.VerticalAlignment=VerticalAlignment.Center;
+        WindowChrome.SetIsHitTestVisibleInChrome(undoSettings,true);
+        actions.Children.Add(undoSettings);
         Button Caption(string name,string data,Action action)
         {
             var button=UI.CaptionButton(name,action);button.Width=48;button.Height=58;button.MinHeight=58;button.Padding=new(0);button.Margin=new(0);button.Tag=new CornerRadius(0);button.Background=Brushes.Transparent;button.ToolTip=Localization.Text(name);

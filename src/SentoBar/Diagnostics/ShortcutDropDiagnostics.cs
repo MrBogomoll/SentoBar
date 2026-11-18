@@ -73,6 +73,14 @@ internal static class ShortcutDropDiagnostics
         var settings=Application.Current.Windows.OfType<SettingsWindow>().Single();
         check("The Add shortcut action goes directly to shortcut management",
             Diagnostics.LogicalDescendants(settings).OfType<Button>().Any(b=>UI.Identity(b)=="Add installed app"));
+        var settingsButtons=Diagnostics.LogicalDescendants(settings).OfType<Button>().ToArray();
+        check("Shortcut settings replaces up and down buttons with one reorder grip per row",
+            settingsButtons.Count(b=>b.Content?.ToString()=="⠿")==s.Shortcuts.Count &&
+            !settingsButtons.Any(b=>UI.Identity(b) is "Move up" or "Move down"));
+        settingsButtons.Single(b=>UI.Identity(b)=="Add shortcut").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        check("Shortcut validation remains visible without a permanent settings footer",
+            Diagnostics.LogicalDescendants(settings).OfType<TextBlock>().Any(t=>t.IsVisible && t.Text==Localization.Text("Enter a name and destination first.")) &&
+            !settingsButtons.Any(b=>UI.Identity(b)=="Done with settings"));
         settings.Close();
         island.DiagnosticPointerPresent=false;
     }
