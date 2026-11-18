@@ -23,7 +23,7 @@ internal static class MiniLayoutDiagnostics
         s.HoverWidth=300;s.HoverHeight=184;s.TwoStageHover=false;
         s.ReduceMotion=s.HoverPeek=s.HoverFollowsWidgets=s.CompactLayout=s.DetachablePreviews=true;
         s.SmartActivities=s.HideMaximized=s.HideFullscreen=s.AlwaysTucked=false;
-        s.ClockSeconds=s.ShowDate=s.ClipboardHistory=true;
+        s.ClockSeconds=s.ShowDate=s.ClipboardHistory=s.LiveActivity=true;
         s.WeatherLatitude=s.WeatherLongitude=null;
         foreach(var widget in s.Widgets)widget.Enabled=true;
         foreach(var page in s.HoverViews)page.Enabled=true;
@@ -100,6 +100,25 @@ internal static class MiniLayoutDiagnostics
                     string scenario=$"{preset}-{style}-{id}";
                     Validate(scenario+" content",viewport);
                     Validate(scenario+" footer",footer);
+                    if(id=="media")
+                    {
+                        Rect Bounds(FrameworkElement control)=>control.TransformToAncestor(viewport).TransformBounds(new Rect(control.RenderSize));
+                        var progress=Field<ProgressBar>("peekProgress");
+                        var wave=Field<ActivityVisual>("peekWave");
+                        var volume=Field<Slider>("peekVolume");
+                        var seek=Field<PeekSeekStrip>("peekSeek");
+                        var progressBounds=Bounds(progress);
+                        var waveBounds=Bounds(wave);
+                        var volumeBounds=Bounds(volume);
+                        check(scenario+" progress, wave and volume occupy separate rows",
+                            progressBounds.Bottom+4<waveBounds.Top && waveBounds.Bottom<volumeBounds.Top &&
+                            volumeBounds.Bottom<=viewport.ActualHeight+.5);
+                        var seekBounds=Bounds(seek);
+                        check(scenario+" seek hit area covers only the timeline",
+                            seek.IsHitTestVisible && seekBounds.Top<=progressBounds.Top && seekBounds.Bottom>=progressBounds.Bottom &&
+                            Math.Abs(seekBounds.Width-progressBounds.Width)<.5 && seekBounds.Bottom<=waveBounds.Top &&
+                            OverlayWindow.PeekGestureBlocked(seek));
+                    }
                     if(style=="Dots")
                     {
                         double center=strip.TranslatePoint(new Point(strip.ActualWidth/2,0),footer).X;
@@ -128,6 +147,15 @@ internal static class MiniLayoutDiagnostics
                 check($"{preset} {style}: pushpin is centered in its circle ({offset.X:F2}, {offset.Y:F2})",
                     Math.Abs(offset.X)<.18 && Math.Abs(offset.Y)<.18 && LayoutInformation.GetLayoutClip((Viewbox)detach.Content)==null);
             }
+
+            island.SelectPeek("media");
+            var miniSeek=Field<PeekSeekStrip>("peekSeek");
+            typeof(MediaService).GetProperty("CanSeek")!.SetValue(app.Media,false);
+            app.PublishUpdate(RuntimeChange.Media);await Task.Delay(60);
+            check("Read-only mini timeline shows progress without taking seek gestures",
+                !miniSeek.IsHitTestVisible && Field<ProgressBar>("peekProgress").IsVisible);
+            typeof(MediaService).GetProperty("CanSeek")!.SetValue(app.Media,true);
+            app.PublishUpdate(RuntimeChange.Media);
 
             foreach(string id in new[]{"timer","focus"})
             {

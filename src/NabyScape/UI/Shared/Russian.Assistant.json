@@ -1106,5 +1106,10 @@
   "From {0}": "От {0}",
   "ASR: ": "Распознавание: ",
   "TTS: ": "Синтез: ",
-  "CPU · ": "Процессор · "
+  "CPU · ": "Процессор · ",
+  "Let me interrupt Naby while it speaks (use headphones)": "Разрешить перебивать Naby (используйте наушники)",
+  "During live voice, the microphone pauses while Naby speaks. If you use headphones, turn this on to interrupt the reply by speaking.": "В режиме голоса в реальном времени микрофон отключается на время ответа Naby. В наушниках можно включить эту опцию и перебивать Naby голосом.",
+  "Voice interruption enabled.": "Перебивание голосом включено.",
+  "Voice interruption disabled.": "Перебивание голосом выключено.",
+  "The change applies to your next voice conversation.": "Изменение вступит в силу при следующем голосовом разговоре."
 }

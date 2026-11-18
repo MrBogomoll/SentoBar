@@ -129,6 +129,7 @@ public sealed partial class OverlayWindow
     {
         var s=app.Settings;
         bool closed=!expanded && !peeking;
+        ApplyDockOpacity(closed);
         bool compactLighting=closed || peeking;
         bool playing=app.Media.Available && app.Media.Playing && !app.Media.SourceDisabled;
         bool live=playing && !IsTucked && !userHidden && IsVisible && WindowState!=WindowState.Minimized;

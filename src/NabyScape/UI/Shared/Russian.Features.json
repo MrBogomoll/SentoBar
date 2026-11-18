@@ -893,5 +893,10 @@
   "MiB": "МиБ",
   "GiB": "ГиБ",
   "TiB": "ТиБ",
-  "PiB": "ПиБ"
+  "PiB": "ПиБ",
+  "{0} d ago": "{0} дн назад",
+  "Updated {0}": "Обновлено {0}",
+  "{0} · connection unavailable": "{0} · нет соединения",
+  "Saved outlook": "Сохранённый прогноз",
+  "Weather is unavailable right now.": "Сейчас прогноз недоступен."
 }

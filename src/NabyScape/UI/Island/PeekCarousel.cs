@@ -58,7 +58,7 @@ public sealed partial class OverlayWindow
     private string? peekFilePath;
     private string? peekShelfArtPath;
     private readonly Image peekShelfArt=new(){Width=44,Height=44,Stretch=Stretch.Uniform,Margin=new(0,0,12,0),Visibility=Visibility.Collapsed};
-    private bool PeekInteractionActive=>OwnedPopupOpen || dockEditing || peekDragging || peekTouching || peekDetachButton?.IsMouseCaptured==true || peekDurationEditor!=null || peekNote?.IsKeyboardFocusWithin==true || peekNoteTitle?.IsKeyboardFocusWithin==true;
+    private bool PeekInteractionActive=>OwnedPopupOpen || dockEditing || peekDragging || peekTouching || peekSeeking || peekDetachButton?.IsMouseCaptured==true || peekDurationEditor!=null || peekNote?.IsKeyboardFocusWithin==true || peekNoteTitle?.IsKeyboardFocusWithin==true;
     internal string PeekPage=>peekId;
     internal string[] HoverDeckIds=>PeekPages();
     internal bool PeekTabSafe=>peekViews.Where(pair=>pair.Key!=peekId).All(pair=>KeyboardNavigation.GetTabNavigation(pair.Value)==KeyboardNavigationMode.None);
@@ -80,15 +80,15 @@ public sealed partial class OverlayWindow
         app.SettingsChanged+=InvalidateHoverDeck;
         peekPanel.HorizontalAlignment=HorizontalAlignment.Center;peekPanel.VerticalAlignment=VerticalAlignment.Top;peekPanel.Width=PeekWidth;peekPanel.Height=PeekContentHeight+PeekFooterHeight;peekPanel.Margin=new(0,20,0,0);peekPanel.Visibility=Visibility.Collapsed;
         peekPanel.RowDefinitions.Add(new(){Height=new GridLength(PeekContentHeight)});peekPanel.RowDefinitions.Add(new(){Height=new GridLength(PeekFooterHeight)});peekPanel.Children.Add(peekViewport);
-        peekMedia.Height=PeekContentHeight;peekMedia.Width=PeekWidth;peekMedia.Visibility=Visibility.Visible;peekMedia.RowDefinitions.Add(new(){Height=new GridLength(32)});
-        var controls=new Grid{Margin=new(0,2,0,0)};controls.ColumnDefinitions.Add(new(){Width=new GridLength(34)});controls.ColumnDefinitions.Add(new(){Width=new GridLength(34)});controls.ColumnDefinitions.Add(new(){Width=new GridLength(34)});controls.ColumnDefinitions.Add(new());controls.ColumnDefinitions.Add(new(){Width=GridLength.Auto});controls.ColumnDefinitions.Add(new(){Width=new GridLength(28)});
+        peekMedia.Height=PeekContentHeight;peekMedia.Width=PeekWidth;peekMedia.Visibility=Visibility.Visible;peekMedia.RowDefinitions.Add(new(){Height=new GridLength(28)});
+        var controls=new Grid();controls.ColumnDefinitions.Add(new(){Width=new GridLength(34)});controls.ColumnDefinitions.Add(new(){Width=new GridLength(34)});controls.ColumnDefinitions.Add(new(){Width=new GridLength(34)});controls.ColumnDefinitions.Add(new());controls.ColumnDefinitions.Add(new(){Width=GridLength.Auto});controls.ColumnDefinitions.Add(new(){Width=new GridLength(28)});
         controls.ColumnDefinitions.Add(new(){Width=new GridLength(28)});
         var previous=PeekIcon("previous",Localization.Text("Previous track in preview"),()=>_=app.Media.Command("previous"));var next=PeekIcon("next",Localization.Text("Next track in preview"),()=>_=app.Media.Command("next"));var mute=PeekIcon("volume",Localization.Text("Mute preview audio"),()=>{app.Audio.ToggleMute();app.Audio.Read();Update();});var output=PeekIcon("chevron",Localization.Text("Choose preview audio output"),OpenAudioMenu);
         peekTrackPrevious=previous;peekTrackNext=next;peekMute=mute;peekOutput=output;controls.Children.Add(previous);Grid.SetColumn(next,1);controls.Children.Add(next);Grid.SetColumn(mute,2);controls.Children.Add(mute);
         var favorite=new SpotifyLikeButton(app){Width=28,MinWidth=28,Height=26,MinHeight=26,Margin=new(0)};
         // Keep the current hover stage when liking a track.
         favorite.PreviewMouseDown+=(_,_)=>detailDelay.Stop();favorite.PreviewTouchDown+=(_,_)=>detailDelay.Stop();Grid.SetColumn(favorite,4);controls.Children.Add(favorite);
-        peekVolume=new Slider{Minimum=0,Maximum=100,Height=26,Margin=new(7,0,9,0),VerticalAlignment=VerticalAlignment.Center};UI.Named(peekVolume,Localization.Text("Preview volume"));peekVolume.ValueChanged+=(_,_)=>{if(!updating){app.Audio.SetVolume(peekVolume.Value/100);}};Grid.SetColumn(peekVolume,3);controls.Children.Add(peekVolume);Grid.SetColumn(output,5);controls.Children.Add(output);var mixerButton=PeekIcon("mixer",Localization.Text("Open mixer from preview"),OpenMixer);Grid.SetColumn(mixerButton,6);controls.Children.Add(mixerButton);Grid.SetRow(controls,3);Grid.SetColumnSpan(controls,3);peekMedia.Children.Add(controls);AddPeekView("media",peekMedia);
+        peekVolume=new Slider{Minimum=0,Maximum=100,Height=26,Margin=new(7,0,9,0),VerticalAlignment=VerticalAlignment.Center};UI.Named(peekVolume,Localization.Text("Preview volume"));peekVolume.ValueChanged+=(_,_)=>{if(!updating){app.Audio.SetVolume(peekVolume.Value/100);}};Grid.SetColumn(peekVolume,3);controls.Children.Add(peekVolume);Grid.SetColumn(output,5);controls.Children.Add(output);var mixerButton=PeekIcon("mixer",Localization.Text("Open mixer from preview"),OpenMixer);Grid.SetColumn(mixerButton,6);controls.Children.Add(mixerButton);Grid.SetRow(controls,4);Grid.SetColumnSpan(controls,3);peekMedia.Children.Add(controls);AddPeekView("media",peekMedia);
         peekPageName.TextWrapping=TextWrapping.NoWrap;peekPageName.TextTrimming=TextTrimming.CharacterEllipsis;peekPageName.VerticalAlignment=VerticalAlignment.Center;
         var footer=peekFooter=new Grid{Margin=new(0,2,0,2)};
         footer.ColumnDefinitions.Add(new(){Width=new(PeekFooterEndWidth)});
@@ -172,7 +172,7 @@ public sealed partial class OverlayWindow
 
     internal static bool PeekGestureBlocked(DependencyObject? source)
     {
-        for(var node=source;node!=null;node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node))if(node is ButtonBase or TextBoxBase or Slider or ComboBox)return true;return false;
+        for(var node=source;node!=null;node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node))if(node is ButtonBase or TextBoxBase or Slider or ComboBox or PeekSeekStrip)return true;return false;
     }
     private Button PlainPeekButton(string name,Action action)
     {var button=UI.Button(name,action);button.Template=(ControlTemplate)FindResource("ToolRowTemplate");button.Background=Brushes.Transparent;button.BorderThickness=new(0);button.Padding=new(3);button.Margin=new(0);button.MinHeight=22;button.HorizontalContentAlignment=HorizontalAlignment.Center;button.MouseEnter+=(_,_)=>PeekButtonLight(button,.075);button.MouseLeave+=(_,_)=>PeekButtonLight(button,button.IsKeyboardFocusWithin?.075:0);button.GotKeyboardFocus+=(_,_)=>PeekButtonLight(button,.075);button.LostKeyboardFocus+=(_,_)=>PeekButtonLight(button,button.IsMouseOver?.075:0);return button;}
@@ -254,7 +254,7 @@ public sealed partial class OverlayWindow
     {var ids=PeekPages();int index=Array.IndexOf(ids,peekId);peekOffset=Math.Clamp(distance,-PeekWidth,PeekWidth);if((index==0 && distance>0)||(index==ids.Length-1 && distance<0))peekOffset*=.22;LayoutPeek(Motion.Enabled?peekOffset:0,false);}
     internal void FinishPeekSwipe(double offset)
     {var ids=PeekPages();int index=Array.IndexOf(ids,peekId);int next=Math.Clamp(index+(offset < -app.Settings.SwipeDistance?1:offset>app.Settings.SwipeDistance?-1:0),0,Math.Max(0,ids.Length-1));if(ids.Length==0)return;peekId=ids[next];RememberPanel(peekId);LayoutPeek(offset+(next-index)*PeekWidth,false);UpdatePeekDeck();LayoutPeek(0,true);peekOffset=0;WakeLiveRendering();if(!DiagnosticRun && !PointerInside() && !PeekInteractionActive)leaveDelay.Start();}
-    private void EndPeekGesture(){peekDown=null;peekDragging=peekTouching=false;peekOffset=0;peekWheel.Reset();if(peekViewport.IsMouseCaptured)peekViewport.ReleaseMouseCapture();}
+    private void EndPeekGesture(){CancelPeekSeek();peekDown=null;peekDragging=peekTouching=false;peekOffset=0;peekWheel.Reset();if(peekViewport.IsMouseCaptured)peekViewport.ReleaseMouseCapture();}
     internal bool RoutePeekWheel(int delta,bool horizontal,DependencyObject? source,bool? scrollContent=null)
     {
         if(!peeking || noticeShowing || assistantPeeking)return false;
@@ -582,6 +582,7 @@ public sealed partial class OverlayWindow
     private void UpdatePeekDeck()
     {
         UpdateAmbientMotion();
+        ApplyPeekSeek();
         if(peekVolume!=null && !peekVolume.IsMouseCaptureWithin && !peekVolume.IsKeyboardFocusWithin){bool previous=updating;updating=true;try{peekVolume.Value=app.Audio.Volume*100;}finally{updating=previous;}}
         peekMute.IsEnabled=peekOutput.IsEnabled=peekVolume!.IsEnabled=app.Audio.Available;Motion.Icon(peekMute,app.Audio.Muted?"muted":"volume",14);peekTrackPrevious.IsEnabled=app.Media.CanPrevious;peekTrackNext.IsEnabled=app.Media.CanNext;peekTrackPrevious.Opacity=peekTrackPrevious.IsEnabled?1:.3;peekTrackNext.Opacity=peekTrackNext.IsEnabled?1:.3;
         UpdateExtraPeek();UpdateToolPeeks();var now=app.UpdateSampleTime;peekSystem.Text=Localization.Format("CPU  {0:0}%\nRAM  {1:0.0} / {2:0.0} GB",app.Usage.cpu,app.Usage.used,app.Usage.total);

@@ -30,5 +30,15 @@
   "Panel navigation style": "Вид навигации",
   "Labels": "Подписи",
   "Each tool has its own panel above. Enable and reorder Notes, Tasks, Shelf, Clipboard, Calendar and Keep awake alongside your other widgets. Saved content is preserved.": "У каждого инструмента своя панель. Здесь можно включить и переставить заметки, задачи, полку файлов, буфер обмена, календарь и режим «Не засыпать».",
-  "Adds File shelf, Notes, Clipboard, Calendar and Keep awake.": "Добавляет полку файлов, заметки, буфер обмена, календарь и режим «Не засыпать»."
+  "Adds File shelf, Notes, Clipboard, Calendar and Keep awake.": "Добавляет полку файлов, заметки, буфер обмена, календарь и режим «Не засыпать».",
+  "Separate opacity for closed dock": "Отдельная непрозрачность выреза",
+  "Closed dock background opacity": "Непрозрачность фона свёрнутого выреза",
+  "This player doesn't share its position": "Плеер не передаёт позицию воспроизведения",
+  "This player doesn't allow seeking": "Плеер не поддерживает перемотку",
+  "Click or drag to seek": "Нажмите или перетащите, чтобы перемотать",
+  "Seek in the hover preview": "Перемотка в мини-плеере",
+  "Animations are off · the waveform stays still": "Анимации отключены · звуковая волна неподвижна",
+  "Spectrum unavailable · showing measured amplitude": "Спектр недоступен · показан измеренный уровень звука",
+  "Default output · {0:0}% peak": "Устройство вывода по умолчанию · пик {0:0}%",
+  "Follows the selected app across its active outputs. If it cannot be matched, the waveform follows the Windows default output.": "Волна следует за звуком выбранного приложения. Если Windows не передаёт его аудиосессию, используется устройство вывода по умолчанию."
 }

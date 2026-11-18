@@ -40,6 +40,7 @@ public sealed class MediaService : IDisposable
     private string artworkKey="";
     private long timelineStamp;
     private (double elapsed,double duration) timelineSample;
+    private readonly MediaTimelineClock timelineClock=new();
     private readonly MediaSourceSelection sourceSelection=new();
     internal string SourceSelectionId=>sourceSelection.Id;
     internal bool SourceDisabled=>sourceSelection.IsNone;
@@ -113,12 +114,12 @@ public sealed class MediaService : IDisposable
         if(manual)sourceSelection.Select(session?.SourceAppUserModelId);
         if(ReferenceEquals(selected,session)){if(session==null)_=Refresh();else Changed?.Invoke();return;}
         if(selected!=null) { selected.MediaPropertiesChanged-=PropertiesChanged; selected.PlaybackInfoChanged-=PlaybackChanged;selected.TimelinePropertiesChanged-=TimelineChanged; }
-        selected=session;timelineStamp=0;
+        selected=session;timelineStamp=0;timelineClock.Reset();
         if(selected!=null) { selected.MediaPropertiesChanged+=PropertiesChanged; selected.PlaybackInfoChanged+=PlaybackChanged;selected.TimelinePropertiesChanged+=TimelineChanged; }
         _=Refresh();
     }
     private void PropertiesChanged(GlobalSystemMediaTransportControlsSession sender,MediaPropertiesChangedEventArgs args)=>dispatcher.BeginInvoke(()=>_=Refresh());
-    private void PlaybackChanged(GlobalSystemMediaTransportControlsSession sender,PlaybackInfoChangedEventArgs args)=>dispatcher.BeginInvoke(()=>{if(!disposed && selected!=null && sender.SourceAppUserModelId==selected.SourceAppUserModelId){ReadPlayback(selected);Changed?.Invoke();}});
+    private void PlaybackChanged(GlobalSystemMediaTransportControlsSession sender,PlaybackInfoChangedEventArgs args)=>dispatcher.BeginInvoke(()=>{if(!disposed && selected!=null && sender.SourceAppUserModelId==selected.SourceAppUserModelId){ReadPlayback(selected);timelineStamp=0;Changed?.Invoke();}});
     private void TimelineChanged(GlobalSystemMediaTransportControlsSession sender,TimelinePropertiesChangedEventArgs args)=>dispatcher.BeginInvoke(()=>{if(!disposed && selected!=null && selected.SourceAppUserModelId==sender.SourceAppUserModelId)timelineStamp=0;});
     private void ReadPlayback(GlobalSystemMediaTransportControlsSession session)
     {
@@ -157,6 +158,7 @@ public sealed class MediaService : IDisposable
             Title=string.IsNullOrWhiteSpace(p.Title) ? Localization.Text("Untitled media") : p.Title;
             Artist=string.IsNullOrWhiteSpace(p.Artist) ? session.SourceAppUserModelId : p.Artist;
             ReadPlayback(session);
+            if(artworkKey!=key){timelineClock.Reset();timelineStamp=0;}
             artworkKey=key;Artwork=artwork;Changed?.Invoke();
         }
         catch(Exception ex) { if(disposed || version!=generation)return;log(ex);Artist=Localization.Text("Media session unavailable");CanToggle=CanNext=CanPrevious=CanSeek=false;Changed?.Invoke(); }
@@ -186,15 +188,12 @@ public sealed class MediaService : IDisposable
         try
         {
             if(selected==null)return(0,0);var timeline=selected.GetTimelineProperties();
-            double duration=(timeline.EndTime-timeline.StartTime).TotalSeconds;
-            if(duration<=0)return(0,0);
-            double position=(timeline.Position-timeline.StartTime).TotalSeconds;
-            double age=(DateTimeOffset.UtcNow-timeline.LastUpdatedTime).TotalSeconds;
-            if(Playing && age>=0 && age<86400)position+=age;
-            return(Math.Clamp(position,0,duration),duration);
+            if(timeline==null)return(0,0);
+            return timelineClock.Sample(timeline.StartTime,timeline.EndTime,timeline.Position,timeline.LastUpdatedTime,Playing,DateTimeOffset.UtcNow);
         }
         catch{return(0,0);}
     }
+    internal MediaTimelineState TimelineState=>Available?MediaTimelinePolicy.State(Timeline().duration,CanSeek):MediaTimelineState.None;
     public async Task Seek(double fraction)
     {
         try

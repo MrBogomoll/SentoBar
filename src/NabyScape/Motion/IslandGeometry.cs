@@ -41,6 +41,13 @@ internal sealed partial class IslandSurface : FrameworkElement
     private (Color Background,Color Light)? glassDockPalette;
     private Brush? glassDockFill;
     private PanelBackdropPaint? panelBackdrop;
+    private double? backgroundOpacity;
+    internal void SetBackgroundOpacity(double? opacity)
+    {
+        if(backgroundOpacity==opacity)return;
+        backgroundOpacity=opacity;
+        InvalidateVisual();
+    }
     internal void SetPanelBackdrop(PanelBackdropPaint? backdrop)
     {
         if(ReferenceEquals(panelBackdrop,backdrop))return;
@@ -108,7 +115,7 @@ internal sealed partial class IslandSurface : FrameworkElement
         }
         if(panelBackdrop!=null)
         {
-            panelBackdrop.Draw(context,Contour);
+            panelBackdrop.Draw(context,Contour,backgroundOpacity);
             context.PushClip(Contour);
             context.PushOpacity(GlassDockAppearance.GlowOpacity(AmbientColor));
             DrawAmbient(context);
@@ -117,6 +124,12 @@ internal sealed partial class IslandSurface : FrameworkElement
             context.Pop();
             return;
         }
+        if(backgroundOpacity is {} opacity)context.PushOpacity(opacity);
+        RenderDefaultMaterial(context);
+        if(backgroundOpacity.HasValue)context.Pop();
+    }
+    private void RenderDefaultMaterial(DrawingContext context)
+    {
         if(UseGlassDock && glassDockFill!=null && !SuppressGlassDock)
         {
             context.DrawGeometry(glassDockFill,null,Contour);

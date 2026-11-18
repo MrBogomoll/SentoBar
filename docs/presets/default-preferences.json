@@ -206,6 +206,8 @@
     "ImageOpacity": 0.5,
     "Blur": 12
   },
+  "UseClosedBackgroundOpacity": false,
+  "ClosedBackgroundOpacity": 0.95,
   "Accent": "#FFFFFF",
   "ControlFill": "#16171B",
   "ControlBorder": "#303238",

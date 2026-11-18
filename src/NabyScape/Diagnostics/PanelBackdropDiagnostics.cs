@@ -63,6 +63,14 @@ internal static class PanelBackdropDiagnostics
         island.Collapse();await Settle();InspectDock("closed");
         island.PreviewActivity();island.SelectPeek("notes");await Settle();InspectDock("mini");
         island.Reveal(false);island.SelectPage("calendar",false);await Settle();InspectDock("expanded");
+        s.UseClosedBackgroundOpacity=true;s.ClosedBackgroundOpacity=.42;
+        app.ChangeSettings();island.Collapse();await Settle();
+        int MidAlpha()=>Sample(Capture(surface),(int)(surface.Contour.Bounds.Left+surface.Contour.Bounds.Width/2),10).A;
+        check("Closed opacity affects the background while UI stays at full opacity",island.Opacity==1 && Math.Abs(MidAlpha()-.42*255)<3);
+        island.PreviewActivity();island.SelectPeek("notes");await Settle();
+        check("Hover restores the shared background opacity",Math.Abs(MidAlpha()-options.Opacity*255)<3);
+        island.Reveal(false);island.SelectPage("calendar",false);await Settle();
+        check("Expanded restores the shared background opacity",Math.Abs(MidAlpha()-options.Opacity*255)<3);
         var header=Diagnostics.Descendants(island).OfType<Grid>().Single(g=>Equals(g.Tag,"panel-navigation"));
         var scroller=Diagnostics.Descendants(header).OfType<ScrollViewer>().Single();
         var row=(StackPanel)scroller.Content;
@@ -144,8 +152,8 @@ internal static class PanelBackdropDiagnostics
         Save("blurred-background",soft);
         var layout=CustomizationProfile.Export(s);var clone=new Settings();
         CustomizationProfile.Import(layout,clone);
-        check("The shared palette and picture effect settings survive a layout round trip with no file path",
-            clone.PanelBackdrop==s.PanelBackdrop && !layout.Contains(directory,StringComparison.Ordinal));
+        check("The shared palette, closed opacity, and picture settings survive a layout round trip with no file path",
+            clone.PanelBackdrop==s.PanelBackdrop && clone.DockBackgroundOpacity(true)==.42 && clone.DockBackgroundOpacity(false)==null && !layout.Contains(directory,StringComparison.Ordinal));
         options.Image="No image";options.Gradient="Two soft lights";app.ChangeSettings();
         var settingsWindow=new SettingsWindow(app){Width=1000,Height=785};
         settingsWindow.Show();Diagnostics.NavigateSettings(settingsWindow,"Appearance");
@@ -154,7 +162,7 @@ internal static class PanelBackdropDiagnostics
             await Task.Delay(150);
             var controls=Diagnostics.LogicalDescendants(settingsWindow).OfType<FrameworkElement>();
             check("Settings exposes independent background opacity, palette and picture controls",
-                new[]{"Panel background opacity","Panel gradient type","First gradient position","Second gradient position","Panel background image"}
+                new[]{"Panel background opacity","Separate opacity for closed dock","Closed dock background opacity","Panel gradient type","First gradient position","Second gradient position","Panel background image"}
                     .All(name=>controls.Any(c=>UI.Identity(c)==name)));
         }
         finally{settingsWindow.Close();}

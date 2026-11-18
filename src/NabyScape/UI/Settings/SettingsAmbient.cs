@@ -29,6 +29,7 @@ public sealed partial class SettingsWindow
         ambientPreview.Radius=s.Radius;
         ambientPreview.GlassStyle=s.GlassStyle;
         ambientPreview.GlassStrength=s.GlassStrength;
+        ambientPreview.SetBackgroundOpacity(s.DockBackgroundOpacity(previewMode=="Closed"));
         ambientPreview.SetPanelBackdrop(app.PanelBackground.Get(s,app.Store.DirectoryPath));
         ambientPreview.SetGlassDockPalette(UI.Brush(s.Background).Color,allowed?colors.Primary:System.Windows.Media.Colors.Transparent);
         ambientPreview.Refresh();

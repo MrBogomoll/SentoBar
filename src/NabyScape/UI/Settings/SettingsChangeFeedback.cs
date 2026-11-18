@@ -13,7 +13,7 @@ internal static class SettingsChangeFeedback
     private static readonly Dictionary<string,string> Labels=new()
     {
         ["Background"]="Island color",["PanelNavigationStyle"]="Panel navigation style",
-        ["DetachablePreviews"]="Show Detach button",["GlassStyle"]="Dock reflections",["GlassStrength"]="Reflection strength",
+        ["DetachablePreviews"]="Show Detach button",["UseClosedBackgroundOpacity"]="Separate opacity for closed dock",["ClosedBackgroundOpacity"]="Closed dock background opacity",["GlassStyle"]="Dock reflections",["GlassStrength"]="Reflection strength",
         ["AlbumAccent"]="Tint with album artwork",["PanelSwipe"]="Switch expanded tabs with wheel or drag",
         ["WindowTheme"]="Window theme",["WindowGlass"]="Transparency and blur",["WindowLargeCorners"]="Window corners",["WindowEffects"]="Interface effects",["WindowCompact"]="Compact mode",["WindowHoverAccents"]="Show hover accents",
         ["CoverAmbient"]="Ambient light",["ClosedAmbient"]="Closed dock ambience",

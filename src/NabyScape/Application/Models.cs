@@ -143,7 +143,7 @@ public sealed partial class Settings
     {
         NormalizeLanguageAccessibility();NormalizeHideExceptions();
         NormalizeWindowTheme();
-        PanelBackdrop??=new();PanelBackdrop.Normalize();
+        PanelBackdrop??=new();PanelBackdrop.Normalize();ClosedBackgroundOpacity=Clamp(ClosedBackgroundOpacity,0,1,.95);
         if(Array.IndexOf(SettingsBackdrop.Choices,SettingsMaterial)<0)SettingsMaterial="";
         if(NotificationDelivery is not ("Notch" or "Windows" or "Both" or "Off"))NotificationDelivery="Notch";
         ExternalNotificationMuted=(ExternalNotificationMuted??new()).Where(n=>!string.IsNullOrWhiteSpace(n)).Select(n=>n.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Take(100).ToList();

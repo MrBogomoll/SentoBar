@@ -51,7 +51,7 @@ public sealed partial class SettingsWindow
             UI.CaptionButton("Set dock content",()=>Navigate("ClosedDock"))));
         page.Children.Add(Section("Volume mixer",UI.Caption("In the compact media panel, choose the speaker button for volume and mute. The mixer icon opens Apps or Outputs; the chevron opens devices and microphone controls. Choose the media source button to switch playing apps. Tab to a button and press Enter or Space; Esc closes its popover.",12,UI.Muted),UI.CaptionButton("Open volume mixer",()=>app.OpenMixer())));
         var signal=new StackPanel();audioSignalWave=new ActivityVisual{WaveOnly=true,Width=96,Height=16,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,4,0,12)};signal.Children.Add(new Border{Child=audioSignalWave,Background=UI.Brush("#303030"),BorderBrush=UI.Brush("#777777"),BorderThickness=new(1),CornerRadius=new(9),Padding=new(12,8,12,0),HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,5,0,8)});audioSignalState=UI.Caption("Reading selected app…",11,UI.Muted);signal.Children.Add(audioSignalState);
-        page.Children.Add(Section("Live signal",UI.Caption("Follows the selected app across its active outputs. Spectrum includes other sounds sharing those outputs; Amplitude history reads the selected app level only.",11,UI.Muted),signal,UI.Caption("Spectrum shows 25 real frequency bands from low to high. If output capture is unavailable, the waveform uses measured amplitude history. Sensitivity changes the visible range without adding artificial beats.",11,UI.Muted)));
+        page.Children.Add(Section("Live signal",UI.Caption("Follows the selected app across its active outputs. If it cannot be matched, the waveform follows the Windows default output.",11,UI.Muted),signal,UI.Caption("Spectrum shows 25 real frequency bands from low to high. If output capture is unavailable, the waveform uses measured amplitude history. Sensitivity changes the visible range without adding artificial beats.",11,UI.Muted)));
         page.Children.Add(Section("Audio behavior",UI.Caption("Output selection changes the Windows default device. Microphone mute is available from the audio menu.",12,UI.Muted),UI.CaptionButton("Windows sound settings",()=>ShortcutService.Open(new(){Target="ms-settings:sound"}))));
 
     }
@@ -85,11 +85,12 @@ public sealed partial class SettingsWindow
         bool detailExample=!closed && ((!hover && current!="Layout") || previewContent is "Control colors" or "Typography" or "Panel navigation" or "Drop zone" or "Detached preview" or "Cover gestures" or "Smart clipboard" or "Shelf" or "Visibility");
         if(detailExample){closed=false;hover=false;width=300;height=previewContent switch{"Control colors"=>330,"Smart clipboard"=>320,"Detached preview"=>260,"Typography"=>220,"Shelf"=>260,"Music"=>250,"System"=>210,"Navigation"=>160,_=>230};}
         var custom=app.PanelBackground.Get(s,app.Store.DirectoryPath);
-        AnimatePreviewSize(width,height);preview.Opacity=Accessibility.HighContrast || custom!=null?1:s.Opacity;
-        preview.Background=custom!=null?Brushes.Transparent:Accessibility.HighContrast?SystemColors.WindowBrush:closed && !previewIdle?Brushes.Black:UI.Brush(s.Background);
+        bool separateFill=s.DockBackgroundOpacity(closed).HasValue && !Accessibility.HighContrast;
+        AnimatePreviewSize(width,height);preview.Opacity=Accessibility.HighContrast || custom!=null || separateFill?1:s.Opacity;
+        preview.Background=custom!=null || separateFill?Brushes.Transparent:Accessibility.HighContrast?SystemColors.WindowBrush:closed && !previewIdle?Brushes.Black:UI.Brush(s.Background);
         void PreviewSurface(Border material)
         {
-            material.Visibility=custom==null && s.GlassStyle?Visibility.Visible:Visibility.Collapsed;
+            material.Visibility=custom==null && !separateFill && s.GlassStyle?Visibility.Visible:Visibility.Collapsed;
             if(custom==null)material.Background=IslandSurface.Material(s.Background);
             material.Opacity=(closed?.45:1)*s.GlassStrength;
         }

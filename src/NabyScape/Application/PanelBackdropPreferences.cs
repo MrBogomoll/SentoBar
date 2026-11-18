@@ -37,4 +37,7 @@ public sealed record PanelBackdropPreferences
 public sealed partial class Settings
 {
     public PanelBackdropPreferences PanelBackdrop {get;set;}=new();
+    public bool UseClosedBackgroundOpacity {get;set;}
+    public double ClosedBackgroundOpacity {get;set;}=.95;
+    internal double? DockBackgroundOpacity(bool closed)=>closed && UseClosedBackgroundOpacity?ClosedBackgroundOpacity:null;
 }

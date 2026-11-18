@@ -176,9 +176,9 @@ internal sealed class PanelBackdropPaint
         "Bottom left"=>new(0,1),"Bottom"=>new(.5,1),"Bottom right"=>new(1,1),_=>new(.5,.5)
     };
 
-    internal void Draw(DrawingContext context,Geometry contour)
+    internal void Draw(DrawingContext context,Geometry contour,double? opacityOverride=null)
     {
-        context.PushOpacity(opacity);
+        context.PushOpacity(opacityOverride??opacity);
         context.DrawGeometry(basis,null,contour);
         if(image!=null)context.DrawGeometry(image,null,contour);
         if(first!=null)context.DrawGeometry(first,null,contour);

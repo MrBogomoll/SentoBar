@@ -42,7 +42,7 @@ public sealed partial class SettingsWindow
     {
         bool visible=IsVisible && WindowState!=WindowState.Minimized;
         bool live=app.Settings.LiveActivity && app.Media.Playing;
-        bool work=!app.Settings.ReduceMotion && Motion.Enabled && (previewStage.IsVisible && (previewContent=="Drop zone" || live && hasPreviewWave) || live && AudioSignalVisible);
+        bool work=Motion.Enabled && Motion.Enabled && (previewStage.IsVisible && (previewContent=="Drop zone" || live && hasPreviewWave) || live && AudioSignalVisible);
         if(!visible || !work){bool settle=previewRendering && visible;StopPreviewRendering();if(settle)RunPreviewFrame();return;}
         if(previewRendering)return;previewRendering=true;previewPacer.Reset();lastPreviewFrame=previewClock.Elapsed.TotalSeconds;CompositionTarget.Rendering+=PreviewDisplayFrame;
     }
@@ -96,10 +96,10 @@ private ActivityVisual? audioSignalWave;
     private void UpdateAudioSignal(double seconds)
     {
         if(!AudioSignalVisible || audioSignalWave==null || audioSignalState==null)return;
-        float peak=app.Media.Playing && app.Settings.LiveActivity && !app.Settings.ReduceMotion?app.Audio.MediaPeak(app.Media.Selected?.SourceAppUserModelId):0;
-        bool animate=app.Media.Playing && !app.Audio.MediaMeterMuted && app.Settings.LiveActivity && !app.Settings.ReduceMotion;
+        float peak=app.Media.Playing && app.Settings.LiveActivity && Motion.Enabled?app.Audio.MediaPeak(app.Media.Selected?.SourceAppUserModelId):0;
+        bool animate=app.Media.Playing && !app.Audio.MediaMeterMuted && app.Settings.LiveActivity && Motion.Enabled;
         bool fresh=animate && signalSequence!=app.Audio.MediaLevel.Sequence;signalSequence=app.Audio.MediaLevel.Sequence;
         audioSignalWave.Sample(peak,previewDt,0,false,false,animate,seconds,fresh,app.Settings.WaveformIdleMotion,app.Audio.MediaSpectrum,app.Settings.WaveformSensitivity);
-        audioSignalState.Text=!app.Settings.LiveActivity?Localization.Text("Live activity is off · enable it in Audio"):app.Settings.ReduceMotion?Localization.Text("Reduce Motion is on · the waveform stays still"):!app.Media.Playing?Localization.Text("Playback paused · quiet baseline"):app.Audio.MediaMeterMuted?Localization.Text("Selected app or output is muted"):app.Audio.MediaMeterSessions==0?Localization.Text("No matching audio meter · optional gentle fallback"):Localization.Format("Live meter · {0} audible session · {1:0}% peak",app.Audio.MediaAudibleSessions,peak*100);
+        audioSignalState.Text=!app.Settings.LiveActivity?Localization.Text("Live activity is off · enable it in Audio"):!Motion.Enabled?Localization.Text("Animations are off · the waveform stays still"):!app.Media.Playing?Localization.Text("Playback paused · quiet baseline"):app.Audio.MediaMeterMuted?Localization.Text("Selected app or output is muted"):app.Audio.SpectrumStatus!=null && app.Settings.WaveformSource=="Spectrum"?Localization.Text("Spectrum unavailable · showing measured amplitude"):app.Audio.MediaMeterFallback?Localization.Format("Default output · {0:0}% peak",peak*100):app.Audio.MediaMeterSessions==0?Localization.Text("No matching audio meter · optional gentle fallback"):Localization.Format("Live meter · {0} audible session · {1:0}% peak",app.Audio.MediaAudibleSessions,peak*100);
     }
 }

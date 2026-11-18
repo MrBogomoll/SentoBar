@@ -22,6 +22,16 @@ public sealed partial class SettingsWindow
         details.Children.Add(UI.Caption("Shares the background across the closed dock, mini panel, expanded panel and detached windows. The base color comes from Island color above.",11,UI.Muted));
         AddSlider(details,"Panel background opacity",options.Opacity*100,0,100,value=>options.Opacity=value/100,"%");
 
+        var closedOpacity=new StackPanel{Visibility=app.Settings.UseClosedBackgroundOpacity?Visibility.Visible:Visibility.Collapsed};
+        editor.Children.Add(Check("Separate opacity for closed dock",app.Settings.UseClosedBackgroundOpacity,value=>
+        {
+            app.Settings.UseClosedBackgroundOpacity=value;
+            closedOpacity.Visibility=value?Visibility.Visible:Visibility.Collapsed;
+        }));
+        AddSlider(closedOpacity,"Closed dock background opacity",app.Settings.ClosedBackgroundOpacity*100,0,100,
+            value=>app.Settings.ClosedBackgroundOpacity=value/100,"%");
+        editor.Children.Add(closedOpacity);
+
         var first=new StackPanel();
         var second=new StackPanel();
         details.Children.Add(PremiumChoice("Panel gradient type",options.Gradient,PanelBackdropPreferences.Gradients,value=>

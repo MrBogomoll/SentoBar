@@ -18,7 +18,7 @@ public sealed partial class OverlayWindow
     private readonly Dictionary<string,Button> compactTabs=new();
     private readonly Grid compactPageHost=new(),peekPanel=new(),timelinePanel=new();
     private readonly TextBlock peekTitle=UI.Caption("",13),peekSubtitle=UI.Caption("",11,UI.Muted);
-    private readonly Image peekArt=new(){Width=56,Height=56,Stretch=Stretch.UniformToFill};
+    private readonly Image peekArt=new(){Width=48,Height=48,Stretch=Stretch.UniformToFill};
     private readonly ProgressBar peekProgress=new(){Minimum=0,Maximum=1,Height=3,Background=UI.Brush("#34363D"),Foreground=Brushes.White,BorderThickness=new(0)};
     private readonly TextBlock peekElapsed=UI.Caption("",11,UI.Muted),peekDuration=UI.Caption("",11,UI.Muted);
     private readonly TranslateTransform peekArtSlide=new();
@@ -94,20 +94,22 @@ public sealed partial class OverlayWindow
             if(!PeekInteractionActive)Collapse();
         };
         peekMedia.HorizontalAlignment=HorizontalAlignment.Center;peekMedia.VerticalAlignment=VerticalAlignment.Top;peekMedia.Width=286;peekMedia.Height=100;peekMedia.Margin=new(0);
-        peekMedia.RowDefinitions.Add(new(){Height=new GridLength(56)});peekMedia.RowDefinitions.Add(new(){Height=new GridLength(18)});peekMedia.RowDefinitions.Add(new(){Height=new GridLength(18)});
+        // Separate the transport timeline, time labels, and audio wave.
+        foreach(double height in new[]{48d,14d,15d,19d})
+            peekMedia.RowDefinitions.Add(new(){Height=new GridLength(height)});
         peekMedia.ColumnDefinitions.Add(new(){Width=GridLength.Auto});peekMedia.ColumnDefinitions.Add(new());peekMedia.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
         peekArt.RenderTransform=peekArtSlide;
         peekCoverContent.Children.Add(WrapArtwork(peekArt));peekFallback=Icons.Create("activity",28);peekCoverContent.Children.Add(peekFallback);
-        var cover=new Border{CornerRadius=new(14),Child=peekCoverContent,Background=UI.Brush("#16FFFFFF"),Width=56,Height=56,Margin=new(0,0,16,0)};
-        cover.Clip=new RectangleGeometry(new Rect(0,0,56,56),14,14);peekMedia.Children.Add(cover);
+        var cover=new Border{CornerRadius=new(14),Child=peekCoverContent,Background=UI.Brush("#16FFFFFF"),Width=48,Height=48,Margin=new(0,0,16,0)};
+        cover.Clip=new RectangleGeometry(new Rect(0,0,48,48),14,14);peekMedia.Children.Add(cover);
         peekTitle.FontSize=15;peekSubtitle.FontSize=12;peekSubtitle.Margin=new(0,6,0,0);
         peekTitle.TextWrapping=TextWrapping.NoWrap;peekTitle.TextTrimming=TextTrimming.CharacterEllipsis;peekTitle.FontWeight=FontWeights.SemiBold;
         peekSubtitle.TextWrapping=TextWrapping.NoWrap;peekSubtitle.TextTrimming=TextTrimming.CharacterEllipsis;
         var info=new StackPanel{VerticalAlignment=VerticalAlignment.Center};info.Children.Add(WrapTitle(peekTitle));info.Children.Add(WrapTitle(peekSubtitle));Grid.SetColumn(info,1);peekMedia.Children.Add(info);
         peekPlay=Icons.Button("play",Localization.Text("Play or pause from preview"),()=>_=app.Media.Command("toggle"),true,38);peekPlay.Margin=new(16,0,0,0);Grid.SetColumn(peekPlay,2);peekMedia.Children.Add(peekPlay);
-        Grid.SetRow(peekProgress,1);Grid.SetColumnSpan(peekProgress,3);peekProgress.Margin=new(0,12,0,0);peekMedia.Children.Add(peekProgress);
+        Grid.SetRow(peekProgress,1);Grid.SetColumnSpan(peekProgress,3);peekProgress.VerticalAlignment=VerticalAlignment.Center;peekMedia.Children.Add(peekProgress);
         var peekTimes=new DockPanel();DockPanel.SetDock(peekDuration,Dock.Right);peekTimes.Children.Add(peekDuration);peekTimes.Children.Add(peekElapsed);Grid.SetRow(peekTimes,2);Grid.SetColumnSpan(peekTimes,3);peekMedia.Children.Add(peekTimes);
-        Grid.SetRow(peekWave,2);Grid.SetColumn(peekWave,1);peekWave.HorizontalAlignment=HorizontalAlignment.Center;peekMedia.Children.Add(peekWave);
+        Grid.SetRow(peekWave,3);Grid.SetColumnSpan(peekWave,3);peekWave.VerticalAlignment=VerticalAlignment.Center;peekWave.HorizontalAlignment=HorizontalAlignment.Center;peekMedia.Children.Add(peekWave);
 
         timelinePanel.RowDefinitions.Add(new(){Height=GridLength.Auto});timelinePanel.RowDefinitions.Add(new(){Height=GridLength.Auto});
         var labels=new DockPanel();DockPanel.SetDock(duration,Dock.Right);labels.Children.Add(duration);labels.Children.Add(elapsed);timelinePanel.Children.Add(labels);
@@ -126,6 +128,7 @@ public sealed partial class OverlayWindow
         };
         seekSlider.ValueChanged+=(_,_)=>{if(!updating && (seekSlider.IsMouseCaptureWithin || seekSlider.IsKeyboardFocusWithin)){seekDelay.Stop();seekDelay.Start();}};
         seekDelay.Tick+=async(_,_)=>{seekDelay.Stop();await app.Media.Seek(seekSlider.Value);};
+        InitializeMediaTimeline();
     }
     private void StopHoverTimers(){hoverDelay.Stop();leaveDelay.Stop();detailDelay.Stop();assistantHover.Stop();}
     internal void PreviewActivity()
@@ -156,11 +159,11 @@ public sealed partial class OverlayWindow
         var position=media?app.Media.Timeline():(ActiveCountdown() is Countdown c?(c.DurationSeconds-c.Remaining(now),c.DurationSeconds):(0d,0d));
         peekProgress.Visibility=position.Item2>0?Visibility.Visible:Visibility.Collapsed;
         peekElapsed.Visibility=peekDuration.Visibility=Visibility.Visible;
-        peekProgress.Value=position.Item2>0?Math.Clamp(position.Item1/position.Item2,0,1):0;
+        if(!peekSeeking)peekProgress.Value=position.Item2>0?Math.Clamp(position.Item1/position.Item2,0,1):0;
         var format=position.Item2>=3600?@"h\:mm\:ss":@"m\:ss";
         peekElapsed.Text=TimeSpan.FromSeconds(Math.Max(0,position.Item1)).ToString(format);peekDuration.Text=TimeSpan.FromSeconds(Math.Max(0,position.Item2)).ToString(format);
-        if(position.Item2<=0){peekElapsed.Text=media?Localization.Text("Windows media controls"):Localization.Text("No active session");peekDuration.Text=media?"":Localization.Text("Open →");}
-        if(media){timelineAt=DateTimeOffset.UtcNow;timelineElapsed=position.Item1;timelineDuration=position.Item2;}
+        if(position.Item2<=0){peekElapsed.Text=media?Localization.Text("This player doesn't share its position"):Localization.Text("No active session");peekDuration.Text=media?"":Localization.Text("Open →");}
+        if(media && !peekSeeking){timelineAt=DateTimeOffset.UtcNow;timelineElapsed=position.Item1;timelineDuration=position.Item2;}
         peekWave.Visibility=peekId=="media" && media && app.Settings.LiveActivity?Visibility.Visible:Visibility.Collapsed;
         UpdateClosedLyricsDemand();ApplyPeekGeometry();
     }
@@ -299,7 +302,7 @@ public sealed partial class OverlayWindow
         if(!app.Settings.CompactLayout || !WidgetOn("media"))return;
         var position=app.Media.Timeline();elapsed.Text=TimeSpan.FromSeconds(position.elapsed).ToString(position.duration>=3600?@"h\:mm\:ss":@"m\:ss");duration.Text=TimeSpan.FromSeconds(position.duration).ToString(position.duration>=3600?@"h\:mm\:ss":@"m\:ss");
         timelineAt=DateTimeOffset.UtcNow;timelineElapsed=position.elapsed;timelineDuration=position.duration;
-        seekSlider.IsEnabled=position.duration>0 && app.Media.CanSeek;
+        ApplyTimelineState(app.Media.Available?MediaTimelinePolicy.State(position.duration,app.Media.CanSeek):MediaTimelineState.None,app.Media.Available);
         if(!seekSlider.IsMouseCaptureWithin && !seekSlider.IsKeyboardFocusWithin && !seekDelay.IsEnabled)seekSlider.Value=position.duration>0?position.elapsed/position.duration:0;
     }
     private bool mediaLayoutPending;

@@ -63,6 +63,7 @@ public sealed partial class SettingsWindow
         Add("Smooth monitor follow","Layout","Display","Slide smoothly between monitors","monitor screen layar follow cursor kursor smooth animation slide");
         Add("Drag & reorder widgets","Content","Enabled widgets & order","","drag drop urutan widget reorder susun");
         Add("Hover shows active widgets","Content","Hover pages","Show all active widgets in hover","hover semua widget aktif active preview swipe slide");
+        Add("Closed dock background opacity","Appearance","Surface","Separate opacity for closed dock","opacity transparency collapsed вырез прозрачность");
         Add("Dock size","Layout","Closed island","Closed width","width height ukuran lebar tinggi compact");
         Add("Panel size","Layout","Open panel","Panel width","resize size ukuran besar panel");
         Add("Automatic hide & tuck","Visibility","Automatic tucking","","tuck hide fullscreen fullscreen otomatis sembunyi dock");
