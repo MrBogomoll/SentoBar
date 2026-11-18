@@ -6,7 +6,7 @@
   </LinearGradientBrush>
   <SolidColorBrush x:Key="MenuBorder" Color="#536781"/>
   <SolidColorBrush x:Key="PopupText" Color="#F4F7FC"/>
-  <SolidColorBrush x:Key="GlassFieldFill" Color="#D4263244"/>
+  <SolidColorBrush x:Key="GlassFieldFill" Color="Transparent"/>
   <SolidColorBrush x:Key="GlassFieldText" Color="#F4F7FC"/>
   <SolidColorBrush x:Key="GlassFieldHover" Color="#6984A4"/>
   <SolidColorBrush x:Key="GlassFieldFocus" Color="#83B5E9"/>
@@ -61,7 +61,7 @@
       <Setter.Value>
         <ControlTemplate TargetType="TextBox">
           <Border x:Name="EditorFrame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" CornerRadius="9">
+                  BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" CornerRadius="8">
             <ScrollViewer x:Name="PART_ContentHost" Focusable="False"/>
           </Border>
           <ControlTemplate.Triggers>
@@ -84,10 +84,10 @@
       </Track></Grid><ControlTemplate.Triggers><Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Opacity" Value="0.8"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger></ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value></Setter>
   </Style>
-  <Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="{DynamicResource PopupText}"/><Setter Property="Padding" Value="10,8"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Border x:Name="Item" Padding="{TemplateBinding Padding}" Background="Transparent" CornerRadius="6"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource SelectionFill}"/><Setter Property="Foreground" Value="{DynamicResource SelectionText}"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource SelectionFill}"/><Setter Property="Foreground" Value="{DynamicResource SelectionText}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+  <Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="{DynamicResource PopupText}"/><Setter Property="Padding" Value="10,8"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Border x:Name="Item" Padding="{TemplateBinding Padding}" Background="Transparent" CornerRadius="8" BorderThickness="1" BorderBrush="Transparent"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource SelectionFill}"/><Setter TargetName="Item" Property="BorderBrush" Value="{DynamicResource MenuBorder}"/><Setter Property="Foreground" Value="{DynamicResource SelectionText}"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource SelectionFill}"/><Setter TargetName="Item" Property="BorderBrush" Value="{DynamicResource MenuBorder}"/><Setter Property="Foreground" Value="{DynamicResource SelectionText}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
   <Style TargetType="ComboBox"><Setter Property="Background" Value="{DynamicResource ControlFill}"/><Setter Property="BorderBrush" Value="{DynamicResource ControlBorder}"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusOutline}"/><Setter Property="Margin" Value="0,4,0,8"/><Setter Property="MinHeight" Value="34"/><Setter Property="Foreground" Value="{DynamicResource ControlText}"/><Setter Property="FontSize" Value="12"/>
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox"><Grid>
-      <ToggleButton Focusable="False" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" Foreground="{TemplateBinding Foreground}" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" ClickMode="Press"><ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="9"><Path Data="M1,1 L4,4 7,1" Width="7" Height="4" Stroke="{TemplateBinding Foreground}" Opacity="0.65" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Margin="0,0,13,0" HorizontalAlignment="Right" VerticalAlignment="Center"/></Border></ControlTemplate></ToggleButton.Template></ToggleButton>
+      <ToggleButton Focusable="False" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" Foreground="{TemplateBinding Foreground}" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" ClickMode="Press"><ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8"><Path Data="M1,1 L4,4 7,1" Width="7" Height="4" Stroke="{TemplateBinding Foreground}" Opacity="0.65" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Margin="0,0,13,0" HorizontalAlignment="Right" VerticalAlignment="Center"/></Border></ControlTemplate></ToggleButton.Template></ToggleButton>
       <ContentPresenter x:Name="SelectionPresenter" Margin="11,6,32,6" VerticalAlignment="Center" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
       <TextBox x:Name="PART_EditableTextBox" Visibility="Collapsed" Margin="10,2,31,2" Padding="1,3" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center" IsReadOnly="{TemplateBinding IsReadOnly}" MaxLength="160" Foreground="{TemplateBinding Foreground}"/>
       <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="{DynamicResource PopupMotion}"><Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="244" Background="{DynamicResource PopupFill}" BorderBrush="{DynamicResource MenuBorder}" BorderThickness="1" CornerRadius="12" Padding="5"><ScrollViewer><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer></Border></Popup>
@@ -109,7 +109,7 @@
     <Setter Property="Background" Value="{DynamicResource GlassFieldFill}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource GlassControlBorder}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="CornerRadius" Value="9"/>
+    <Setter Property="CornerRadius" Value="8"/>
     <Style.Triggers>
       <Trigger Property="IsMouseOver" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource GlassFieldHover}"/></Trigger>
       <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource GlassFieldFocus}"/></Trigger>
@@ -128,7 +128,7 @@
       <Setter.Value>
         <ControlTemplate TargetType="PasswordBox">
           <Border x:Name="PasswordFrame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" CornerRadius="9">
+                  BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" CornerRadius="8">
             <ScrollViewer x:Name="PART_ContentHost" Focusable="False"/>
           </Border>
           <ControlTemplate.Triggers>
@@ -151,6 +151,114 @@
   <ControlTemplate x:Key="ToolRowTemplate" TargetType="Button"><Grid Background="Transparent"><Border x:Name="RowLight" Background="White" Opacity="0" CornerRadius="8"/><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/></Grid></ControlTemplate>
   <Style x:Key="SettingsSwitch" TargetType="CheckBox"><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusOutline}"/><Setter Property="local:ControlFeedback.Enabled" Value="True"/><Setter Property="Foreground" Value="#F2F3F6"/><Setter Property="Margin" Value="0,1"/><Setter Property="MinHeight" Value="40"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="46"/></Grid.ColumnDefinitions><ContentPresenter VerticalAlignment="Center" Margin="0,0,12,0"/><Border x:Name="Track" Grid.Column="1" Width="34" Height="20" CornerRadius="10" Background="{DynamicResource ControlFill}" BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1" HorizontalAlignment="Right"><Grid><Ellipse x:Name="Knob" Width="14" Height="14" Fill="{DynamicResource SwitchKnob}" HorizontalAlignment="Left" Margin="3,0,0,0"/></Grid></Border></Grid><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Track" Property="Background" Value="{DynamicResource CheckedFill}"/><Setter TargetName="Knob" Property="Fill" Value="{DynamicResource CheckedText}"/><Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/><Setter TargetName="Knob" Property="Margin" Value="0,0,3,0"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource ControlText}"/><Setter TargetName="Track" Property="BorderThickness" Value="1"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
   <Style TargetType="ContextMenu"><Setter Property="OverridesDefaultStyle" Value="True"/><Setter Property="Background" Value="{DynamicResource PopupFill}"/><Setter Property="Foreground" Value="{DynamicResource PopupText}"/><Setter Property="BorderBrush" Value="{DynamicResource MenuBorder}"/><Setter Property="Padding" Value="8"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="{TemplateBinding Padding}"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/></Border></ControlTemplate></Setter.Value></Setter></Style>
+  <Style x:Key="GlassPanelSlider" TargetType="Slider" BasedOn="{StaticResource {x:Type Slider}}">
+    <Setter Property="local:ControlFeedback.Enabled" Value="False"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <Grid Background="Transparent" MinHeight="16">
+            <Border x:Name="Rail" Height="6" VerticalAlignment="Center" CornerRadius="3"
+                    Background="{DynamicResource GlassFieldFill}" BorderBrush="{DynamicResource GlassControlBorder}" BorderThickness="1"/>
+            <Track x:Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                   Value="{TemplateBinding Value}" IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Command="Slider.DecreaseLarge" Focusable="False">
+                  <RepeatButton.Template><ControlTemplate TargetType="RepeatButton">
+                    <Grid Background="Transparent"><Border Height="2" CornerRadius="1" Margin="2,0,0,0" Background="{DynamicResource GlassFieldFocus}"/></Grid>
+                  </ControlTemplate></RepeatButton.Template>
+                </RepeatButton>
+              </Track.DecreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb Width="16" Height="16">
+                  <Thumb.Template><ControlTemplate TargetType="Thumb">
+                    <Grid><Ellipse x:Name="Rim" Fill="{DynamicResource GlassControlFill}" Stroke="{DynamicResource GlassFieldFocus}"/>
+                      <Ellipse Width="6" Height="6" Fill="{DynamicResource GlassControlText}"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Rim" Property="Stroke" Value="{DynamicResource GlassFieldText}"/></Trigger>
+                      <Trigger Property="IsDragging" Value="True"><Setter TargetName="Rim" Property="StrokeThickness" Value="2"/></Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate></Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Command="Slider.IncreaseLarge" Focusable="False">
+                  <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+                </RepeatButton>
+              </Track.IncreaseRepeatButton>
+            </Track>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Rail" Property="BorderBrush" Value="{DynamicResource GlassFieldHover}"/></Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Rail" Property="BorderBrush" Value="{DynamicResource GlassFieldFocus}"/></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".45"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="GlassPanelSwitch" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Foreground" Value="{DynamicResource GlassFieldText}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CheckBox">
+          <Grid Background="Transparent">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <ContentPresenter VerticalAlignment="Center" Margin="0,0,8,0" RecognizesAccessKey="True"/>
+            <Border x:Name="Track" Grid.Column="1" Width="34" Height="20" CornerRadius="10" VerticalAlignment="Center"
+                    Background="{DynamicResource GlassFieldFill}" BorderBrush="{DynamicResource GlassControlBorder}" BorderThickness="1">
+              <Ellipse x:Name="Knob" Width="12" Height="12" Margin="3,0" HorizontalAlignment="Left"
+                       Stroke="{DynamicResource GlassFieldFocus}" Fill="{DynamicResource GlassControlFill}"/>
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+              <Setter TargetName="Knob" Property="Fill" Value="{DynamicResource GlassFieldText}"/>
+              <Setter TargetName="Track" Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource GlassFieldHover}"/></Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource GlassFieldFocus}"/></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".45"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="GlassPanelTaskToggle" TargetType="CheckBox" BasedOn="{StaticResource TaskToggle}">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CheckBox">
+          <Grid Background="Transparent">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="30"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Border x:Name="Ring" Width="19" Height="19" CornerRadius="9.5" HorizontalAlignment="Left"
+                    Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1">
+              <Path x:Name="Tick" Visibility="Hidden" Width="10" Height="8" Stretch="Fill" Data="M1,4 L4,7 10,1"
+                    Stroke="{DynamicResource GlassFieldText}" StrokeThickness="1.7" StrokeLineJoin="Round"/>
+            </Border>
+            <ContentPresenter Grid.Column="1" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+              <Setter TargetName="Ring" Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".45"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="Background" Value="{DynamicResource GlassFieldFill}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource GlassControlBorder}"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource GlassFieldHover}"/></Trigger>
+      <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource GlassFieldFocus}"/></Trigger>
+    </Style.Triggers>
+  </Style>
   <Style TargetType="Separator"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Separator"><Border Height="1" Margin="8,5" Background="#35383F"/></ControlTemplate></Setter.Value></Setter></Style>
   <Style TargetType="ProgressBar"><Setter Property="Foreground" Value="{DynamicResource ProgressFill}"/><Setter Property="Background" Value="{DynamicResource ProgressTrack}"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ProgressBar"><Grid x:Name="PART_Track" ClipToBounds="True"><Border Background="{TemplateBinding Background}" CornerRadius="2"/><Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="2" HorizontalAlignment="Left"/></Grid></ControlTemplate></Setter.Value></Setter></Style>
   <Style TargetType="ToolTip">

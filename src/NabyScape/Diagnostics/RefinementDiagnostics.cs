@@ -75,14 +75,14 @@ internal static class RefinementDiagnostics
             var imageFile=Path.Combine(output,"Color sample.png");File.WriteAllBytes(imageFile,SamplePng());p.Shelf.Clear();p.AddFiles(new[]{fixture,imageFile});
             overlay.ShowTools("files",false);await Settle();
             var selector=Tree(overlay).OfType<CheckBox>().Single(c=>AutomationProperties.GetName(c)=="Select "+Path.GetFileName(fixture));selector.IsChecked=true;
-            Check("shelf uses TaskToggle and selecting updates shared selection",ReferenceEquals(selector.Style,app.FindResource("TaskToggle")) && selection.Contains(fixture));
+            Check("shelf uses TaskToggle and selecting updates shared selection",ReferenceEquals(selector.Style,selector.FindResource("TaskToggle")) && selection.Contains(fixture));
             var actualDragTile=Tree(overlay).OfType<Border>().First(b=>b.Tag as string=="file-drag");
             Check("rendered shelf drag surface blocks panel drag",(bool)blocked.Invoke(null,new object[]{actualDragTile})!);
             Fits("shelf rows fit their horizontal viewport",overlay);Capture(overlay,Path.Combine(output,"shelf-selected.png"));
             s.ClipboardHistory=true;app.ChangeSettings();p.ClipboardPaused=false;p.ClearClips();p.IngestText("A thought worth keeping for the next session.");p.IngestText("https://example.com/design?keep=yes&utm_source=review#draft");p.IngestText("#8E9AAF");p.IngestImage(SamplePng());
             overlay.ShowTools("clips",false);await Settle();
             var pause=Tree(overlay).OfType<CheckBox>().Single(c=>AutomationProperties.GetName(c)=="Pause capture");
-            Check("clipboard capture uses SettingsSwitch",ReferenceEquals(pause.Style,app.FindResource("SettingsSwitch")));
+            Check("clipboard capture uses SettingsSwitch",ReferenceEquals(pause.Style,pause.FindResource("SettingsSwitch")));
             pause.IsChecked=true;pause.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));Check("pause switch prevents fixture ingestion",p.ClipboardPaused && !p.IngestText("must not be captured"));
             pause=Tree(overlay).OfType<CheckBox>().Single(c=>AutomationProperties.GetName(c)=="Pause capture");pause.IsChecked=false;pause.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Check("pause switch resumes capture",!p.ClipboardPaused);

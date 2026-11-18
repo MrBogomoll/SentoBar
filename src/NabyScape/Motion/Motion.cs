@@ -63,18 +63,18 @@ internal static class Motion
     private static readonly DependencyProperty IconKeyProperty=DependencyProperty.RegisterAttached("IconKey",typeof(string),typeof(Motion));
     public static void Button(Button button)
     {
-        var scale=new ScaleTransform(1,1);var lift=new TranslateTransform();button.RenderTransformOrigin=new(.5,.5);button.RenderTransform=new TransformGroup{Children={scale,lift}};
-        void State(bool hover,bool pressed=false)
+        var scale=new ScaleTransform();button.RenderTransformOrigin=new(.5,.5);button.RenderTransform=scale;
+        void Press(bool pressed)
         {
             bool active=Enabled && Interaction!="Off" && button.IsEnabled && Window.GetWindow(button) is not (SettingsWindow or WelcomeWindow);bool expressive=Interaction=="Expressive";
-            double value=!active?1:pressed?(expressive?.94:.965):hover?(expressive?1.035:1.018):1;
-            To(scale,ScaleTransform.ScaleXProperty,value,pressed?100:220);To(scale,ScaleTransform.ScaleYProperty,value,pressed?100:220);To(lift,TranslateTransform.YProperty,active && hover && !pressed?(expressive?-1.5:-.6):0,180);
+            double value=active && pressed?(expressive?.94:.965):1;
+            To(scale,ScaleTransform.ScaleXProperty,value,pressed?100:220);To(scale,ScaleTransform.ScaleYProperty,value,pressed?100:220);
         }
-        button.MouseEnter+=(_,_)=>State(true);button.MouseLeave+=(_,_)=>State(false);
-        button.PreviewMouseLeftButtonDown+=(_,_)=>State(false,true);button.PreviewMouseLeftButtonUp+=(_,_)=>State(button.IsMouseOver);
-        button.LostMouseCapture+=(_,_)=>State(button.IsMouseOver);button.IsEnabledChanged+=(_,_)=>State(button.IsMouseOver);
-        button.PreviewKeyDown+=(_,e)=>{if(e.Key is Key.Space or Key.Enter)State(false,true);};button.PreviewKeyUp+=(_,_)=>State(false);
-        button.Unloaded+=(_,_)=>State(false);
+        button.MouseLeave+=(_,_)=>Press(false);
+        button.PreviewMouseLeftButtonDown+=(_,_)=>Press(true);button.PreviewMouseLeftButtonUp+=(_,_)=>Press(false);
+        button.LostMouseCapture+=(_,_)=>Press(false);button.IsEnabledChanged+=(_,_)=>Press(false);
+        button.PreviewKeyDown+=(_,e)=>{if(e.Key is Key.Space or Key.Enter)Press(true);};button.PreviewKeyUp+=(_,_)=>Press(false);
+        button.Unloaded+=(_,_)=>Press(false);
     }
     public static void Progress(System.Windows.Controls.Primitives.RangeBase bar,double value)
     {

@@ -35,6 +35,11 @@ internal static class GlassDockAppearance
         host.Resources[typeof(PasswordBox)]=host.FindResource("GlassPanelPassword");
         host.Resources[typeof(ComboBox)]=host.FindResource("GlassPanelChoice");
         host.Resources[typeof(Button)]=host.FindResource("GlassPanelButton");
+        host.Resources[typeof(Slider)]=host.FindResource("GlassPanelSlider");
+        var toggle=host.FindResource("GlassPanelSwitch");
+        host.Resources[typeof(CheckBox)]=toggle;
+        host.Resources["SettingsSwitch"]=toggle;
+        host.Resources["TaskToggle"]=host.FindResource("GlassPanelTaskToggle");
     }
 
     internal static void UpdateControlColors(Settings settings)
@@ -46,12 +51,11 @@ internal static class GlassDockAppearance
         UI.ResourceBrush("GlassControlText",Accessibility.HighContrast?SystemColors.WindowTextBrush:fill=="#263244"?Foreground:UI.ContrastText(fill));
 
         var panel=UI.Brush(settings.Background).Color;
+        bool customTint=!settings.ControlFill.Equals("#16171B",StringComparison.OrdinalIgnoreCase);
         var tint=UI.Brush(fill).Color;
-        if(settings.ControlFill.Equals("#16171B",StringComparison.OrdinalIgnoreCase))tint=Blend(tint,panel,.4);
-        var ink=(SolidColorBrush)UI.ContrastText(Blend(panel,tint,.83).ToString());
+        var surface=customTint?UI.Brush(Color.FromArgb(28,tint.R,tint.G,tint.B).ToString()):Brushes.Transparent;
+        var ink=(SolidColorBrush)UI.ContrastText((customTint?Blend(panel,tint,28d/255):panel).ToString());
         var outline=UI.Brush(border).Color;
-        var surface=new SolidColorBrush(Color.FromArgb(212,tint.R,tint.G,tint.B));
-        surface.Freeze();
         UI.ResourceBrush("GlassFieldFill",Accessibility.HighContrast?SystemColors.WindowBrush:surface);
         UI.ResourceBrush("GlassFieldText",Accessibility.HighContrast?SystemColors.WindowTextBrush:ink);
         UI.ResourceBrush("GlassFieldHover",Accessibility.HighContrast?SystemColors.WindowTextBrush:UI.Brush(Blend(outline,ink.Color,.3).ToString()));
@@ -60,14 +64,14 @@ internal static class GlassDockAppearance
 
     internal static double Radius(double radius)=>radius>0?radius+10:0;
 
-    internal static LinearGradientBrush Material(Color background,Color light)
+    internal static LinearGradientBrush Material(Color background,Color light,double opacity=1)
     {
         bool standard=background==Colors.Black;
         var top=standard?Color.FromRgb(0x15,0x1a,0x23):background;
         var baseColor=standard?Color.FromRgb(0x17,0x1c,0x25):background;
         Color bottom=light.A==0?baseColor:Blend(baseColor,light,HasColor(light)?.13:.045);
         var brush=new LinearGradientBrush(new GradientStopCollection{new(top,0),new(top,.28),new(bottom,1)},new Point(.5,0),new Point(.5,1));
-        brush.Freeze();
+        brush.Opacity=opacity;brush.Freeze();
         return brush;
     }
 

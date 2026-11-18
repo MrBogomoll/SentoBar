@@ -43,7 +43,7 @@ internal static class PremiumExperienceDiagnostics
         check("Visible playing artwork starts the retained drift clock",!Motion.Enabled || surface.AmbientAnimating);
         island.SelectPage("focus",false);check("Other panels retain their dark surface",!surface.AmbientVisible && !surface.AmbientAnimating);island.SelectPage("media",false);
         var cover=Field<Image>("artwork").Parent as FrameworkElement;cover!.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice,0){RoutedEvent=Mouse.MouseEnterEvent});await Task.Delay(310);
-        check("Artwork reacts to hover without changing playback",!Motion.Enabled || cover.RenderTransform is ScaleTransform {ScaleX:>1.03});cover.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice,0){RoutedEvent=Mouse.MouseLeaveEvent});
+        check("Hover keeps album artwork inside its frame",cover.RenderTransform.Value.IsIdentity);cover.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice,0){RoutedEvent=Mouse.MouseLeaveEvent});
         app.Media.DiagnosticPlayback(false);app.PublishUpdate(RuntimeChange.Media);check("Pausing playback stops ambient motion",!surface.AmbientAnimating);
         app.Media.DiagnosticPlayback(true);app.PublishUpdate(RuntimeChange.Media);s.AmbientMotion="Still";app.ChangeSettings();check("Still mode keeps color without an animation clock",!surface.AmbientAnimating);
         s.AmbientMotion="Breathe";app.ChangeSettings();check("Breathe starts a retained opacity animation",!Motion.Enabled || surface.AmbientAnimating);

@@ -44,7 +44,7 @@ internal static class ControlFeedback
     {
         var scale=new ScaleTransform();image.RenderTransformOrigin=new(.5,.5);image.RenderTransform=scale;
         void Size(double value){if(!Active)value=1;Motion.To(scale,ScaleTransform.ScaleXProperty,value,280);Motion.To(scale,ScaleTransform.ScaleYProperty,value,280);}
-        image.MouseEnter+=(_,_)=>Size(1.045);image.MouseLeave+=(_,_)=>Size(1);image.PreviewMouseLeftButtonDown+=(_,_)=>Size(.98);image.PreviewMouseLeftButtonUp+=(_,_)=>Size(image.IsMouseOver?1.045:1);
+        image.MouseLeave+=(_,_)=>Size(1);image.PreviewMouseLeftButtonDown+=(_,_)=>Size(.98);image.PreviewMouseLeftButtonUp+=(_,_)=>Size(1);
     }
     internal static void Notice(FrameworkElement card,string mode)
     {

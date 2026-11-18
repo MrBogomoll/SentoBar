@@ -51,13 +51,17 @@ internal static class PanelBackdropDiagnostics
             var right=Sample(image,(int)(area.Left+area.Width*.85),(int)(area.Top+area.Height*.80));
             return left.B>left.R+20 && right.R>right.B+20 && Math.Abs(left.A-options.Opacity*255)<3;
         }
+        void SavePanel(string phase)
+        {
+            var window=Capture(island);
+            int width=(int)Math.Ceiling(island.PaintedWidth),height=(int)Math.Ceiling(island.PaintedHeight);
+            Save(phase,new CroppedBitmap(window,new Int32Rect((window.PixelWidth-width)/2,0,width,height)));
+        }
         void InspectDock(string phase)
         {
             check(phase+" shares the selected blue and gold corner colors and background opacity",
                 island.Opacity==1 && Corners(Capture(surface),surface.Contour.Bounds));
-            var window=Capture(island);
-            int width=(int)Math.Ceiling(island.PaintedWidth),height=(int)Math.Ceiling(island.PaintedHeight);
-            Save(phase,new CroppedBitmap(window,new Int32Rect((window.PixelWidth-width)/2,0,width,height)));
+            SavePanel(phase);
         }
 
         island.Collapse();await Settle();InspectDock("closed");
@@ -74,6 +78,8 @@ internal static class PanelBackdropDiagnostics
         Button CalendarButton(string name)=>Diagnostics.Descendants(island).OfType<Button>()
             .Single(button=>button.IsVisible && UI.Identity(button)==Localization.Text(name));
         var todayAction=CalendarButton("Today");
+        var calendarFill=(SolidColorBrush)todayAction.Background;
+        var calendarStroke=(SolidColorBrush)todayAction.BorderBrush;
         var addEvent=CalendarButton("Add local event");
         check("Add event matches Today's transparent fill, border and height",
             addEvent.Background==Brushes.Transparent && addEvent.BorderThickness==todayAction.BorderThickness &&
@@ -116,7 +122,8 @@ internal static class PanelBackdropDiagnostics
             box.IsDropDownOpen=false;
         }
 
-        bool SharedField(Control field)=>field.IsVisible && field.Background is SolidColorBrush {Color.A:>0 and <255} &&
+        bool CalendarStroke(Brush brush)=>brush is SolidColorBrush solid && solid.Color==calendarStroke.Color;
+        bool SharedField(Control field)=>field.IsVisible && field.Background is SolidColorBrush fill && fill.Color.A==calendarFill.Color.A &&
             field.BorderBrush==app.FindResource("GlassControlBorder") && field.BorderThickness==new Thickness(1);
         TextBox[] Editors()=>Diagnostics.Descendants(island).OfType<TextBox>().Where(field=>field.IsVisible).ToArray();
         island.Collapse();island.PreviewActivity();island.SelectPeek("notes");await Settle();
@@ -124,6 +131,9 @@ internal static class PanelBackdropDiagnostics
         check("Mini Notes uses the shared translucent editor surface",miniEditors.Length==2 && miniEditors.All(SharedField));
         island.SelectPeek("awake");await Settle();
         var miniChoice=Diagnostics.Descendants(island).OfType<ComboBox>().Single(box=>box.IsVisible);
+        bool HasSwitch()=>Diagnostics.Descendants(island).OfType<CheckBox>().Any(box=>box.IsVisible &&
+            box.Template.FindName("Track",box) is Border track && CalendarStroke(track.BorderBrush));
+        check("Mini Awake uses an outlined switch",HasSwitch());
         check("Mini drop-down uses the same translucent field and outline",SharedField(miniChoice) &&
             miniEditors.All(editor=>editor.Background==miniChoice.Background));
         miniChoice.IsDropDownOpen=true;await Settle();
@@ -136,6 +146,15 @@ internal static class PanelBackdropDiagnostics
         var expandedEditors=Editors();
         check("Expanded Notes uses the same material and outline as the mini editor",expandedEditors.Length==2 &&
             expandedEditors.All(editor=>SharedField(editor) && editor.Background==miniEditors[0].Background));
+
+        island.ShowTools("awake",false);await Settle();
+        check("Expanded Awake uses the same outlined switch",HasSwitch());
+        island.SelectPage("volume",false);await Settle();
+        bool HasGlassSlider()=>Diagnostics.Descendants(island).OfType<Slider>().Any(slider=>slider.IsVisible &&
+            slider.Template.FindName("Rail",slider) is Border rail && CalendarStroke(rail.BorderBrush));
+        check("Expanded Volume has an outlined slider",HasGlassSlider());
+        island.Collapse();island.PreviewActivity();island.SelectPeek("volume");await Settle();
+        check("Mini Volume has the same outlined slider",HasGlassSlider());
 
         island.OpenFeaturePage("voice");await Settle();
         var voiceOptions=Diagnostics.Descendants(island).OfType<Button>().Single(b=>b.IsVisible && UI.Identity(b)=="Options");
@@ -198,6 +217,25 @@ internal static class PanelBackdropDiagnostics
                     .All(name=>controls.Any(c=>UI.Identity(c)==name)));
         }
         finally{settingsWindow.Close();}
+        s.Background="#212339";s.Preset="Mac";s.PanelWidth=526;s.PanelPadding=32;
+        options=s.PanelBackdrop;options.Image="No image";options.Gradient="Two soft lights";options.Opacity=.89;
+        options.FirstColor="#000000";options.SecondColor="#C73C7D";options.FirstPosition="Top";options.SecondPosition="Bottom right";options.Strength=.36;
+        app.ChangeSettings();island.Reveal(false);island.SelectPage("notes",false);await Settle();
+        SavePanel("outlined-notes");
+        island.Collapse();island.PreviewActivity();island.SelectPeek("awake");await Settle();
+        SavePanel("outlined-mini-switch");
+        var duration=Diagnostics.Descendants(island).OfType<ComboBox>().Single(box=>box.IsVisible);
+        duration.IsDropDownOpen=true;await Settle();
+        var durationMenu=(Popup)duration.Template.FindName("PART_Popup",duration);
+        Save("outlined-duration-menu",Capture((Border)durationMenu.Child));
+        duration.IsDropDownOpen=false;
+        island.SelectPeek("volume");await Settle();SavePanel("outlined-mini-slider");
+        island.Reveal(false);island.SelectPage("calendar",false);await Settle();
+        s.ReduceMotion=false;s.InteractionMotion="Expressive";Motion.Configure(s);
+        var month=CalendarButton("Toggle calendar month");var before=ButtonBounds(month);
+        month.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,0){RoutedEvent=System.Windows.Input.Mouse.MouseEnterEvent});
+        await Task.Delay(280);
+        check("Hover preserves both edges of the calendar month button",before==ButtonBounds(month));
         island.DiagnosticPointerPresent=false;
     }
 }
