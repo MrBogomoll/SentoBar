@@ -128,8 +128,8 @@ internal sealed partial class AssistantView : UserControl,IDisposable
     private void HostSizeChanged(object sender,SizeChangedEventArgs e)=>AdjustLayout();
     internal static Size PanelSize(Settings settings,bool voice=false)
     {
-        var screen=Native.ChooseScreen(settings);double scale=Native.Scale(screen);
-        return new Size(Math.Max(240,Math.Min(Math.Max(voice?520:720,settings.PanelWidth),screen.WorkingArea.Width/scale-32)),Math.Max(240,Math.Min(Math.Max(voice?540:680,settings.PanelMaxHeight),screen.WorkingArea.Height/scale-32)));
+        var screen=Native.ChooseScreen(settings);double scale=Native.Scale(screen);var workArea=Native.PanelWorkArea(screen);
+        return new Size(Math.Max(240,Math.Min(Math.Max(voice?520:720,settings.PanelWidth),workArea.Width/scale-32)),Math.Max(240,Math.Min(Math.Max(voice?540:680,settings.PanelMaxHeight),workArea.Height/scale-32)));
     }
     private void AdjustLayout()
     {

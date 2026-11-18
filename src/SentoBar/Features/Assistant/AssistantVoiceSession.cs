@@ -118,7 +118,9 @@ internal sealed class AssistantVoiceSession : IAssistantVoice
             await s.Socket.Connect(endpoint, apiKey, gemini, connect.Token).ConfigureAwait(false);
             await SendBatch(s, new[] { Setup(provider, instructions, enabledTools, halfDuplex) }, s.Cancel.Token).ConfigureAwait(false);
             s.Reader = ReceiveLoop(s);
-            await s.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20), s.Cancel.Token).ConfigureAwait(false);
+            // End cancels Ready after closing the socket. Listening to s.Cancel here can
+            // resume Start inline inside teardown and report failure before the socket is released.
+            await s.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20)).ConfigureAwait(false);
             // Seed only bounded text history. Images are sent exclusively by explicit SendImage calls.
             var seed = history.Where(m => m.Role is "user" or "assistant" && !string.IsNullOrWhiteSpace(m.Text)).TakeLast(80).ToArray();
             foreach (var m in seed) CheckText(m.Text);
@@ -298,11 +300,11 @@ internal sealed class AssistantVoiceSession : IAssistantVoice
         try { audio?.Dispose(); } catch { }
         s.Input.Writer.TryComplete();
         try { s.Cancel.Cancel(); } catch { }
-        s.Ready.TrySetCanceled();
         try { s.Socket.Abort(); } catch { }
         try { s.Socket.Dispose(); } catch { }
         lock (gate) if (ReferenceEquals(current, s)) current = null;
         s.HardwareStopped.Set();
+        s.Ready.TrySetCanceled();
     }
     private void Fail(Session s, string message)
     {

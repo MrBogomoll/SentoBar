@@ -54,13 +54,13 @@ internal sealed class AssistantKeys : IAssistantKeys
         }
         finally{CredFree(pointer);}
     }
-    internal static void CopyForkCredentials(Store previous)
+    internal static void CopyForkCredentials(Store stagedProfile)
     {
         var keys=new AssistantKeys();
-        var options=previous.Load<AssistantOptions>("assistant");
+        var options=stagedProfile.Load<AssistantOptions>("assistant");
         var ids=new HashSet<string>{SpotifyService.CredentialId,LyricsProviders.MusixmatchKey,LyricsProviders.PaxKey};
         foreach(var provider in options.Providers??new())
-            if(Guid.TryParseExact(provider.Id,"N",out _))ids.Add(provider.Id);
+            if(provider!=null && Guid.TryParseExact(provider.Id,"N",out _))ids.Add(provider.Id);
         foreach(var id in ids)
         {
             if(keys.Exists(id))continue;

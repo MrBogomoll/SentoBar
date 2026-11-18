@@ -44,16 +44,47 @@ internal static class PersistenceTests
             Assert(data.Clips[0].ImagePath==Path.Combine(next,"clipboard-images","test.png") && data.Clips[1].ImagePath==Path.Combine(root,"outside.png") && data.Shelf[0].Path==image && settings.Shortcuts[0].Target==image && data.Note=="private" && data.Tasks.Count==1);
             Assert(File.ReadAllText(Path.Combine(next,"activities.json"))==File.ReadAllText(Path.Combine(legacy,"activities.json")));
         });
+        Fixture("Assistant rename updates exact factory defaults once and retains provider extension fields",root=>
+        {
+            string original=AssistantOptions.DefaultInstructions.Replace("Sento does","Naby does");
+            var store=new Store(root);
+            string path=Path.Combine(root,"assistant.json");
+            File.WriteAllText(path,JsonSerializer.Serialize(new{Instructions=original,WakeWord=new{Phrase="Hey Naby"},Providers=new[]{new{Id=Guid.NewGuid().ToString("N"),FutureProviderSetting=11}}}));
+            var options=store.Load<AssistantOptions>("assistant");store.UpgradeAssistantDefaults(options);
+            using var document=JsonDocument.Parse(File.ReadAllText(path));
+            Assert(options.Instructions==AssistantOptions.DefaultInstructions && options.WakeWord.Phrase=="Hey Sento");
+            Assert(document.RootElement.GetProperty("Instructions").GetString()==options.Instructions &&
+                document.RootElement.GetProperty("WakeWord").GetProperty("Phrase").GetString()=="Hey Sento" &&
+                document.RootElement.GetProperty("Providers")[0].GetProperty("FutureProviderSetting").GetInt32()==11);
+            string custom=JsonSerializer.Serialize(new{Instructions="My Naby",WakeWord=new{Phrase="Call Naby"}});
+            File.WriteAllText(path,custom);store.UpgradeAssistantDefaults(store.Load<AssistantOptions>("assistant"));
+            Assert(File.ReadAllText(path)==custom);
+        });
         Fixture("Migration ignores interrupted staging and never merges existing destination",root=>
         {
             string legacy=Path.Combine(root,"legacy"),next=Path.Combine(root,"next");new Store(legacy).Save("settings",new Settings{Width=301});Directory.CreateDirectory(next+".migration-interrupted");File.WriteAllText(Path.Combine(next+".migration-interrupted","settings.json"),"{broken");
             var migrated=Store.Migrate(legacy,next);Assert(migrated.Load<Settings>("settings").Width==301);
             new Store(next).Save("settings",new Settings{Width=322});var existing=Store.Migrate(legacy,next);Assert(existing.Load<Settings>("settings").Width==322 && existing.Warning!.Contains("Both"));
         });
+        Fixture("Empty destination, voice assets and an expired clipboard image do not block migration",root=>
+        {
+            string previous=Path.Combine(root,"NabyScape"),next=Path.Combine(root,"SentoBar");
+            var old=new Store(previous);old.Save("settings",new Settings{Width=345});
+            File.WriteAllText(Path.Combine(previous,"russian-build-initialized.txt"),"fixture");
+            string voice=Path.Combine(previous,"local-speech");Directory.CreateDirectory(voice);
+            File.WriteAllText(Path.Combine(voice,"asset.json"),"42");
+            old.Save("productivity",new ProductivityData{Note="keep",Clips=new(){new(){Kind="image",ImagePath=Path.Combine(previous,"clipboard-images","expired.png")}}});
+            Directory.CreateDirectory(next);
+            var migrated=Store.ProfileAt(root);
+            Assert(migrated.DirectoryPath==next && migrated.Load<Settings>("settings").Width==345 &&
+                migrated.Load<ProductivityData>("productivity").Note=="keep" &&
+                File.ReadAllText(Path.Combine(next,"local-speech","asset.json"))=="42");
+        });
         Fixture("Migration invalid JSON or blocked destination falls back with warning",root=>
         {
             string legacy=Path.Combine(root,"legacy"),next=Path.Combine(root,"next");var old=new Store(legacy);old.Save("settings",new Settings{Width=301});File.WriteAllText(Path.Combine(legacy,"broken.json"),"{broken");
             var failed=Store.Migrate(legacy,next);Assert(failed.DirectoryPath==legacy && failed.Warning!=null && !Directory.Exists(next) && failed.Load<Settings>("settings").Width==301);
+            Assert(!Directory.EnumerateDirectories(root,"next.migration-*").Any());
             File.Delete(Path.Combine(legacy,"broken.json"));File.WriteAllText(Path.Combine(legacy,"productivity.json"),"{\"Tasks\":\"invalid\"}");failed=Store.Migrate(legacy,next);Assert(failed.DirectoryPath==legacy && failed.Warning!=null && !Directory.Exists(next));File.Delete(Path.Combine(legacy,"productivity.json"));File.SetAttributes(Path.Combine(legacy,"settings.json"),FileAttributes.ReadOnly);failed=Store.Migrate(legacy,next);Assert(failed.DirectoryPath==legacy && failed.Warning!=null && !Directory.Exists(next));File.SetAttributes(Path.Combine(legacy,"settings.json"),FileAttributes.Normal);File.WriteAllText(next,"blocked");File.SetAttributes(next,FileAttributes.ReadOnly);
             failed=Store.Migrate(legacy,next);Assert(failed.DirectoryPath==legacy && failed.Warning!=null && failed.Load<Settings>("settings").Width==301);
         });

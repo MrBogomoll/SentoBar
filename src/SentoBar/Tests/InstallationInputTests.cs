@@ -33,7 +33,7 @@ internal static class InstallationInputTests
                 var existing=store.Load<Settings>("settings");Check(!existing.LyricsEnabled && existing.NotificationDelivery=="Off");
             }
             finally{foreach(string file in Directory.GetFiles(root))File.Delete(file);Directory.Delete(root);}
-            Check(Installer.Uninstaller.Contains("Get-NabyDataRoots") && Installer.Uninstaller.Contains("Remove-NabySavedKeys") && Installer.Uninstaller.Contains("Также удалить мои данные и скачанные голосовые модели"));
+            Check(Installer.Uninstaller.Contains("Get-SentoBarDataRoots") && Installer.Uninstaller.Contains("Remove-SentoBarSavedKeys") && Installer.Uninstaller.Contains("Также удалить мои данные и скачанные голосовые модели"));
         });
         test("Selected wake microphone stream satisfies the real Windows Speech adapter without hardware",()=>
         {
@@ -83,6 +83,19 @@ internal static class InstallationInputTests
             var saved=JsonSerializer.Deserialize<AssistantOptions>(JsonSerializer.Serialize(new AssistantOptions{MicrophoneId="usb-a"}))!;
             Check(saved.MicrophoneId=="usb-a" && new AssistantOptions().MicrophoneId=="");
         });
+        test("Rename migration recognizes marked historical fork builds and their own startup command",()=>
+        {
+            foreach(string version in new[]{"2.26.1-ru.1","1.0.0+revision","1.0.0_b.9","1.1.6","1.2.0","1.2.0_b.14+revision"})
+                Check(InstallPaths.KnownForkBuild("NabyScape",version));
+            foreach(string version in new[]{"2.26.1","1.0.1","1.1.60","1.2.0_b.","1.2.0_b.1-unknown"})
+                Check(!InstallPaths.KnownForkBuild("NabyScape",version));
+            Check(!InstallPaths.KnownForkBuild("Another product","1.2.0"));
+            string folder=@"D:\My Apps\NabyScape";
+            string executable=Path.Combine(folder,"NabyScape.exe");
+            Check(Installer.IsForkStartup('"'+executable+'"'+" --background",folder));
+            Check(Installer.IsForkStartup(executable+" --background",folder));
+            Check(!Installer.IsForkStartup(null,folder) && !Installer.IsForkStartup(executable+".backup",folder));
+        });
         test("Installer accepts dedicated custom folders and rejects root data relative and network paths",()=>
         {
             string custom=Path.Combine(Path.GetTempPath(),"SentoBar-install-fixture","SentoBar");
@@ -90,6 +103,7 @@ internal static class InstallationInputTests
             Check(InstallPaths.FromArguments(new[]{"--silent","--install-dir",custom},InstallPaths.Default)==custom);
             Reject(()=>InstallPaths.FromArguments(Array.Empty<string>(),InstallPaths.Legacy));
             foreach(string path in new[]{@"C:\",@"C:\Users",@"SentoBar",@"\\server\Apps\SentoBar",Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"SentoBar")})Reject(()=>InstallPaths.Validate(path));
+            Reject(()=>InstallPaths.Validate(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"SentoBar","notes","SentoBar")));
             Reject(()=>InstallPaths.FromArguments(new[]{"--install-dir"},custom));
             Reject(()=>InstallPaths.FromArguments(new[]{"--install-dir",custom,"--install-dir",custom},custom));
         });

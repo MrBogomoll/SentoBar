@@ -42,7 +42,7 @@ internal static class Installer
             if(picker.ShowDialog(window)==true)folder.Text=string.Equals(Path.GetFileName(picker.FolderName),"SentoBar",StringComparison.OrdinalIgnoreCase)?picker.FolderName:Path.Combine(picker.FolderName,"SentoBar");
         });DockPanel.SetDock(browse,Dock.Right);row.Children.Add(browse);row.Children.Add(folder);panel.Children.Add(row);
         var state=UI.Text(Localization.Text("Choose a location you can write to. Your personal settings are kept separately."),11,UI.Muted);state.Margin=new(0,0,0,12);panel.Children.Add(state);
-        var startupChoice=new CheckBox{Content=Localization.Text("Start SentoBar with Windows"),IsChecked=HasSavedPreferences?StartupService.Enabled():FactoryDefaults.Create().AutoStart,Margin=new(0,0,0,8)};panel.Children.Add(startupChoice);
+        var startupChoice=new CheckBox{Content=Localization.Text("Start SentoBar with Windows"),IsChecked=SuggestedStartup(InstallPaths.PreviousForkDirectory()),Margin=new(0,0,0,8)};panel.Children.Add(startupChoice);
         var launch=new CheckBox{Content=Localization.Text("Open SentoBar after installation"),IsChecked=true};panel.Children.Add(launch);
         var button=UI.Button(Localization.Text("Install SentoBar"),()=>{},true);button.Click+=(_,_)=>
         {
@@ -55,8 +55,11 @@ internal static class Installer
     internal static void Install(string? directory=null,bool? startWithWindows=null)
     {
         ValidateArchitecture(Environment.ProcessPath??throw new IOException(Localization.Text("Installer executable is unavailable.")));
-        string previous=InstallDirectory;string target=InstallPaths.Validate(directory??previous);
+        string? registered=InstallPaths.RegisteredDirectory;
+        string previous=registered??InstallPaths.Default;
+        string target=InstallPaths.Validate(directory??previous);
         string? fork=InstallPaths.PreviousForkDirectory();
+        bool startupEnabled=startWithWindows??SuggestedStartup(fork);
         if(fork!=null)
         {
             foreach(var process in Process.GetProcessesByName("NabyScape"))
@@ -99,7 +102,6 @@ internal static class Installer
             if(license!=null){using var reader=new StreamReader(license);File.WriteAllText(Path.Combine(target,name),reader.ReadToEnd());}
         }
         using var startup=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-        bool previousStartup=fork!=null && (startup.GetValue("NabyScape") as string)?.StartsWith("\""+Path.Combine(fork,"NabyScape.exe")+"\"",StringComparison.OrdinalIgnoreCase)==true;
         object? shell=null,shortcut=null;
         try
         {
@@ -118,7 +120,6 @@ internal static class Installer
         key.SetValue("QuietUninstallString","powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \""+Path.Combine(target,"Uninstall.ps1")+"\" -Quiet");
         key.SetValue("NoModify",1,RegistryValueKind.DWord);key.SetValue("NoRepair",1,RegistryValueKind.DWord);key.SetValue("EstimatedSize",(int)(new FileInfo(executable).Length/1024),RegistryValueKind.DWord);
         // Carry the fork's autostart choice into the renamed installation.
-        bool startupEnabled=startWithWindows??(StartupService.Enabled() || previousStartup || !HasSavedPreferences && FactoryDefaults.Create().AutoStart);
         if(startupEnabled)
         {
             startup.SetValue("SentoBar","\""+executable+"\" --background");
@@ -126,11 +127,31 @@ internal static class Installer
         else startup.DeleteValue("SentoBar",false);
         if(fork!=null)
         {
-            if(previousStartup)startup.DeleteValue("NabyScape",false);
+            if(IsForkStartup(startup.GetValue("NabyScape") as string,fork))startup.DeleteValue("NabyScape",false);
             RetirePreviousFork(fork);
         }
 
-        if(!string.Equals(previous,target,StringComparison.OrdinalIgnoreCase))RemovePreviousFiles(previous,source);
+        if(registered!=null && !string.Equals(registered,target,StringComparison.OrdinalIgnoreCase))RemovePreviousFiles(registered,source);
+    }
+    private static bool SuggestedStartup(string? fork)
+    {
+        if(StartupService.Enabled())return true;
+        if(fork!=null)
+        {
+            using var run=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+            return IsForkStartup(run?.GetValue("NabyScape") as string,fork);
+        }
+        return !HasSavedPreferences && FactoryDefaults.Create().AutoStart;
+    }
+    internal static bool IsForkStartup(string? command,string directory)
+    {
+        if(string.IsNullOrWhiteSpace(command))return false;
+        string executable=Path.Combine(directory,"NabyScape.exe");
+        string text=command.Trim();
+        foreach(string prefix in new[]{'"'+executable+'"',executable})
+            if(text.StartsWith(prefix,StringComparison.OrdinalIgnoreCase) &&
+                (text.Length==prefix.Length || char.IsWhiteSpace(text[prefix.Length])))return true;
+        return false;
     }
     private static void RetirePreviousFork(string directory)
     {

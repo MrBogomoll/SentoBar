@@ -22,13 +22,20 @@ public sealed partial class OverlayWindow
         {
             double height=peekDurationEditor==null?app.Settings.HoverHeight:Math.Max(app.Settings.HoverHeight,PeekWidth<300?300:225);
             var screen=IslandScreen;
-            return Math.Min(height,screen.WorkingArea.Height/Native.Scale(screen)-16);
+            return Math.Max(1,Math.Min(height,Native.PanelWorkArea(screen).Height/Native.Scale(screen)-16));
         }
     }
     private ScrollViewer? peekDurationEditor;
-    private double PeekSurfaceWidth=>Math.Min(app.Settings.HoverWidth,IslandScreen.WorkingArea.Width/Native.Scale(IslandScreen)-24);
+    private double PeekSurfaceWidth
+    {
+        get
+        {
+            var screen=IslandScreen;
+            return Math.Max(1,Math.Min(app.Settings.HoverWidth,Native.PanelWorkArea(screen).Width/Native.Scale(screen)-24));
+        }
+    }
     private double WindowHostWidth {get{double scale=Native.Scale(IslandScreen);return Math.Ceiling(Math.Max(Math.Max(expandedWidth,app.Settings.Width),PeekSurfaceWidth)*scale)/scale;}}
-    private double PeekWidth=>PeekSurfaceWidth-64;
+    private double PeekWidth=>Math.Max(1,PeekSurfaceWidth-64);
     private Button peekDetachButton=null!;
     private readonly Grid peekMedia=new(),peekViewport=new(){ClipToBounds=true,Height=PeekContentHeight,Background=Brushes.Transparent};
     private readonly Dictionary<string,FrameworkElement> peekViews=new();

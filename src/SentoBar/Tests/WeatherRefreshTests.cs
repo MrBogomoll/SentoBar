@@ -68,7 +68,7 @@ internal static class WeatherRefreshTests
         });
         test("Weather downloads finish after views leave, retry with backoff, recover on resume and survive restart",()=>
         {
-            string root=Path.Combine(Path.GetTempPath(),"nabyscape-weather-"+Guid.NewGuid().ToString("N"));
+            string root=Path.Combine(Path.GetTempPath(),"sentobar-weather-"+Guid.NewGuid().ToString("N"));
             try
             {
                 var clock=new DateTimeOffset(2026,11,14,1,15,0,TimeSpan.Zero);int calls=0;var gate=new TaskCompletionSource<string>();

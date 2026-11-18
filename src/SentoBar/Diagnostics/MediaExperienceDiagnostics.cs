@@ -46,9 +46,10 @@ internal static class MediaExperienceDiagnostics
         app.Media.Dispose();app.Media.DiagnosticFixture=true;app.Media.DiagnosticPlayback(true);typeof(MediaService).GetProperty("Artwork")!.SetValue(app.Media,null);
         app.Audio.DiagnosticPeak=()=>(float)(.3+.15*Math.Sin(Environment.TickCount64*.013));
         s.CompactLayout=true;s.Preset="Mac";s.Top=0;s.PanelWidth=526;s.PanelMaxHeight=650;s.PanelPadding=26;s.PanelScale=1;s.CategoryStyle="Dots";s.ReduceMotion=true;s.SmartActivities=false;s.CountdownSound="Off";s.LiveActivity=true;s.DetachablePreviews=true;
+        foreach(var widget in s.Widgets.Where(w=>Settings.ToolNames.ContainsKey(w.Id)))widget.Enabled=true;
         app.ChangeSettings();island.Reveal(false);await Task.Delay(450);
         var tabs=Field<System.Collections.Generic.Dictionary<string,Button>>(island,"compactTabs");
-        check("Tools appear as seven independent navigation panels, without a Tools folder",Settings.ToolNames.Keys.All(tabs.ContainsKey) && !tabs.ContainsKey("tools"));
+        check("Every enabled tool has its own navigation tab, without a Tools folder",Settings.ToolNames.Keys.All(tabs.ContainsKey) && !tabs.ContainsKey("tools"));
         check("Dot navigation retains names and selection semantics",tabs.Values.All(button=>button.Content is System.Windows.Shapes.Rectangle && AutomationProperties.GetName(button).Length>0));
         app.Productivity.Note="A local note for the interface check.";app.Productivity.AddTask("Check the new panels");
         island.ShowTools("notes",false);await Task.Delay(120);var note=Entry("Quick notes");note.Text="Note retained while changing panels.";note.Select(5,8);Capture("notes-dots");
@@ -95,14 +96,17 @@ internal static class MediaExperienceDiagnostics
         }
         island.CloseAssistant();
         var window=new SettingsWindow(app){ShowActivated=false};window.Show();await Task.Delay(160);
-        foreach(string category in new[]{"Audio","Layout","Application","Content"})
+        foreach(var (category,section) in new[]{("Audio","Lyrics"),("Layout","Display"),("Application","Reset preferences"),("Content","Enabled widgets & order")})
         {
-            Invoke(window,"Navigate",category);await Task.Delay(140);check("Settings "+category+" registers all new visual examples",Diagnostics.Descendants(window).OfType<SettingsScene>().All(scene=>SettingsScene.Sections.Contains(scene.Section)));
+            Invoke(window,"Navigate",category);await Task.Delay(140);
+            check("Settings "+category+" shows the "+section+" controls",Diagnostics.Descendants(window).OfType<Border>().Any(card=>card.Tag as string==section && card.IsVisible));
             if(category=="Audio")
             {
-                var sample=Diagnostics.Descendants(window).OfType<LyricsView>().Single();sample.BringIntoView();await Task.Delay(100);check("Lyrics preview recognizes its actual visible scroll viewport",ElementVisibility.InViewport(sample));
-                window.WindowState=WindowState.Minimized;await Task.Delay(60);check("Minimized Settings is not an active lyric preview consumer",!ElementVisibility.InViewport(sample));window.WindowState=WindowState.Normal;
-                check("Settings lyric sample never starts an external metadata request",typeof(LyricsService).GetField("pending",Private)!.GetValue(app.Lyrics)==null);
+                var sample=Field<ActivityVisual>(window,"audioSignalWave");sample.BringIntoView();await Task.Delay(100);
+                bool Measuring()=>typeof(SettingsWindow).GetProperty("AudioSignalVisible",Private)!.GetValue(window) is true;
+                check("Live signal preview recognizes its actual visible scroll viewport",ElementVisibility.InViewport(sample) && Measuring());
+                window.WindowState=WindowState.Minimized;await Task.Delay(60);check("Minimized Settings stops consuming the live signal",!ElementVisibility.InViewport(sample) && !Measuring());window.WindowState=WindowState.Normal;
+                check("Opening music settings leaves the lyrics provider idle",typeof(LyricsService).GetField("pending",Private)!.GetValue(app.Lyrics)==null);
             }
         }
         window.Close();check("UI diagnostics never start voice or screen sharing",!app.Assistant.VoiceConnected && !app.Assistant.Desktop.Sharing);

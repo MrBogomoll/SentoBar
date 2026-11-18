@@ -27,7 +27,7 @@ internal sealed partial class AssistantSpeechInstall : IDisposable
     internal double Progress {get;private set;}
     internal SpeechHardware? Hardware {get;private set;}
     internal event Action? Changed;
-    internal AssistantSpeechInstall(Store store){root=Path.Combine(store.DirectoryPath,"local-speech");http.DefaultRequestHeaders.UserAgent.ParseAdd("SentoBar/2.20.0");}
+    internal AssistantSpeechInstall(Store store){root=Path.Combine(store.DirectoryPath,"local-speech");http.DefaultRequestHeaders.UserAgent.ParseAdd("SentoBar/"+AppVersion.Display);}
     internal string EngineFolder(bool gpu)=>Path.Combine(root,"engines",gpu?"whisper-1.8.7-cuda12":"whisper-1.8.7-cpu");
     internal string WhisperExe(bool gpu)=>Path.Combine(EngineFolder(gpu),"Release","whisper-server.exe");
     internal string PiperFolder=>Path.Combine(root,"engines","piper-2023.11.14-2");

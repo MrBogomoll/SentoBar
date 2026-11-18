@@ -20,7 +20,7 @@ public sealed partial class OverlayWindow
             string? widget=app.Settings.Widgets.FirstOrDefault(w=>w.Enabled && w.Id==page)?.Id;
             index=Array.FindIndex(pages,p=>p.Id==page || widget!=null && p.Id==PageFor(widget));
         }
-        if(index<0)return JsonSerializer.Serialize(new{ok=false,error="That page is disabled or unavailable. Use naby_list_widget_pages for enabled pages."});
+        if(index<0)return JsonSerializer.Serialize(new{ok=false,error="That page is disabled or unavailable. Use sento_list_widget_pages for enabled pages."});
         var chosen=pages[index];
         if(!app.Settings.CompactLayout){LeaveAssistantPanel();FlushNotes();hoverPanelWidget=chosen.Widget;activePage=chosen.Id;BuildBody();Reveal();scroll.ScrollToTop();}
         else OpenFeaturePage(chosen.Widget);
@@ -38,11 +38,14 @@ public sealed partial class App
 
 internal sealed partial class AssistantRuntime
 {
+    internal const string ListPagesTool = "sento_list_widget_pages";
+    private const string NavigateTool = "sento_navigate_widget";
+
     internal IReadOnlyList<AssistantTool> WidgetTools()
     {
         if(disposed || !Options.Enabled || !Options.WidgetNavigation)return Array.Empty<AssistantTool>();
-        return new[]{new AssistantTool("naby_list_widget_pages","List enabled SentoBar widget pages and the current page. Read-only; does not inspect widget contents.",JsonSerializer.SerializeToElement(new{type="object",properties=new{},additionalProperties=false})),
-            new AssistantTool("naby_navigate_widget","Open an enabled SentoBar widget page, or move to the next/previous page. Only changes the visible page; never starts a timer, recording, playback, app or computer action.",JsonSerializer.SerializeToElement(new{type="object",properties=new{page=new{type="string",@enum=app.AssistantWidgetPageIds()}},required=new[]{"page"},additionalProperties=false}))};
+        return new[]{new AssistantTool(ListPagesTool,"List enabled SentoBar widget pages and the current page. Read-only; does not inspect widget contents.",JsonSerializer.SerializeToElement(new{type="object",properties=new{},additionalProperties=false})),
+            new AssistantTool(NavigateTool,"Open an enabled SentoBar widget page, or move to the next/previous page. Only changes the visible page; never starts a timer, recording, playback, app or computer action.",JsonSerializer.SerializeToElement(new{type="object",properties=new{page=new{type="string",@enum=app.AssistantWidgetPageIds()}},required=new[]{"page"},additionalProperties=false}))};
     }
     private IReadOnlyList<AssistantTool> ChatWidgetTools(AssistantProvider provider)
     {var tools=provider.Backend=="Hermes"?Array.Empty<AssistantTool>():WidgetTools();provider.Tools=tools.Count>0;return tools;}
@@ -55,8 +58,15 @@ internal sealed partial class AssistantRuntime
         {
             using var json=JsonDocument.Parse(call.Arguments,new JsonDocumentOptions{MaxDepth=4});var args=json.RootElement;
             if(args.ValueKind!=JsonValueKind.Object)throw new JsonException();
-            if(call.Name=="naby_list_widget_pages" && !args.EnumerateObject().Any())return JsonSerializer.Serialize(new{ok=true,current=app.AssistantCurrentPage,pages=app.AssistantWidgetPages()});
-            if(call.Name!="naby_navigate_widget" || args.EnumerateObject().Count()!=1 || !args.TryGetProperty("page",out var page) || page.ValueKind!=JsonValueKind.String || page.GetString() is not {Length:>0 and <=64} target)throw new JsonException();
+            // Clients can still send a tool call cached before the rename.
+            string name=call.Name switch
+            {
+                "naby_list_widget_pages"=>ListPagesTool,
+                "naby_navigate_widget"=>NavigateTool,
+                _=>call.Name
+            };
+            if(name==ListPagesTool && !args.EnumerateObject().Any())return JsonSerializer.Serialize(new{ok=true,current=app.AssistantCurrentPage,pages=app.AssistantWidgetPages()});
+            if(name!=NavigateTool || args.EnumerateObject().Count()!=1 || !args.TryGetProperty("page",out var page) || page.ValueKind!=JsonValueKind.String || page.GetString() is not {Length:>0 and <=64} target)throw new JsonException();
             token.ThrowIfCancellationRequested();string result=app.NavigateAssistantWidget(target);Status=Localization.Text("Widget navigation · ")+target;Notify();return result;
         }
         catch(JsonException){return JsonSerializer.Serialize(new{ok=false,error="Use an offered widget tool with the documented arguments."});}

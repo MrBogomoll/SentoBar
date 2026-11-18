@@ -25,7 +25,7 @@ internal sealed partial class AssistantRuntime
     {
         if(!app.Dispatcher.CheckAccess())return await app.Dispatcher.InvokeAsync(()=>BridgeRequest(request,token),System.Windows.Threading.DispatcherPriority.Normal,token).Task.Unwrap();
         token.ThrowIfCancellationRequested();string operation=request.TryGetProperty("operation",out var op)?op.GetString()??"":"";
-        if(operation=="tools")return JsonSerializer.SerializeToElement(new{tools=WidgetTools().Select(t=>new{name=t.Name,description=t.Description,inputSchema=t.Parameters,annotations=new{readOnlyHint=t.Name=="naby_list_widget_pages",destructiveHint=false,openWorldHint=false}})});
+        if(operation=="tools")return JsonSerializer.SerializeToElement(new{tools=WidgetTools().Select(t=>new{name=t.Name,description=t.Description,inputSchema=t.Parameters,annotations=new{readOnlyHint=t.Name==ListPagesTool,destructiveHint=false,openWorldHint=false}})});
         if(operation!="call" || !request.TryGetProperty("name",out var name) || name.ValueKind!=JsonValueKind.String || !request.TryGetProperty("arguments",out var args))return JsonSerializer.SerializeToElement(new{ok=false,error="Unsupported widget bridge request."});
         string result=await ExecuteWidgetTool(new(Guid.NewGuid().ToString("N"),name.GetString()!,args.GetRawText()),token);using var json=JsonDocument.Parse(result);return json.RootElement.Clone();
     }

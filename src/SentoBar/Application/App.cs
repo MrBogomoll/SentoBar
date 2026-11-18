@@ -144,6 +144,7 @@ public sealed partial class App : Application
         bool reloadFixture=isolatedFixture && Array.Exists(e.Args,a=>a=="--settings-persistence-reload");
         Settings=diagnosticPath==null || reloadFixture?Store.Load<Settings>("settings"):new Settings();
         if(diagnosticPath==null)RussianBuildProfile.Initialize(Store,Settings);
+        else if(Array.Exists(e.Args,a=>a=="--stability-only"))Settings.UiLanguage="en"; // Fixture uses English accessibility labels.
         Settings.Normalize();Localization.Configure(Settings);Settings.AutoStart=StartupService.Enabled();
         if(assistantFixture || isolatedFixture){Settings.HotkeyEnabled=Settings.VisibilityHotkeyEnabled=Settings.TuckHotkeyEnabled=false;Settings.HideFullscreen=Settings.HideMaximized=false;}
         Updates=new(Store,Array.Exists(e.Args,a=>a=="--stage3-only")?new Stage3Diagnostics.Network():null,stagingDirectory:diagnosticPath!=null?Path.Combine(Store.DirectoryPath,"updates"):null);

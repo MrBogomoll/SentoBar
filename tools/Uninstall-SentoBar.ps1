@@ -1,7 +1,7 @@
 ﻿param([switch]$Quiet,[switch]$KeepData,[switch]$RemoveData)
 $ErrorActionPreference = 'Stop'
 
-function Get-NabyDataRoots([string]$LocalRoot, [string]$TempRoot) {
+function Get-SentoBarDataRoots([string]$LocalRoot, [string]$TempRoot) {
     $local = [IO.Path]::GetFullPath($LocalRoot)
     $temp = [IO.Path]::GetFullPath($TempRoot)
     $roots = @('SentoBar','SentoBar-Updates') | ForEach-Object { Join-Path $local $_ }
@@ -17,10 +17,16 @@ function Get-NabyDataRoots([string]$LocalRoot, [string]$TempRoot) {
     foreach ($name in @('SentoBar','SentoBar-Setup','SentoBar-win-x64-Setup','SentoBar-win-arm64-Setup','SentoBar-UpdateHelper','SentoBar-Previous')) {
         $roots += Join-Path (Join-Path $temp '.net') $name
     }
+    $net=Join-Path $temp '.net'
+    if (Test-Path -LiteralPath $net -PathType Container) {
+        $roots += @(Get-ChildItem -LiteralPath $net -Directory -Force | Where-Object {
+            $_.Name -match '^SentoBar-\d+\.\d+\.\d+(?:_b\.\d+)?-win-(?:x64|arm64)-Setup$'
+        } | ForEach-Object FullName)
+    }
     return @($roots | ForEach-Object { [IO.Path]::GetFullPath($_) } | Select-Object -Unique)
 }
 
-function Assert-NabyOwnedPath([string]$Path,[string]$Root) {
+function Assert-SentoBarOwnedPath([string]$Path,[string]$Root) {
     $full = [IO.Path]::GetFullPath($Path)
     $base = [IO.Path]::GetFullPath($Root).TrimEnd('\','/')
     if ($base -eq [IO.Path]::GetPathRoot($base).TrimEnd('\','/') -or
@@ -40,21 +46,21 @@ function Assert-NabyOwnedPath([string]$Path,[string]$Root) {
     return $full
 }
 
-function New-NabyRemovalPlan([string[]]$Roots) {
+function New-SentoBarRemovalPlan([string[]]$Roots) {
     $files = New-Object 'Collections.Generic.List[object]'
     $directories = New-Object 'Collections.Generic.List[object]'
     foreach ($root in $Roots) {
-        $full = Assert-NabyOwnedPath $root $root
+        $full = Assert-SentoBarOwnedPath $root $root
         if (-not (Test-Path -LiteralPath $full)) { continue }
         if (-not (Test-Path -LiteralPath $full -PathType Container)) { throw "Ожидалась папка приложения: $full" }
         $pending = New-Object 'Collections.Generic.Stack[string]'
         $pending.Push($full)
         while ($pending.Count -gt 0) {
             $folder = $pending.Pop()
-            $null = Assert-NabyOwnedPath $folder $full
+            $null = Assert-SentoBarOwnedPath $folder $full
             $directories.Add([pscustomobject]@{Path=$folder;Root=$full})
             foreach ($entry in Get-ChildItem -LiteralPath $folder -Force) {
-                $path = Assert-NabyOwnedPath $entry.FullName $full
+                $path = Assert-SentoBarOwnedPath $entry.FullName $full
                 if ($entry.PSIsContainer) { $pending.Push($path) }
                 else { $files.Add([pscustomobject]@{Path=$path;Root=$full}) }
             }
@@ -63,21 +69,21 @@ function New-NabyRemovalPlan([string[]]$Roots) {
     return [pscustomobject]@{Files=$files.ToArray();Directories=@($directories.ToArray() | Sort-Object { $_.Path.Length } -Descending)}
 }
 
-function Remove-NabyPlannedData($Plan) {
+function Remove-SentoBarPlannedData($Plan) {
     # Preflight the entire plan before the first mutation, then check each item again.
-    foreach ($entry in @($Plan.Files)+@($Plan.Directories)) { $null = Assert-NabyOwnedPath $entry.Path $entry.Root }
+    foreach ($entry in @($Plan.Files)+@($Plan.Directories)) { $null = Assert-SentoBarOwnedPath $entry.Path $entry.Root }
     foreach ($entry in $Plan.Files) {
-        $path = Assert-NabyOwnedPath $entry.Path $entry.Root
+        $path = Assert-SentoBarOwnedPath $entry.Path $entry.Root
         if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
     }
     foreach ($entry in $Plan.Directories) {
-        $path = Assert-NabyOwnedPath $entry.Path $entry.Root
+        $path = Assert-SentoBarOwnedPath $entry.Path $entry.Root
         # A concurrent writer is an error; never recursively delete an unplanned item.
         if (Test-Path -LiteralPath $path -PathType Container) { [IO.Directory]::Delete($path,$false) }
     }
 }
 
-function Remove-NabySavedKeys {
+function Remove-SentoBarSavedKeys {
     if (-not ('SentoBarUninstallCredentials' -as [type])) {
         Add-Type -TypeDefinition @'
 using System;
@@ -114,7 +120,7 @@ public static class SentoBarUninstallCredentials {
     [SentoBarUninstallCredentials]::Remove()
 }
 
-function New-NabyUninstallDialog([bool]$RemoveAll) {
+function New-SentoBarUninstallDialog([bool]$RemoveAll) {
     Add-Type -AssemblyName System.Windows.Forms
     [Windows.Forms.Application]::EnableVisualStyles()
     $form = New-Object Windows.Forms.Form
@@ -131,22 +137,22 @@ function New-NabyUninstallDialog([bool]$RemoveAll) {
     return $form
 }
 
-function Invoke-NabyUninstall {
+function Invoke-SentoBarUninstall {
     if ($KeepData -and $RemoveData) { throw 'Выберите только один параметр: KeepData или RemoveData.' }
     $removeAll = -not $KeepData
     $islandTarget = [IO.Path]::GetFullPath($PSScriptRoot)
     $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SentoBar'
     $registered = (Get-ItemProperty -LiteralPath $uninstallKey -Name InstallLocation -ErrorAction Stop).InstallLocation
     if ($islandTarget -ne [IO.Path]::GetFullPath($registered)) { throw 'Неверное расположение программы удаления.' }
-    $null = Assert-NabyOwnedPath $islandTarget $islandTarget
+    $null = Assert-SentoBarOwnedPath $islandTarget $islandTarget
     if (-not $Quiet) {
-        $form=New-NabyUninstallDialog $removeAll
+        $form=New-SentoBarUninstallDialog $removeAll
         try { if ($form.ShowDialog() -ne 'OK') { return };$removeAll=$form.Tag.Checked } finally { $form.Dispose() }
     }
     $local=[Environment]::GetFolderPath('LocalApplicationData')
-    $roots=Get-NabyDataRoots $local ([IO.Path]::GetTempPath())
+    $roots=Get-SentoBarDataRoots $local ([IO.Path]::GetTempPath())
     # Validate roots before stopping anything. Imported engines outside these roots are not owned.
-    foreach ($root in $roots) { $null=Assert-NabyOwnedPath $root $root }
+    foreach ($root in $roots) { $null=Assert-SentoBarOwnedPath $root $root }
     $appExe=Join-Path $islandTarget 'SentoBar.exe'
     if (Test-Path -LiteralPath $appExe) { Start-Process -FilePath $appExe -ArgumentList '--exit' -WindowStyle Hidden -Wait }
     Start-Sleep -Milliseconds 800
@@ -161,9 +167,9 @@ function Invoke-NabyUninstall {
         }
     }
     if ($removeAll) {
-        $plan=New-NabyRemovalPlan $roots
-        Remove-NabySavedKeys
-        Remove-NabyPlannedData $plan
+        $plan=New-SentoBarRemovalPlan $roots
+        Remove-SentoBarSavedKeys
+        Remove-SentoBarPlannedData $plan
     }
     $startupKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
     foreach ($name in @('SentoBar','LumaIsland','BillyNabilaIsland')) {
@@ -186,7 +192,7 @@ function Invoke-NabyUninstall {
         }
     } finally { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) | Out-Null }
     foreach ($name in @('SentoBar.exe','SentoBar.UI.exe','SentoBar.Core.exe','SentoBar.ico','LumaIsland.exe','BillyNabilaIsland.exe','Uninstall.ps1','LICENSE','LUCIDE-LICENSE.txt','MANROPE-OFL.txt','NAudio-LICENSE.txt','System.Speech-LICENSE.txt','DOTNET-LICENSE.txt','DOTNET-ThirdPartyNotices.txt','ROMAJI-ThirdPartyNotices.txt','LYRICS-LANGUAGE-LICENSE.txt','NATIVE-ThirdPartyNotices.txt','RUST-Library-COPYRIGHT.html')) {
-        $path=Assert-NabyOwnedPath (Join-Path $islandTarget $name) $islandTarget
+        $path=Assert-SentoBarOwnedPath (Join-Path $islandTarget $name) $islandTarget
         if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
     }
     if ((Test-Path -LiteralPath $islandTarget -PathType Container) -and -not (Get-ChildItem -LiteralPath $islandTarget -Force | Select-Object -First 1)) { [IO.Directory]::Delete($islandTarget,$false) }
@@ -196,7 +202,7 @@ function Invoke-NabyUninstall {
 
 # Dot-source only exposes helpers for isolated fixture tests; no Registry or credential changes.
 if ($MyInvocation.InvocationName -eq '.') { return }
-try { Invoke-NabyUninstall }
+try { Invoke-SentoBarUninstall }
 catch {
     if (-not $Quiet) { Add-Type -AssemblyName System.Windows.Forms;[Windows.Forms.MessageBox]::Show(('Не удалось завершить удаление. '+$_.Exception.Message),'SentoBar') | Out-Null }
     else { [Console]::Error.WriteLine($_.Exception.Message) }

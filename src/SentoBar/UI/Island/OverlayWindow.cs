@@ -137,8 +137,9 @@ public sealed partial class OverlayWindow : Window
     {
         UpdateAmbientMotion();
         var screen=Native.ChooseScreen(app.Settings);var scale=Native.Scale(screen);
-        expandedWidth=assistantOpen || VoiceRoomOpen?AssistantView.PanelSize(app.Settings,VoiceRoomOpen).Width:MediaLyricsLayout.Width(app.Settings,screen.WorkingArea.Width/scale-24,ShowLyricsLayout);
-        double available=screen.WorkingArea.Height/scale-16;
+        var workArea=Native.PanelWorkArea(screen);
+        expandedWidth=assistantOpen || VoiceRoomOpen?AssistantView.PanelSize(app.Settings,VoiceRoomOpen).Width:MediaLyricsLayout.Width(app.Settings,Math.Max(1,workArea.Width/scale-24),ShowLyricsLayout);
+        double available=Math.Max(1,workArea.Height/scale-16);
         bodyWidth=Math.Max(140,(expandedWidth-app.Settings.PanelPadding*2)/app.Settings.PanelScale);
         body.Width=bodyWidth;
         ArrangeMediaLyrics();SizeClipboardViewport();SizeWeatherViewport();
@@ -148,6 +149,7 @@ public sealed partial class OverlayWindow : Window
         // resize its layered host in the middle of the return animation.
         if(expanded){if(Width<WindowHostWidth)Width=WindowHostWidth;if(Height<HostHeight)Height=HostHeight;}
         if(body.LayoutTransform is ScaleTransform scaling){scaling.ScaleX=scaling.ScaleY=app.Settings.PanelScale;}else body.LayoutTransform=new ScaleTransform(app.Settings.PanelScale,app.Settings.PanelScale);
+        double viewportWidth=Math.Max(0,expandedWidth-app.Settings.PanelPadding*2+PanelScrollGutter);
         double desired=assistantOpen || VoiceRoomOpen?AssistantView.PanelSize(app.Settings,VoiceRoomOpen).Height:app.Settings.PanelMaxHeight;
         bool fitPage=FitExpandedContent;
         if(!assistantOpen && !VoiceRoomOpen && app.Settings.CompactLayout && (app.Settings.PanelAutoHeight || fitPage))
@@ -165,7 +167,7 @@ public sealed partial class OverlayWindow : Window
             if(fitPage)
             {
                 if(fittedExtent is {} last && last.Page==activePage &&
-                   Math.Abs(last.Width-(expandedWidth-app.Settings.PanelPadding*2+PanelScrollGutter))<.5 && last.Scale==app.Settings.PanelScale)
+                   Math.Abs(last.Width-viewportWidth)<.5 && last.Scale==app.Settings.PanelScale)
                     measuredHeight=Math.Max(measuredHeight,last.Height+PanelFramePadding);
                 desired=Math.Max(app.Settings.PanelAutoHeight?184:desired,Math.Ceiling(measuredHeight)+1);
             }
@@ -173,7 +175,7 @@ public sealed partial class OverlayWindow : Window
         }
         expandedHeight=Math.Max(app.Settings.Height,Math.Min(desired,available));
         if(expanded && Height<expandedHeight)Height=expandedHeight;
-        scroll.Width=expandedWidth-app.Settings.PanelPadding*2+PanelScrollGutter;scroll.Height=Math.Max(0,expandedHeight-PanelFramePadding);scroll.Margin=new(0,PanelFramePadding==44?20:10,-PanelScrollGutter,0);
+        scroll.Width=viewportWidth;scroll.Height=Math.Max(0,expandedHeight-PanelFramePadding);scroll.Margin=new(0,PanelFramePadding==44?20:10,-PanelScrollGutter,0);
         SizeVoiceViewport();
     }
     private void ApplySettings()
@@ -332,7 +334,7 @@ public sealed partial class OverlayWindow : Window
         try{var s=app.Settings;
             // Contour animation changes only painted geometry. Monitor/DPI discovery
             // belongs to placement, display, settings and follow events, not each frame.
-            if(!contourOnly || !positionContextReady){var screen=Native.ChooseScreen(s);positionScale=Native.Scale(screen);positionBounds=s.DockEdge=="Top"?screen.Bounds:screen.WorkingArea;positionContextReady=true;}
+            if(!contourOnly || !positionContextReady){var screen=Native.ChooseScreen(s);positionScale=Native.Scale(screen);positionBounds=s.DockEdge=="Top"?screen.Bounds:Native.PanelWorkArea(screen);positionContextReady=true;}
             var scale=positionScale;var b=positionBounds;var width=(int)Math.Ceiling(ActualWidth*scale);var height=(int)Math.Ceiling(ActualHeight*scale);if(width<1 || height<1)return;
             var point=MonitorFollowPolicy.Place(s,b,scale,width,Math.Min(height,(int)Math.Ceiling(PaintedHeight*scale)),TuckRequested,(int)Math.Ceiling(PaintedWidth*scale));Native.GetWindowRect(hwnd,out var current);if(followMoving){followTarget=point;return;}if(current.Left!=point.X || current.Top!=point.Y)Native.SetWindowPos(hwnd,new IntPtr(-1),point.X,point.Y,0,0,0x0010|0x0001);
         }finally{positioning=false;}

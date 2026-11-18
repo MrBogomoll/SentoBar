@@ -19,8 +19,8 @@ public sealed partial class SettingsWindow
         {
             page.Children.Add(Section("Updates",UI.Text(Localization.Text("Installed:")+" "+AppVersion.Display+" · "+RuntimePlatform.Rid,13),
                 UI.Caption("This fork is protected from upstream updates. Checks, downloads and automatic installation are blocked.",12),
-                UI.Caption("New upstream changes are reviewed and merged into our fork manually. Install only our builds; the original setup can replace this copy if you run it manually.",11,UI.Muted),
-                UI.CaptionButton("Open our fork",()=>ShortcutService.Open(new(){Target="https://github.com/MrBogomoll/nabyscape"}))));
+                UI.Caption("Install SentoBar updates from the releases page of this fork.",11,UI.Muted),
+                UI.CaptionButton("Open SentoBar releases",()=>ShortcutService.Open(new(){Target=OfficialUpdates.Repository+"/releases"}))));
             return;
         }
         var auto=new CheckBox{Content=Localization.Text("Check automatically once per day"),IsChecked=app.Settings.AutoCheckUpdates};UI.LocalizedName(auto,"Check automatically once per day");auto.Click+=(_,_)=>{app.Settings.AutoCheckUpdates=auto.IsChecked==true;Save();};auto.ToolTip=Localization.Text("Check once at normal startup when the last attempt was at least 24 hours ago.");

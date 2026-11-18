@@ -31,6 +31,11 @@ public sealed partial class Store
     // Save failures do not set this latch: callers may safely retry a pre-commit failure with their own values.
     private readonly HashSet<string> fallbackLoads=new(StringComparer.OrdinalIgnoreCase);
 
+    internal bool LoadedFallback(string name)
+    {
+        lock(DocumentGate)return fallbackLoads.Contains(name);
+    }
+
     internal StoreHealth GetHealth()
     {
         lock(DocumentGate)return new(documentStates.Count,

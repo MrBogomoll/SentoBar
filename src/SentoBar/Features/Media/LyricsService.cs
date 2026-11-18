@@ -81,7 +81,7 @@ internal sealed partial class LyricsService : IDisposable
     internal event Action? Changed;
     private static string TrackKey(string title,string artist,double duration)=>title+"\n"+artist+"\n"+Math.Round(duration);
     internal LyricsService(HttpMessageHandler? handler=null,IAssistantKeys? providerKeys=null)
-    {lyricKeys=providerKeys??new AssistantKeys();client=new(handler??new HttpClientHandler{AllowAutoRedirect=false,UseCookies=false}){Timeout=TimeSpan.FromSeconds(8),MaxResponseContentBufferSize=2*1024*1024};client.DefaultRequestHeaders.UserAgent.ParseAdd("SentoBar/2.7.0 (+https://github.com/BillyNabil/nabyscape)");}
+    {lyricKeys=providerKeys??new AssistantKeys();client=new(handler??new HttpClientHandler{AllowAutoRedirect=false,UseCookies=false}){Timeout=TimeSpan.FromSeconds(8),MaxResponseContentBufferSize=2*1024*1024};client.DefaultRequestHeaders.UserAgent.ParseAdd("SentoBar/"+AppVersion.Display+" (+https://github.com/MrBogomoll/nabyscape)");}
     internal async Task Load(string title,string artist,double duration,bool enabled,bool compatible,string? mediaSource=null)
     {
         if(disposed)return;

@@ -35,7 +35,7 @@ public sealed partial class OverlayWindow
         {
             if(assistantOpen || VoiceRoomOpen)return AssistantView.PanelSize(app.Settings,VoiceRoomOpen).Height;
             if(!app.Settings.CompactLayout)return expandedHeight;
-            var screen=Native.ChooseScreen(app.Settings);return Math.Min(Math.Max(app.Settings.PanelMaxHeight,expandedHeight),screen.WorkingArea.Height/Native.Scale(screen)-16);
+            var screen=Native.ChooseScreen(app.Settings);return Math.Min(Math.Max(app.Settings.PanelMaxHeight,expandedHeight),Math.Max(1,Native.PanelWorkArea(screen).Height/Native.Scale(screen)-16));
         }
     }
     internal bool IsPeeking=>peeking;

@@ -160,6 +160,14 @@ internal static class MediaExperienceTests
             settings.NotifyTimer=false;
             Assert(!CountdownAudio.EnabledForCompletion(settings,false,now) && CountdownAudio.EnabledForCompletion(settings,true,now));
         });
+        test("Display changes fall back to the monitor bounds until the taskbar reports a valid work area",()=>
+        {
+            var bounds=new System.Drawing.Rectangle(-1920,0,1920,1080);
+            var work=new System.Drawing.Rectangle(-1920,48,1920,1032);
+            Assert(Native.ValidWorkArea(System.Drawing.Rectangle.Empty,bounds)==bounds);
+            Assert(Native.ValidWorkArea(new System.Drawing.Rectangle(-1920,0,1920,0),bounds)==bounds);
+            Assert(Native.ValidWorkArea(work,bounds)==work);
+        });
         test("Side lyrics expand only within the working area and restore the saved panel width",()=>
         {var s=new Settings{PanelWidth=526,PanelPadding=26,PanelScale=1.04};Assert(MediaLyricsLayout.Width(s,1900,true)>800 && MediaLyricsLayout.Width(s,1900,false)==526 && s.PanelWidth==526);Assert(MediaLyricsLayout.Width(s,600,true)==600);Assert(MediaLyricsLayout.Width(s,480,true)==480);});
         test("Lyrics avoid squeezing two columns into a narrow scaled working area",()=>

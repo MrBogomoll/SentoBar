@@ -93,7 +93,7 @@ public sealed partial class SettingsWindow
         bool musicActive=s.Widgets.Any(w=>w.Id=="media" && w.Enabled) && app.Media.Available && app.Media.Playing && s.ClosedMediaContent!="None";
         bool previewAssistantExample=closed && previewContent=="AI";
         bool previewIdle=previewAssistantExample || closedMusic && !musicActive && timedKind.Length==0;
-        bool previewAskNaby=previewIdle && (previewAssistantExample || s.ClosedIdleContent=="Assistant");
+        bool previewAskSento=previewIdle && (previewAssistantExample || s.ClosedIdleContent=="Assistant");
         bool clockEnabled=s.Widgets.Any(w=>w.Id=="clock" && w.Enabled);
         bool detailExample=!closed && ((!hover && current!="Layout") || previewContent is "Control colors" or "Typography" or "Panel navigation" or "Drop zone" or "Detached preview" or "Cover gestures" or "Smart clipboard" or "Shelf" or "Visibility");
         if(detailExample){closed=false;hover=false;width=300;height=previewContent switch{"Control colors"=>330,"Smart clipboard"=>320,"Detached preview"=>260,"Typography"=>220,"Shelf"=>260,"Music"=>250,"System"=>210,"Navigation"=>160,_=>230};}
@@ -122,7 +122,7 @@ public sealed partial class SettingsWindow
             time.Visibility=CompactDockPresentation.ShowClock(clockEnabled,previewIdle,false)?Visibility.Visible:Visibility.Collapsed;
             if(previewIdle)
             {
-                appName.Text=previewAskNaby?Localization.Text("Ask Sento"):"";time.FontWeight=FontWeights.Medium;time.FontFamily=new FontFamily("Segoe UI Variable Text, Segoe UI");
+                appName.Text=previewAskSento?Localization.Text("Ask Sento"):"";time.FontWeight=FontWeights.Medium;time.FontFamily=new FontFamily("Segoe UI Variable Text, Segoe UI");
                 double innerWidth=CompactDockPresentation.ContentWidth(width,s.PanelWidth,s.UsesTopNotch);
                 bool companionVisible=previewAssistantExample || app.Assistant.Options.IslandCharacter || app.Assistant.WakeListening;
                 double size=Math.Clamp(s.Height-4,24,32);double companionSpace=companionVisible?size+9:0;
@@ -131,7 +131,7 @@ public sealed partial class SettingsWindow
                 header.Children.Remove(time);time.HorizontalAlignment=HorizontalAlignment.Right;time.VerticalAlignment=VerticalAlignment.Center;time.Margin=new(0,0,14+companionSpace,0);idleHeader.Children.Add(time);
                 if(companionVisible)idleHeader.Children.Add(new AssistantOrb{Width=size,Height=size,ReduceMotion=s.ReduceMotion,Margin=new(0,0,9,0),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center});
                 time.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));double dateRoom=CompactDockPresentation.DateRoom(innerWidth,time.DesiredSize.Width);
-                if(previewAskNaby)
+                if(previewAskSento)
                 {
                     header.Children.Remove(appName);
                     appName.HorizontalAlignment=HorizontalAlignment.Left;

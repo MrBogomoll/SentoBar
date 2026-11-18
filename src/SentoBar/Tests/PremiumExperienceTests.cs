@@ -59,7 +59,7 @@ internal static class PremiumExperienceTests
             using var conversation=new AssistantConversation(transport);var provider=AssistantProviderCatalog.Create("Hermes Agent");
             foreach(string text in new[]{"Hello","Continue"})await conversation.Send(provider,"fixture-only-not-a-real-key","Be concise",text,null,Array.Empty<AssistantTool>(),(_,_)=>Task.FromResult("unused"));
             conversation.Clear();await conversation.Send(provider,"fixture-only-not-a-real-key","Be concise","Hello",null,Array.Empty<AssistantTool>(),(_,_)=>Task.FromResult("unused"));
-            Assert(sessions.Count==3 && sessions[0]==sessions[1] && sessions[2]!=sessions[0] && conversation.Messages.Last().Text=="A Hermes response");
+            Assert(sessions.Count==3 && sessions.All(id=>id.StartsWith("sentobar-",StringComparison.Ordinal)) && sessions[0]==sessions[1] && sessions[2]!=sessions[0] && conversation.Messages.Last().Text=="A Hermes response");
         }).GetAwaiter().GetResult());
     }
 }

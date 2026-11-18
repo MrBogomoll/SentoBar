@@ -139,9 +139,10 @@ public sealed class ProductivityService : IDisposable
         _note=Bound(data.Note,50000);
         _noteTitle=BoundDraftTitle(data.NoteTitle);
         Notes.AddRange(data.Notes ?? new());Tasks.AddRange(data.Tasks ?? new()); Shelf.AddRange(data.Shelf ?? new()); Clips.AddRange(data.Clips ?? new());
+        RestoreCachePaths();
         Normalize();
         persistedDraft=(_note,_noteTitle);
-        PurgeOrphanImages();
+        if(!store.LoadedFallback("productivity"))PurgeOrphanImages();
     }
 
     public bool Save()
@@ -231,6 +232,7 @@ public sealed class ProductivityService : IDisposable
     public int AddFiles(IEnumerable<string> paths)
     {
         if(_disposed || paths==null)return 0;
+        var previous=Shelf.ToArray();
         int added=0;
         foreach(var path in paths)
         {
@@ -239,18 +241,31 @@ public sealed class ProductivityService : IDisposable
             if(full==null || Shelf.Any(s=>string.Equals(s.Path,full,StringComparison.OrdinalIgnoreCase)))continue;
             Shelf.Add(new(){Path=full}); added++;
         }
-        if(added>0)Commit(); return added;
+        return added>0 && CommitShelf(previous)?added:0;
     }
     public void RemoveFile(string path)
     {
         if(_disposed)return;
         var full=CanonicalPath(path);
-        if(full!=null && Shelf.RemoveAll(s=>string.Equals(s.Path,full,StringComparison.OrdinalIgnoreCase))>0)Commit();
+        var previous=Shelf.ToArray();
+        if(full!=null && Shelf.RemoveAll(s=>string.Equals(s.Path,full,StringComparison.OrdinalIgnoreCase))>0)
+            CommitShelf(previous);
+    }
+    private bool CommitShelf(ShelfItem[] previous)
+    {
+        if(!Save()){Shelf.Clear();Shelf.AddRange(previous);return false;}
+        Changed?.Invoke();return true;
     }
 
     public void SetClipboardEnabled(bool enabled)
     {
         if(_disposed)return;
+        // A fallback setting can suspend capture, but cannot authorize erasing history.
+        if(_store.LoadedFallback("settings") || _store.LoadedFallback("productivity"))
+        {
+            DetachListener();ClipboardEnabled=false;_paused=false;
+            return;
+        }
         if(!enabled)
         {
             if(clipboardConfigured && !ClipboardEnabled && !_paused && Clips.Count==0)return;
@@ -340,20 +355,19 @@ public sealed class ProductivityService : IDisposable
         if(_disposed)return;
         var clip=Clips.FirstOrDefault(c=>c.Id==id);
         if(clip==null || (!clip.Pinned && Clips.Count(c=>c.Pinned)>=20))return;
-        clip.Pinned=!clip.Pinned; TrimClips(); Commit();
+        ChangeClips(()=>clip.Pinned=!clip.Pinned);
     }
     public void RemoveClip(string id)
     {
         if(_disposed)return;
         var clip=Clips.FirstOrDefault(c=>c.Id==id);
         if(clip==null)return;
-        Clips.Remove(clip);thumbnails.Clear(); DeleteImage(clip.ImagePath); Commit();
+        ChangeClips(()=>Clips.Remove(clip));
     }
     public void ClearClips()
     {
         if(_disposed)return;
-        foreach(var clip in Clips)DeleteImage(clip.ImagePath);
-        Clips.Clear();thumbnails.Clear(); _imageHashes.Clear(); PurgeOrphanImages(); Commit();
+        if(ChangeClips(Clips.Clear))PurgeOrphanImages();
     }
 
     internal bool IngestText(string? text)
@@ -362,7 +376,7 @@ public sealed class ProductivityService : IDisposable
         var value=Bound(text,20000);
         var duplicate=Clips.FirstOrDefault(c=>c.Kind=="text" && c.Text==value);
         if(duplicate!=null) { Touch(duplicate); return false; }
-        Clips.Insert(0,new(){Kind="text",Text=value}); TrimClips(); Commit(); return true;
+        return ChangeClips(()=>Clips.Insert(0,new(){Kind="text",Text=value}));
     }
     internal bool IngestImage(byte[]? png)
     {
@@ -386,7 +400,8 @@ public sealed class ProductivityService : IDisposable
             path=System.IO.Path.Combine(_cache,Guid.NewGuid().ToString("N")+".png");
             using(var file=new FileStream(path,FileMode.CreateNew,FileAccess.Write,FileShare.None))file.Write(png);
             _imageHashes[path]=hash;
-            Clips.Insert(0,new(){Kind="image",ImagePath=path}); TrimClips(); Commit(); return true;
+            if(ChangeClips(()=>Clips.Insert(0,new(){Kind="image",ImagePath=path})))return true;
+            DeleteImage(path);return false;
         }
         catch(Exception ex) { if(path!=null)DeleteImage(path); ReportError(ex); return false; }
     }
@@ -420,8 +435,28 @@ public sealed class ProductivityService : IDisposable
         return IntPtr.Zero;
     }
 
-    private void Touch(ClipItem item) { item.Timestamp=DateTimeOffset.UtcNow; Clips.Remove(item); Clips.Insert(0,item); Commit(); }
-    private void Commit() { Save(); Changed?.Invoke(); }
+    private void Touch(ClipItem item)=>ChangeClips(()=>item.Timestamp=DateTimeOffset.UtcNow);
+    private bool ChangeClips(Action change)
+    {
+        if(_store.LoadedFallback("productivity"))return false;
+        var previous=Clips.Select(clip=>(Clip:clip,clip.Timestamp,clip.Pinned)).ToArray();
+        change();
+        if(!Save())
+        {
+            Clips.Clear();
+            foreach(var entry in previous)
+            {
+                entry.Clip.Timestamp=entry.Timestamp;entry.Clip.Pinned=entry.Pinned;
+                Clips.Add(entry.Clip);
+            }
+            return false;
+        }
+        // Commit metadata before removing an image, including images evicted by the history limit.
+        var retained=Clips.Where(c=>c.Kind=="image").Select(c=>c.ImagePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach(var entry in previous)
+            if(entry.Clip.Kind=="image" && !retained.Contains(entry.Clip.ImagePath))DeleteImage(entry.Clip.ImagePath);
+        Changed?.Invoke();return true;
+    }
     private void ReportError(Exception error) { LastError=error.Message; _log(error); }
     private static string Bound(string? text,int limit) => text==null ? "" : text.Length>limit ? text[..limit] : text;
     private static string? CanonicalPath(string? path)
@@ -466,9 +501,26 @@ public sealed class ProductivityService : IDisposable
         foreach(var clip in Clips.ToArray())
         {
             if(clip.Pinned ? ++pinned<=20 : ++regular<=30)continue;
-            Clips.Remove(clip);thumbnails.Clear(); DeleteImage(clip.ImagePath);
+            Clips.Remove(clip);thumbnails.Clear();
         }
     }
+    private void RestoreCachePaths()
+    {
+        // Immutable recovery copies made before the rename contain absolute paths to
+        // the old cache. Resolve them against the copied files, even after uninstalling the old app.
+        var profile=new DirectoryInfo(_store.DirectoryPath);
+        if(!profile.Name.Equals("SentoBar",StringComparison.OrdinalIgnoreCase) || profile.Parent==null)return;
+        string oldCache=Path.Combine(profile.Parent.FullName,"NabyScape","clipboard-images");
+        foreach(var clip in Clips)
+        {
+            if(clip?.Kind!="image" || string.IsNullOrEmpty(clip.ImagePath) || !Path.IsPathFullyQualified(clip.ImagePath))continue;
+            string? full=CanonicalPath(clip.ImagePath);
+            if(full==null || !string.Equals(Path.GetDirectoryName(full),oldCache,StringComparison.OrdinalIgnoreCase))continue;
+            string copy=Path.Combine(_cache,Path.GetFileName(full));
+            if(ValidImageFile(copy))clip.ImagePath=copy;
+        }
+    }
+
     private void EnsureCache()
     {
         Directory.CreateDirectory(_cache);
@@ -530,7 +582,8 @@ public sealed class ProductivityService : IDisposable
     public void Dispose()
     {
         if(_disposed)return;
-        Save(); DetachListener();thumbnails.Clear(); ClipboardEnabled=false; _disposed=true;
+        if(!_store.LoadedFallback("productivity"))Save();
+        DetachListener();thumbnails.Clear(); ClipboardEnabled=false; _disposed=true;
     }
     [DllImport("user32.dll",SetLastError=true)] [return:MarshalAs(UnmanagedType.Bool)] private static extern bool AddClipboardFormatListener(IntPtr hwnd);
     [DllImport("user32.dll",SetLastError=true)] [return:MarshalAs(UnmanagedType.Bool)] private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);

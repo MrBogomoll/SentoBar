@@ -126,7 +126,7 @@ internal sealed partial class AssistantTransport : IAssistantTransport, IDisposa
             if(provider.HermesSessionId.Length>0)
             {
                 if(!Guid.TryParseExact(provider.HermesSessionId,"N",out _))throw new InvalidOperationException(Localization.Text("The Hermes session is invalid. Clear chat and try again."));
-                request.Headers.Add("X-Hermes-Session-Id","nabyscape-"+provider.HermesSessionId);
+                request.Headers.Add("X-Hermes-Session-Id","sentobar-"+provider.HermesSessionId);
             }
             request.Headers.Add("Idempotency-Key",Guid.NewGuid().ToString("N"));
         }

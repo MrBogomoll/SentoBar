@@ -19,7 +19,7 @@ internal static class StabilityDiagnostics
             app.ChangeSettings();await Task.Delay(60);
             var section=Diagnostics.LogicalDescendants(window).OfType<Border>().Single(b=>b.Tag as string=="Enabled widgets & order");
             var items=app.Settings.Widgets;var before=items.Select(w=>(w.Id,w.Enabled)).ToArray();var moving=items[^1];var target=items[0];
-            var grip=Diagnostics.Descendants(section).OfType<Button>().Single(b=>AutomationProperties.GetName(b)=="Drag to reorder "+target.Id);
+            var grip=Diagnostics.Descendants(section).OfType<Button>().Single(b=>AutomationProperties.GetName(b)==Localization.Format("Drag to reorder {0}",Localization.Text(Settings.Names[target.Id])));
             grip.BringIntoView();window.UpdateLayout();var card=(Border)((DockPanel)grip.Parent).Parent;
             var data=new DataObject("SentoBar.Order.widgets",moving);
             var point=card.TranslatePoint(new Point(2,2),(UIElement)PresentationSource.FromVisual(card).RootVisual);

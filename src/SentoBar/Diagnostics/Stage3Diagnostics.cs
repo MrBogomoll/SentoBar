@@ -23,7 +23,7 @@ internal static class Stage3Diagnostics
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
         {
             Calls++;string tag="v"+Version,url=OfficialUpdates.Repository;
-            string json=JsonSerializer.Serialize(new{tag_name=tag,html_url=url+"/releases/tag/"+tag,draft=false,prerelease=false,assets=new[]{new{name="SentoBar-win-x64-Setup.exe",browser_download_url=url+"/releases/download/"+tag+"/SentoBar-win-x64-Setup.exe",size=4},new{name="SHA256SUMS",browser_download_url=url+"/releases/download/"+tag+"/SHA256SUMS",size=100}}});
+            string json=JsonSerializer.Serialize(new{tag_name=tag,html_url=url+"/releases/tag/"+tag,draft=false,prerelease=false,assets=new[]{new{name=RuntimePlatform.SetupAsset,browser_download_url=url+"/releases/download/"+tag+"/"+RuntimePlatform.SetupAsset,size=4},new{name="SHA256SUMS",browser_download_url=url+"/releases/download/"+tag+"/SHA256SUMS",size=100}}});
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK){Content=new StringContent(request.RequestUri==OfficialUpdates.Endpoint?json:"invalid fixture checksum")});
         }
     }

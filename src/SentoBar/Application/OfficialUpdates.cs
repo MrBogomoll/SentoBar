@@ -16,12 +16,13 @@ internal sealed record OfficialRelease(Version Version,string Tag,Uri Notes,Uri 
 internal sealed class UpdateState { public DateTimeOffset LastAttempt {get;set;} }
 internal sealed class OfficialUpdates : IDisposable
 {
-    internal const string Repository="https://github.com/BillyNabil/nabyscape";
-    internal static readonly Uri Endpoint=new("https://api.github.com/repos/BillyNabil/nabyscape/releases/latest");
+    internal const string ProjectPath="MrBogomoll/nabyscape";
+    internal const string Repository="https://github.com/"+ProjectPath;
+    internal static readonly Uri Endpoint=new("https://api.github.com/repos/"+ProjectPath+"/releases/latest");
     internal static Version InstalledVersion=>new(typeof(App).Assembly.GetName().Version!.ToString(3));
     private readonly HttpClient http;
-    // The original releases do not contain this fork's localization. Only injected test transports
-    // exercise the upstream protocol until a separate release channel is configured for the fork.
+    // Automatic updates stay off for this build. Only injected test transports
+    // exercise the release protocol. Manual release links use this fork.
     internal static bool ProductionChannelEnabled=>false;
     internal bool ChannelEnabled { get; }
     private readonly Store store;
@@ -44,7 +45,7 @@ internal sealed class OfficialUpdates : IDisposable
         if(!ChannelEnabled)Status=Localization.Text("Upstream updates are disabled in this Russian build to preserve its changes.");
         this.store=store;this.stagingDirectory=Path.GetFullPath(stagingDirectory??UpdateHandoff.Folder);this.inspect=inspect??InspectSetup;state=store.Load<UpdateState>("update-state");
         http=new(transport??new HttpClientHandler{AllowAutoRedirect=false});http.Timeout=TimeSpan.FromSeconds(45);
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("SentoBar/"+InstalledVersion);http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("SentoBar/"+AppVersion.Display);http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
     }
     internal void Cancel()=>cancellation?.Cancel();
     private void Report(string text){Status=text;Changed?.Invoke();}

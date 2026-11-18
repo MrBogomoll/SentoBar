@@ -30,7 +30,7 @@ internal sealed partial class AssistantTransport
         request.Content.Headers.ContentType=new("application/json");request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));Authenticate(request,provider,apiKey);
         if(provider.Backend=="Hermes")
         {
-            if(provider.HermesSessionId.Length>0){if(!Guid.TryParseExact(provider.HermesSessionId,"N",out _))throw new IOException(Localization.Text("Clear chat to start a new Hermes session."));request.Headers.Add("X-Hermes-Session-Id","nabyscape-"+provider.HermesSessionId);}
+            if(provider.HermesSessionId.Length>0){if(!Guid.TryParseExact(provider.HermesSessionId,"N",out _))throw new IOException(Localization.Text("Clear chat to start a new Hermes session."));request.Headers.Add("X-Hermes-Session-Id","sentobar-"+provider.HermesSessionId);}
             request.Headers.Add("Idempotency-Key",Guid.NewGuid().ToString("N"));
         }
         using var deadline=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);deadline.CancelAfter(provider.Backend=="Hermes" && timeout==TimeSpan.FromSeconds(90)?TimeSpan.FromMinutes(3):timeout);

@@ -70,10 +70,15 @@ internal static class Native
         foreach(var s in Forms.Screen.AllScreens) if(s.DeviceName==target) return s;
         return Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
     }
+    // Windows can briefly return an empty work area during a display change.
+    internal static System.Drawing.Rectangle PanelWorkArea(Forms.Screen screen)
+        => ValidWorkArea(screen.WorkingArea, screen.Bounds);
+    internal static System.Drawing.Rectangle ValidWorkArea(System.Drawing.Rectangle work, System.Drawing.Rectangle bounds)
+        => work.Width > 0 && work.Height > 0 ? work : bounds;
     public static double Scale(Forms.Screen screen)
     {
         var monitor=MonitorFromPoint(new(){X=screen.Bounds.Left+screen.Bounds.Width/2,Y=screen.Bounds.Top+screen.Bounds.Height/2},2);
-        return GetDpiForMonitor(monitor,0,out var x,out _)==0 ? x/96.0 : 1;
+        return GetDpiForMonitor(monitor,0,out var x,out _)==0 && x>0 ? x/96.0 : 1;
     }
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint processId);
     [DllImport("user32.dll")] private static extern bool IsZoomed(IntPtr hwnd);

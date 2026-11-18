@@ -299,6 +299,69 @@ public static class ProductivityTests
             Assert(!restored.IngestText("no capture")); restored.SetClipboardEnabled(false);
             Assert(restored.Clips.Count==0 && Directory.GetFiles(Path.Combine(root,"clipboard-images")).Length==0);
         });
+        Check("Productivity: protected settings stop capture and preserve stored history",root=>
+        {
+            string image;
+            using(var first=Service(root)){first.SetClipboardEnabled(true);first.IngestText("keep");first.IngestImage(Png());image=first.Clips[0].ImagePath;}
+            var store=new Store(root);
+            File.WriteAllText(Path.Combine(root,"settings.json"),"{broken");
+            var fallback=store.Load<Settings>("settings");
+            using(var service=new ProductivityService(store,_=>{},false))
+            {
+                service.SetClipboardEnabled(fallback.ClipboardHistory);
+                Assert(!service.ClipboardEnabled && service.Clips.Count==2 && File.Exists(image));
+            }
+            Assert(new Store(root).Load<ProductivityData>("productivity").Clips.Count==2);
+        });
+        Check("Productivity: restoring an old fork backup relinks only its copied cache images",root=>
+        {
+            string previous=Path.Combine(root,"NabyScape"),current=Path.Combine(root,"SentoBar");
+            string image;
+            using(var service=Service(previous))
+            {
+                service.SetClipboardEnabled(true);service.IngestImage(Png());image=service.Clips.Single().ImagePath;
+            }
+            var store=new Store(current);string cache=Path.Combine(current,"clipboard-images");Directory.CreateDirectory(cache);
+            string copy=Path.Combine(cache,Path.GetFileName(image));File.Copy(image,copy);
+            File.Copy(Path.Combine(previous,"productivity.json"),Path.Combine(current,"productivity.json"));
+            File.Delete(image);
+            using(var restored=Service(current))
+            {
+                Assert(restored.Clips.Single().ImagePath==copy && File.Exists(copy));
+                restored.SetClipboardEnabled(true);Assert(restored.LoadClipImage(restored.Clips[0])!=null);
+            }
+            Assert(store.Load<ProductivityData>("productivity").Clips.Single().ImagePath==copy);
+        });
+        Check("Productivity: an unreadable history preserves cached PNGs for recovery",root=>
+        {
+            string image;
+            using(var first=Service(root)){first.SetClipboardEnabled(true);first.IngestImage(Png());image=first.Clips.Single().ImagePath;}
+            File.WriteAllText(Path.Combine(root,"productivity.schema.json"),"{\"SchemaVersion\":999}");
+            using(var service=Service(root))
+            {
+                service.SetClipboardEnabled(true);
+                Assert(!service.ClipboardEnabled && !service.IngestText("ignored"));
+                service.SetClipboardEnabled(false);service.ClearClips();
+            }
+            Assert(File.Exists(image));
+        });
+        Check("Productivity: failed history and shelf mutations preserve rows and files",root=>
+        {
+            string path=Path.Combine(root,"keep.txt");
+            using var service=Service(root);
+            service.SetClipboardEnabled(true);Assert(service.AddFiles(new[]{path})==1 && service.IngestImage(Png()));
+            var image=service.Clips.Single();
+            for(int i=0;i<29;i++)Assert(service.IngestText("row"+i));
+            var ids=service.Clips.Select(c=>c.Id).ToArray();
+            using var locked=new FileStream(Path.Combine(root,"productivity.json"),FileMode.Open,FileAccess.Read,FileShare.Read);
+            int changes=0;service.Changed+=()=>changes++;
+            service.ToggleClipPin(image.Id);Assert(!image.Pinned);
+            Assert(!service.IngestText("should roll back"));
+            service.RemoveClip(image.Id);service.ClearClips();
+            Assert(service.Clips.Select(c=>c.Id).SequenceEqual(ids) && File.Exists(image.ImagePath));
+            service.RemoveFile(path);Assert(service.AddFiles(new[]{path+".new"})==0);
+            Assert(service.Shelf.Single().Path==path && changes==0);
+        });
         Check("Productivity: malformed JSON recovers through Store with a backup",root=>
         {
             File.WriteAllText(Path.Combine(root,"productivity.json"),"{bad json");
