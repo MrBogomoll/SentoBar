@@ -26,9 +26,9 @@ public sealed partial class OverlayWindow
     private FrameworkElement peekFallback=null!;
     private readonly ActivityVisual peekWave=new(){Width=58,Height=16,WaveOnly=true};
     private Button? peekPlay;
-    private readonly Slider seekSlider=new(){Minimum=0,Maximum=1,TickFrequency=.001,SmallChange=.01,LargeChange=.05,IsMoveToPointEnabled=true,Height=24,Margin=new(0)};
+    private readonly MediaSeekSlider seekSlider=new(){Height=24,Margin=new(0)};
     private readonly TextBlock elapsed=UI.Caption("0:00",10,UI.Muted),duration=UI.Caption("0:00",10,UI.Muted);
-    private readonly DispatcherTimer hoverDelay=new(){Interval=TimeSpan.FromMilliseconds(180)},leaveDelay=new(){Interval=TimeSpan.FromMilliseconds(300)},seekDelay=new(){Interval=TimeSpan.FromMilliseconds(140)};
+    private readonly DispatcherTimer hoverDelay=new(){Interval=TimeSpan.FromMilliseconds(180)},leaveDelay=new(){Interval=TimeSpan.FromMilliseconds(300)};
     private double HostHeight
     {
         get
@@ -114,20 +114,7 @@ public sealed partial class OverlayWindow
         timelinePanel.RowDefinitions.Add(new(){Height=GridLength.Auto});timelinePanel.RowDefinitions.Add(new(){Height=GridLength.Auto});
         var labels=new DockPanel();DockPanel.SetDock(duration,Dock.Right);labels.Children.Add(duration);labels.Children.Add(elapsed);timelinePanel.Children.Add(labels);
         Grid.SetRow(seekSlider,1);timelinePanel.Children.Add(seekSlider);UI.LocalizedName(seekSlider,"Playback position");
-        seekSlider.PreviewMouseLeftButtonDown+=(_,e)=>
-        {
-            if(!seekSlider.IsEnabled || updating)return;
-            seekSlider.ApplyTemplate();
-            if(seekSlider.Template.FindName("PART_Track",seekSlider) is not System.Windows.Controls.Primitives.Track track)return;
-            // Thumb gestures keep native dragging. Track clicks seek without depending
-            // on whether WPF has assigned keyboard focus before ValueChanged fires.
-            if(track.Thumb?.IsMouseOver==true)return;
-            double target=track.ValueFromPoint(e.GetPosition(track));if(!double.IsFinite(target))return;
-            seekSlider.Focus();seekSlider.SetCurrentValue(System.Windows.Controls.Primitives.RangeBase.ValueProperty,Math.Clamp(target,seekSlider.Minimum,seekSlider.Maximum));
-            seekDelay.Stop();seekDelay.Start();e.Handled=true;
-        };
-        seekSlider.ValueChanged+=(_,_)=>{if(!updating && (seekSlider.IsMouseCaptureWithin || seekSlider.IsKeyboardFocusWithin)){seekDelay.Stop();seekDelay.Start();}};
-        seekDelay.Tick+=async(_,_)=>{seekDelay.Stop();await app.Media.Seek(seekSlider.Value);};
+        seekSlider.SeekRequested+=(fraction,revision)=>_=app.Media.Seek(fraction,revision);
         InitializeMediaTimeline();
     }
     private void StopHoverTimers(){hoverDelay.Stop();leaveDelay.Stop();detailDelay.Stop();assistantHover.Stop();}
@@ -309,7 +296,7 @@ public sealed partial class OverlayWindow
         var position=app.Media.Timeline();elapsed.Text=TimeSpan.FromSeconds(position.elapsed).ToString(position.duration>=3600?@"h\:mm\:ss":@"m\:ss");duration.Text=TimeSpan.FromSeconds(position.duration).ToString(position.duration>=3600?@"h\:mm\:ss":@"m\:ss");
         timelineAt=DateTimeOffset.UtcNow;timelineElapsed=position.elapsed;timelineDuration=position.duration;
         ApplyTimelineState(app.Media.Available?MediaTimelinePolicy.State(position.duration,app.Media.CanSeek):MediaTimelineState.None,app.Media.Available);
-        if(!seekSlider.IsMouseCaptureWithin && !seekSlider.IsKeyboardFocusWithin && !seekDelay.IsEnabled)seekSlider.Value=position.duration>0?position.elapsed/position.duration:0;
+        seekSlider.ShowPosition(position.duration>0?position.elapsed/position.duration:0,app.Media.SeekRevision);
     }
     private bool mediaLayoutPending;
     private void QueueMediaLayout()

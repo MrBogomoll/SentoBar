@@ -41,6 +41,10 @@ public sealed class MediaService : IDisposable
     private long timelineStamp;
     private (double elapsed,double duration) timelineSample;
     private readonly MediaTimelineClock timelineClock=new();
+    private readonly System.Threading.SemaphoreSlim seekGate=new(1,1);
+    private long seekSequence;
+    internal long SeekRevision {get;private set;}
+    internal bool SeekRejected {get;private set;}
     private readonly MediaSourceSelection sourceSelection=new();
     internal string SourceSelectionId=>sourceSelection.Id;
     internal bool SourceDisabled=>sourceSelection.IsNone;
@@ -114,11 +118,17 @@ public sealed class MediaService : IDisposable
         if(manual)sourceSelection.Select(session?.SourceAppUserModelId);
         if(ReferenceEquals(selected,session)){if(session==null)_=Refresh();else Changed?.Invoke();return;}
         if(selected!=null) { selected.MediaPropertiesChanged-=PropertiesChanged; selected.PlaybackInfoChanged-=PlaybackChanged;selected.TimelinePropertiesChanged-=TimelineChanged; }
-        selected=session;timelineStamp=0;timelineClock.Reset();
+        selected=session;ResetSeekTarget();timelineStamp=0;timelineClock.Reset();
         if(selected!=null) { selected.MediaPropertiesChanged+=PropertiesChanged; selected.PlaybackInfoChanged+=PlaybackChanged;selected.TimelinePropertiesChanged+=TimelineChanged; }
         _=Refresh();
     }
-    private void PropertiesChanged(GlobalSystemMediaTransportControlsSession sender,MediaPropertiesChangedEventArgs args)=>dispatcher.BeginInvoke(()=>_=Refresh());
+    private void PropertiesChanged(GlobalSystemMediaTransportControlsSession sender,MediaPropertiesChangedEventArgs args)=>dispatcher.BeginInvoke(()=>
+    {
+        if(disposed || selected==null || sender.SourceAppUserModelId!=selected.SourceAppUserModelId)return;
+        ResetSeekTarget();
+        _=Refresh();
+    });
+    private void ResetSeekTarget(){SeekRevision++;SeekRejected=false;}
     private void PlaybackChanged(GlobalSystemMediaTransportControlsSession sender,PlaybackInfoChangedEventArgs args)=>dispatcher.BeginInvoke(()=>{if(!disposed && selected!=null && sender.SourceAppUserModelId==selected.SourceAppUserModelId){ReadPlayback(selected);timelineStamp=0;Changed?.Invoke();}});
     private void TimelineChanged(GlobalSystemMediaTransportControlsSession sender,TimelinePropertiesChangedEventArgs args)=>dispatcher.BeginInvoke(()=>{if(!disposed && selected!=null && selected.SourceAppUserModelId==sender.SourceAppUserModelId)timelineStamp=0;});
     private void ReadPlayback(GlobalSystemMediaTransportControlsSession session)
@@ -158,7 +168,7 @@ public sealed class MediaService : IDisposable
             Title=string.IsNullOrWhiteSpace(p.Title) ? Localization.Text("Untitled media") : p.Title;
             Artist=string.IsNullOrWhiteSpace(p.Artist) ? session.SourceAppUserModelId : p.Artist;
             ReadPlayback(session);
-            if(artworkKey!=key){timelineClock.Reset();timelineStamp=0;}
+            if(artworkKey!=key){ResetSeekTarget();timelineClock.Reset();timelineStamp=0;}
             artworkKey=key;Artwork=artwork;Changed?.Invoke();
         }
         catch(Exception ex) { if(disposed || version!=generation)return;log(ex);Artist=Localization.Text("Media session unavailable");CanToggle=CanNext=CanPrevious=CanSeek=false;Changed?.Invoke(); }
@@ -168,6 +178,7 @@ public sealed class MediaService : IDisposable
         try
         {
             if(selected==null) return;
+            if(command=="next" && CanNext || command=="previous" && CanPrevious)ResetSeekTarget();
             bool ok=command switch { "next" when CanNext=>await selected.TrySkipNextAsync(), "previous" when CanPrevious=>await selected.TrySkipPreviousAsync(), "toggle" when CanToggle=>await selected.TryTogglePlayPauseAsync(), _=>false };
             if(!ok) Artist=Localization.Text("This media app does not support this control");
             Changed?.Invoke();
@@ -194,16 +205,38 @@ public sealed class MediaService : IDisposable
         catch{return(0,0);}
     }
     internal MediaTimelineState TimelineState=>Available?MediaTimelinePolicy.State(Timeline().duration,CanSeek):MediaTimelineState.None;
-    public async Task Seek(double fraction)
+    public Task Seek(double fraction)=>Seek(fraction,SeekRevision);
+
+    internal async Task Seek(double fraction,long revision)
     {
+        if(disposed || selected==null || !CanSeek || revision!=SeekRevision || !double.IsFinite(fraction))return;
+        long request=++seekSequence;
+        await seekGate.WaitAsync();
         try
         {
-            if(selected==null || !CanSeek)return;
-            var timeline=selected.GetTimelineProperties();if(timeline==null)return;var span=timeline.EndTime-timeline.StartTime;if(span<=TimeSpan.Zero)return;
-            long ticks=timeline.StartTime.Ticks+(long)(span.Ticks*Math.Clamp(fraction,0,1));
-            timelineStamp=0;bool changed=await selected.TryChangePlaybackPositionAsync(ticks);timelineStamp=0;if(!changed){Artist=Localization.Text("This app does not support seeking");Changed?.Invoke();}
+            var session=selected;
+            if(disposed || session==null || !CanSeek || revision!=SeekRevision || request!=seekSequence)return;
+
+            bool accepted=false;
+            try
+            {
+                var timeline=session.GetTimelineProperties();
+                if(timeline!=null && MediaTimelinePolicy.SeekPosition(timeline.StartTime,timeline.EndTime,
+                    timeline.MinSeekTime,timeline.MaxSeekTime,fraction) is TimeSpan target)
+                {
+                    accepted=await session.TryChangePlaybackPositionAsync(target.Ticks);
+                    if(accepted && !disposed && revision==SeekRevision && request==seekSequence)
+                        timelineClock.AcceptSeek(timeline.StartTime,timeline.Position,timeline.LastUpdatedTime,target,Playing,DateTimeOffset.UtcNow);
+                }
+            }
+            catch(Exception ex){log(ex);}
+
+            if(disposed || revision!=SeekRevision || request!=seekSequence)return;
+            SeekRejected=!accepted;
+            timelineStamp=0;
+            Changed?.Invoke();
         }
-        catch(Exception ex){log(ex);}
+        finally{seekGate.Release();}
     }
     public void Dispose()
     {

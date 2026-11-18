@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -17,6 +16,7 @@ public sealed partial class OverlayWindow
     private readonly TextBlock timelineNotice=UI.Caption("This player doesn't share its position",11,UI.Muted);
     private readonly PeekSeekStrip peekSeek=new(){Background=Brushes.Transparent,Cursor=Cursors.Hand,IsHitTestVisible=false};
     private bool peekSeeking;
+    private long peekSeekRevision;
     private void InitializeMediaTimeline()
     {
         // The notice takes the place of the labels and slider so the panel height never jumps.
@@ -27,24 +27,19 @@ public sealed partial class OverlayWindow
         peekSeek.MouseLeftButtonDown+=(_,e)=>
         {
             detailDelay.Stop();
+            peekSeekRevision=app.Media.SeekRevision;
             peekSeeking=peekSeek.CaptureMouse();
             if(peekSeeking)PreviewPeekSeek(e);
             e.Handled=true;
         };
         peekSeek.MouseMove+=(_,e)=>{if(peekSeeking)PreviewPeekSeek(e);};
-        peekSeek.MouseLeftButtonUp+=(_,e)=>{if(!peekSeeking)return;double target=PreviewPeekSeek(e);peekSeeking=false;peekSeek.ReleaseMouseCapture();_=CommitSeek(target);e.Handled=true;};
+        peekSeek.MouseLeftButtonUp+=(_,e)=>{if(!peekSeeking)return;double target=PreviewPeekSeek(e);peekSeeking=false;peekSeek.ReleaseMouseCapture();_=app.Media.Seek(target,peekSeekRevision);e.Handled=true;};
         peekSeek.LostMouseCapture+=(_,_)=>peekSeeking=false;
     }
     private double PreviewPeekSeek(MouseEventArgs e)
     {
         double width=peekProgress.ActualWidth,target=width>0?Math.Clamp(e.GetPosition(peekProgress).X/width,0,1):0;
         peekProgress.Value=target;return target;
-    }
-    private async Task CommitSeek(double fraction)
-    {
-        // Continue interpolating from the requested point until the player publishes its new position.
-        if(timelineDuration>0){timelineAt=DateTimeOffset.UtcNow;timelineElapsed=fraction*timelineDuration;}
-        await app.Media.Seek(fraction);
     }
     // None: no dead 0:00 slider. ReadOnly: progress at full contrast without seeking. Seekable: both.
     private void ApplyTimelineState(MediaTimelineState state,bool media)
@@ -54,7 +49,7 @@ public sealed partial class OverlayWindow
         foreach(var labels in timelinePanel.Children.OfType<DockPanel>())labels.Visibility=visibility;
         seekSlider.Visibility=visibility;seekSlider.IsEnabled=shown;seekSlider.IsHitTestVisible=seekSlider.Focusable=seekable;
         timelineNotice.Visibility=!shown && media?Visibility.Visible:Visibility.Collapsed;
-        string help=state==MediaTimelineState.ReadOnly?Localization.Text("This player doesn't allow seeking"):"";
+        string help=MediaTimelinePolicy.Help(state,app.Media.SeekRejected)??"";
         timelinePanel.ToolTip=help.Length>0?help:null;AutomationProperties.SetHelpText(seekSlider,help);
     }
     private void CancelPeekSeek()
@@ -67,6 +62,7 @@ public sealed partial class OverlayWindow
     {
         bool seekable=peekDetailed && peekId=="media" && app.Media.TimelineState==MediaTimelineState.Seekable;
         peekSeek.IsHitTestVisible=seekable;
-        if(!seekable)CancelPeekSeek();
+        peekSeek.ToolTip=app.Media.SeekRejected?Localization.Text("Could not seek in the current track"):Localization.Text("Click or drag to seek");
+        if(!seekable || peekSeekRevision!=app.Media.SeekRevision)CancelPeekSeek();
     }
 }

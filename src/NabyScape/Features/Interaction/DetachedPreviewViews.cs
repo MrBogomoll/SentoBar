@@ -24,7 +24,8 @@ internal sealed class DetachedPreviewView : IDisposable
     private TextBlock? title,detail,status;
     private Image? artwork;
     private ComboBox? sessions;
-    private Slider? volume,seek;
+    private Slider? volume;
+    private MediaSeekSlider? seek;
     private Button? toggle,previous,next;
     private TextBox? notes,noteTitle;
     private ProgressBar? progress,memory;
@@ -68,7 +69,7 @@ internal sealed class DetachedPreviewView : IDisposable
             transport.Children.Add(button);
         }
         Add(transport);
-        seek=new Slider{Minimum=0,Maximum=1};UI.Named(seek,Localization.Text("Track position"));seek.ValueChanged+=(_,_)=>{if(!updating)_=app.Media.Seek(seek.Value);};Add(seek);
+        seek=new MediaSeekSlider();UI.Named(seek,Localization.Text("Track position"));seek.SeekRequested+=(fraction,revision)=>_=app.Media.Seek(fraction,revision);Add(seek);
         volume=new Slider{Minimum=0,Maximum=100};UI.Named(volume,Localization.Text("Output volume"));volume.ValueChanged+=(_,_)=>{if(!updating)app.Audio.SetVolume(volume.Value/100);};var volumeRow=new Grid();volumeRow.ColumnDefinitions.Add(new(){Width=GridLength.Auto});volumeRow.ColumnDefinitions.Add(new());
         var volumeLabel=UI.Caption("Volume",11,UI.Muted);volumeLabel.TextWrapping=TextWrapping.NoWrap;volumeLabel.Margin=new(0,0,8,0);
         volumeRow.Children.Add(volumeLabel);Grid.SetColumn(volume,1);volumeRow.Children.Add(volume);Add(volumeRow);
@@ -186,7 +187,7 @@ internal sealed class DetachedPreviewView : IDisposable
                 previous!.IsEnabled=media.CanPrevious;next!.IsEnabled=media.CanNext;toggle!.IsEnabled=media.CanToggle;toggle.Content=media.Playing?Localization.Text("Pause"):Localization.Text("Play");
                 volume!.IsEnabled=app.Audio.Available;if(!volume.IsMouseCaptureWithin && !volume.IsKeyboardFocusWithin)volume.Value=app.Audio.Volume*100;
                 var timeline=media.Timeline();var timelineState=media.Available?MediaTimelinePolicy.State(timeline.duration,media.CanSeek):MediaTimelineState.None;
-                seek!.Visibility=timelineState==MediaTimelineState.None?Visibility.Collapsed:Visibility.Visible;seek.IsEnabled=timelineState==MediaTimelineState.Seekable;seek.ToolTip=timelineState==MediaTimelineState.ReadOnly?Localization.Text("This player doesn't allow seeking"):null;ToolTipService.SetShowOnDisabled(seek,true);if(!seek.IsMouseCaptureWithin && !seek.IsKeyboardFocusWithin)seek.Value=timeline.duration>0?timeline.elapsed/timeline.duration:0;
+                seek!.Visibility=timelineState==MediaTimelineState.None?Visibility.Collapsed:Visibility.Visible;seek.IsEnabled=timelineState==MediaTimelineState.Seekable;seek.ToolTip=MediaTimelinePolicy.Help(timelineState,media.SeekRejected);ToolTipService.SetShowOnDisabled(seek,true);seek.ShowPosition(timeline.duration>0?timeline.elapsed/timeline.duration:0,media.SeekRevision);
             }
             else if(kind=="notes")SyncNotes();else if(kind=="files")RefreshShelf();else if(kind=="calendar")RenderEvents();
             else if(kind=="system")

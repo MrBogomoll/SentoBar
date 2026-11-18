@@ -62,6 +62,7 @@
   "This media app does not support this control": "Медиаприложение не поддерживает это действие",
   "Media control failed; try selecting the session again": "Не удалось управлять медиа; попробуйте выбрать сеанс снова",
   "This app does not support seeking": "Это приложение не поддерживает перемотку",
+  "Could not seek in the current track": "Не удалось перемотать текущий трек",
   "The audio service has closed. Reopen BillyNabila Island to use audio controls.": "Звуковая служба завершена. Перезапустите NabyScape для управления звуком.",
   "Could not read audio outputs. Reconnect your device, then open Windows Sound Settings.": "Не удалось получить список звуковых выходов. Переподключите устройство и откройте параметры звука Windows.",
   "Could not switch audio output. Choose an active device or change the output in Windows Sound Settings.": "Не удалось сменить звуковой выход. Выберите активное устройство или измените выход в параметрах звука Windows.",

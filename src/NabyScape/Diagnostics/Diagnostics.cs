@@ -180,6 +180,12 @@ internal static class Diagnostics
 
             if(Environment.GetCommandLineArgs().Contains("--closed-waveform-only")){await ClosedWaveformDiagnostics.Run(app,overlay,directory,Check);return;}
 
+            if(Environment.GetCommandLineArgs().Contains("--media-seek-only"))
+            {
+                app.Media.DiagnosticFixture=false;
+                await MediaFixture.Verify(app,directory,Check,line=>report.Add(line),requireSeeking:true);
+                return;
+            }
             if(Environment.GetCommandLineArgs().Contains("--media-ux-only")){await MediaExperienceDiagnostics.Run(app,overlay,directory,Check);return;}
 
             if(Environment.GetCommandLineArgs().Contains("--assistant-character-only")){await AssistantCharacterDiagnostics.Run(app,overlay,directory,Check);return;}

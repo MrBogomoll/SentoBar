@@ -13,7 +13,7 @@ namespace NabyScape;
 // It verifies the consumer API without starting/stopping any user's music.
 internal static class MediaFixture
 {
-    public static async Task Verify(App app,string directory,Action<string,bool> check,Action<string> note,Func<Task>? verifyArtwork=null)
+    public static async Task Verify(App app,string directory,Action<string,bool> check,Action<string> note,Func<Task>? verifyArtwork=null,bool requireSeeking=false)
     {
         directory=Path.GetFullPath(directory);var original=app.Media.Selected;
         try
@@ -63,7 +63,25 @@ internal static class MediaFixture
             await app.Media.Command("toggle");await Task.Delay(400);await app.Media.Refresh();
             check("Media play/pause resumes the isolated publisher",app.Media.Playing);
             if(app.Media.CanSeek)
-            {await app.Media.Seek(.5);await Task.Delay(450);check("Seek changes the isolated player's actual position",player.PlaybackSession.Position.TotalSeconds>=29 && player.PlaybackSession.Position.TotalSeconds<34);}
+            {
+                await app.Media.Seek(.5);await Task.Delay(450);
+                check("Seek changes the isolated player's actual position",player.PlaybackSession.Position.TotalSeconds>=29 && player.PlaybackSession.Position.TotalSeconds<34);
+                long revision=app.Media.SeekRevision;
+                var first=app.Media.Seek(.8);
+                var superseded=app.Media.Seek(.65);
+                var latest=app.Media.Seek(.2);
+                await Task.WhenAll(first,superseded,latest);await Task.Delay(450);
+                double actual=player.PlaybackSession.Position.TotalSeconds, displayed=app.Media.Timeline().elapsed;
+                note($"INFO  Rapid seek: player {actual:F1}s, timeline {displayed:F1}s, revision {revision} to {app.Media.SeekRevision}, rejected {app.Media.SeekRejected}");
+                check("Rapid seeks finish at the last requested position",actual is >=11 and <16 && displayed is >=11 and <16);
+                long previousTrack=app.Media.SeekRevision;
+                await app.Media.Command("next");await Task.Delay(450);await app.Media.Refresh();
+                await app.Media.Seek(.85,previousTrack);await Task.Delay(150);
+                check("An old drag cannot seek in the next track",
+                    app.Media.Title=="NabyScape diagnostic 2" && player.PlaybackSession.Position.TotalSeconds<8);
+                await app.Media.Command("previous");await Task.Delay(450);await app.Media.Refresh();
+            }
+            else if(requireSeeking)check("Silent Windows media fixture supports seek commands",false);
             else note("MANUAL  Seek not exposed by this Windows media fixture; seek UI remains disabled for unsupported sessions.");
             await app.Media.Command("next");await Task.Delay(450);await app.Media.Refresh();
             check("Next skips to another item in the isolated playlist",app.Media.Title=="NabyScape diagnostic 2");
