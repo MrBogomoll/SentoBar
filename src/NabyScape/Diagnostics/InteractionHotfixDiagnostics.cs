@@ -7,6 +7,10 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Interop;
+using System.Windows.Input;
+using System.Runtime.InteropServices;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -14,6 +18,63 @@ namespace NabyScape;
 
 internal static class InteractionHotfixDiagnostics
 {
+    [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hwnd,int message,IntPtr wparam,IntPtr lparam);
+
+    internal static async Task RunDockResize(App app,OverlayWindow island,Action<string,bool> check)
+    {
+        var s=app.Settings;
+        s.CompactLayout=true;s.ReduceMotion=true;s.SmartActivities=false;s.HideFullscreen=s.HideMaximized=false;
+        s.AlwaysTucked=false;s.HoverPeek=true;s.TwoStageHover=false;s.DockUnlocked=true;s.DockEdge="Top";
+        s.PanelWidth=526;s.Radius=40;
+        app.ChangeSettings();
+        var handle=new WindowInteropHelper(island).Handle;
+        int NativeHit(Point point)
+        {
+            var screen=island.PointToScreen(point);
+            var packed=new IntPtr(((int)Math.Round(screen.Y)<<16)|((int)Math.Round(screen.X)&0xffff));
+            return SendMessage(handle,0x84,IntPtr.Zero,packed).ToInt32();
+        }
+        bool HitsGrip(Thumb grip,Point offset)
+        {
+            var point=grip.TranslatePoint(offset,island);
+            if(NativeHit(point)!=1)return false;
+            for(DependencyObject? element=island.InputHitTest(point) as DependencyObject;element!=null;element=VisualTreeHelper.GetParent(element))
+                if(ReferenceEquals(element,grip))return true;
+            return false;
+        }
+        foreach(string preset in new[]{"Mac","iPhone"})
+        {
+            s.Preset=preset;app.ChangeSettings();island.Collapse();
+            foreach(string state in new[]{"closed","mini","expanded"})
+            {
+                if(state=="mini")island.PreviewActivity();
+                if(state=="expanded")island.Reveal(false);
+                await Task.Delay(90);island.UpdateLayout();
+                check($"{preset} {state}: resize fixture reached the expected panel state",
+                    island.IsExpanded==(state=="expanded") && island.IsPeeking==(state=="mini"));
+                foreach(string name in new[]{"Resize island from left","Resize island from right"})
+                {
+                    var grip=Diagnostics.Descendants(island).OfType<Thumb>().Single(t=>AutomationProperties.GetName(t)==Localization.Text(name));
+                    check($"{preset} {state}: {name} routes dot and its surrounding hit area to the grip",
+                        grip.IsVisible && HitsGrip(grip,new Point(8,8)) && HitsGrip(grip,new Point(1,15)) && HitsGrip(grip,new Point(15,15)));
+                }
+                check($"{preset} {state}: transparent space beyond the dock still passes clicks through",
+                    NativeHit(new Point(island.VisibleBounds.Left-5,island.VisibleBounds.Bottom-8))==-1);
+            }
+        }
+        var rightGrip=Diagnostics.Descendants(island).OfType<Thumb>()
+            .Single(t=>AutomationProperties.GetName(t)==Localization.Text("Resize island from right"));
+        void RaiseMouseButton(RoutedEvent action)=>rightGrip.RaiseEvent(new MouseButtonEventArgs(
+            Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left){RoutedEvent=action});
+        RaiseMouseButton(UIElement.MouseLeftButtonDownEvent);
+        check("Pressing the resize dot starts a captured drag without closing the expanded panel",
+            rightGrip.IsDragging && rightGrip.IsMouseCaptured && island.IsExpanded);
+        RaiseMouseButton(UIElement.MouseLeftButtonUpEvent);
+        check("Releasing the resize dot ends the drag and keeps the panel open",
+            !rightGrip.IsDragging && !rightGrip.IsMouseCaptured && island.IsExpanded);
+        island.Collapse();
+    }
+
     internal static async Task RunClassicMixer(App app,OverlayWindow island,Action<string,bool> check)
     {
         var s=app.Settings;s.CompactLayout=false;s.ReduceMotion=true;s.SmartActivities=false;s.HideFullscreen=s.HideMaximized=false;

@@ -196,6 +196,7 @@ internal static class Diagnostics
 
             if(Environment.GetCommandLineArgs().Contains("--interaction-tuck-hide-only")){await InteractionHotfixDiagnostics.RunTuckHide(app,overlay,Check);return;}
 
+            if(Environment.GetCommandLineArgs().Contains("--dock-resize-only")){await InteractionHotfixDiagnostics.RunDockResize(app,overlay,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--interaction-hotfix-only")){await InteractionHotfixDiagnostics.Run(app,overlay,directory,Check);return;}
 
             if(Environment.GetCommandLineArgs().Contains("--showcase")){await ShowcaseDiagnostics.Run(app,overlay,directory);return;}

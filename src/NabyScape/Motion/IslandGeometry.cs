@@ -6,13 +6,25 @@ namespace NabyScape;
 
 internal static class IslandGeometry
 {
+    private static double Shoulder(double height,bool notch)=>notch?Math.Min(16,height*.36):0;
+    private static double LowerRadius(double width,double height,double radius,bool notch,double shoulder)
+        =>notch?Math.Min(radius,Math.Min(height-shoulder,(width-2*shoulder)/2)):Math.Min(radius,height/2);
+
+    internal static double BottomInset(double width,double height,double radius,bool notch,double bottomGap)
+    {
+        double shoulder=Shoulder(height,notch);
+        double corner=LowerRadius(width,height,radius,notch,shoulder);
+        double depth=Math.Max(0,corner-bottomGap);
+        return shoulder+corner-Math.Sqrt(corner*corner-depth*depth);
+    }
+
     // The shoulders are concave: the screen edge flows into the sides of the notch.
     // A rounded rectangle with two square corners cannot produce this contour.
     public static Geometry Create(double width,double height,double radius,bool notch,double offset=0)
     {
         width=Math.Max(1,width);height=Math.Max(1,height);
-        if(!notch) {var pill=new RectangleGeometry(new Rect(offset,0,width,height),Math.Min(radius,height/2),Math.Min(radius,height/2));pill.Freeze();return pill;}
-        double shoulder=Math.Min(16,height*.36),r=Math.Min(radius,Math.Min(height-shoulder,(width-2*shoulder)/2));
+        double shoulder=Shoulder(height,notch),r=LowerRadius(width,height,radius,notch,shoulder);
+        if(!notch) {var pill=new RectangleGeometry(new Rect(offset,0,width,height),r,r);pill.Freeze();return pill;}
         var geometry=new StreamGeometry();
         using(var c=geometry.Open())
         {

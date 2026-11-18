@@ -236,6 +236,20 @@ internal static class PanelBackdropDiagnostics
         month.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,0){RoutedEvent=System.Windows.Input.Mouse.MouseEnterEvent});
         await Task.Delay(280);
         check("Hover preserves both edges of the calendar month button",before==ButtonBounds(month));
+        s.ReduceMotion=true;s.ControlFill="#382D46";app.ChangeSettings();
+        var ai=app.Assistant;ai.Options.Enabled=true;
+        typeof(AssistantRuntime).GetField("state",Fields)!.SetValue(ai,AssistantState.Error);
+        var missingModel=Localization.Text("Enter the model identifier supplied by your provider.");
+        typeof(AssistantRuntime).GetProperty("Status",Fields)!.SetValue(ai,missingModel);
+        island.OpenAssistant(false);await Settle();
+        var view=island.IslandAssistantView!;
+        var statusFrame=(Border)typeof(AssistantView).GetField("statusHost",Fields)!.GetValue(view)!;
+        var status=Diagnostics.Descendants(statusFrame).OfType<TextBlock>().First();
+        check("Inline assistant error uses the shared translucent frame and retains its error text",
+            statusFrame.IsVisible && statusFrame.Style==view.FindResource("GlassFieldFrame") &&
+            statusFrame.Background==app.FindResource("GlassFieldFill") && statusFrame.BorderThickness==new Thickness(1) &&
+            status.Text==missingModel && status.Foreground==UI.Brush("#EAB3AD"));
+        SavePanel("outlined-assistant-error");
         island.DiagnosticPointerPresent=false;
     }
 }

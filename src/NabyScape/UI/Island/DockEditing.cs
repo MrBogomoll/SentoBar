@@ -16,6 +16,8 @@ internal readonly record struct DockLayout(double Horizontal,double Top,double W
 
 public sealed partial class OverlayWindow
 {
+    private const double ResizeGripSize=16;
+    private const double ResizeGripPadding=2;
     private readonly Canvas dockHandles=new(){Visibility=Visibility.Collapsed};
     private Thumb moveGrip=null!,resizeLeft=null!,resizeRight=null!;
     private DockLayout? editingOrigin;
@@ -27,9 +29,14 @@ public sealed partial class OverlayWindow
     {
         Thumb Grip(string name,Cursor cursor,bool move,bool left=false)
         {
-            var handle=new Thumb{Width=move?42:16,Height=move?9:16,Cursor=cursor,Focusable=true,ToolTip=name+Localization.Text(" · arrow keys adjust · Esc cancels"),Background=Brushes.Transparent};UI.Named(handle,name);
+            var handle=new Thumb{Width=move?42:ResizeGripSize,Height=move?9:ResizeGripSize,Cursor=cursor,Focusable=true,ToolTip=name+Localization.Text(" · arrow keys adjust · Esc cancels"),Background=Brushes.Transparent};UI.Named(handle,name);
             var shape=new FrameworkElementFactory(typeof(Border));shape.SetValue(Border.BackgroundProperty,UI.Brush("#989DA7"));shape.SetValue(Border.CornerRadiusProperty,new CornerRadius(2));shape.SetValue(WidthProperty,move?26d:6d);shape.SetValue(HeightProperty,move?3d:6d);shape.SetValue(OpacityProperty,.7);
-            handle.Template=new ControlTemplate(typeof(Thumb)){VisualTree=shape};dockHandles.Children.Add(handle);
+            var hitArea=new FrameworkElementFactory(typeof(Grid));
+            hitArea.SetValue(Panel.BackgroundProperty,Brushes.Transparent);
+            shape.SetValue(HorizontalAlignmentProperty,HorizontalAlignment.Center);
+            shape.SetValue(VerticalAlignmentProperty,VerticalAlignment.Center);
+            hitArea.AppendChild(shape);
+            handle.Template=new ControlTemplate(typeof(Thumb)){VisualTree=hitArea};dockHandles.Children.Add(handle);
             handle.DragStarted+=(_,_)=>
             {
                 if(IsAnimating || IsTucked){handle.CancelDrag();return;}
@@ -86,8 +93,12 @@ public sealed partial class OverlayWindow
         if(moveGrip==null)return;
         bool visible=(app.Settings.DockUnlocked || Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) && !userHidden && !IsTucked && !assistantPeeking && !noticeShowing;
         dockHandles.Visibility=visible?Visibility.Visible:Visibility.Collapsed;if(!visible)return;
-        double left=(root.ActualWidth-PaintedWidth)/2;
-        Canvas.SetLeft(moveGrip,left+PaintedWidth/2-21);Canvas.SetTop(moveGrip,1);
-        Canvas.SetLeft(resizeLeft,left+2);Canvas.SetLeft(resizeRight,left+PaintedWidth-18);Canvas.SetTop(resizeLeft,Math.Max(0,PaintedHeight-18));Canvas.SetTop(resizeRight,Math.Max(0,PaintedHeight-18));
+        double width=PaintedWidth,height=PaintedHeight,left=Math.Max(0,(root.ActualWidth-width)/2);
+        Canvas.SetLeft(moveGrip,left+width/2-21);Canvas.SetTop(moveGrip,1);
+        // The transparent HWND only receives input inside the painted contour.
+        double inset=IslandGeometry.BottomInset(width,height,surface.ContourRadius,surface.Notch,ResizeGripPadding)+ResizeGripPadding;
+        double top=Math.Max(0,height-ResizeGripSize-ResizeGripPadding);
+        Canvas.SetLeft(resizeLeft,left+inset);Canvas.SetLeft(resizeRight,left+width-inset-ResizeGripSize);
+        Canvas.SetTop(resizeLeft,top);Canvas.SetTop(resizeRight,top);
     }
 }

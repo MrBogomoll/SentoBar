@@ -10,9 +10,9 @@
     <ApplicationIcon>Assets\island.ico</ApplicationIcon>
     <AssemblyName>NabyScape</AssemblyName>
     <RootNamespace>NabyScape</RootNamespace>
-    <Version>1.2.0-beta.12</Version>
-    <FileVersion>1.2.0.12</FileVersion>
-    <InformationalVersion>1.2.0_b.12</InformationalVersion>
+    <Version>1.2.0-beta.13</Version>
+    <FileVersion>1.2.0.13</FileVersion>
+    <InformationalVersion>1.2.0_b.13</InformationalVersion>
     <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <Title>NabyScape</Title>
     <Product>NabyScape</Product>
