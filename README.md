@@ -4,12 +4,14 @@
 
 Стеклянная панель для Windows с музыкой, текстами песен, заметками, задачами и таймерами. Интерфейс на русском, светлая и тёмная темы. Из панели можно открыть чат с помощником Сенто.
 
-**SentoBar 2.0.0** — первый стабильный выпуск под новым именем. [Что изменилось](https://github.com/MrBogomoll/nabyscape/releases/tag/v2.0.0)
+SentoBar — форк NabyScape. Автор оригинального проекта — **BillyNabil**. [Оригинальный репозиторий](https://github.com/BillyNabil/nabyscape)
+
+**SentoBar 2.0.0** — первый стабильный выпуск под новым именем. [Что изменилось](https://github.com/MrBogomoll/SentoBar/releases/tag/v2.0.0)
 
 | Windows | Установщик | Без установки |
 | --- | --- | --- |
-| x64 | [Скачать EXE](https://github.com/MrBogomoll/nabyscape/releases/download/v2.0.0/SentoBar-win-x64-Setup.exe) | [Portable ZIP](https://github.com/MrBogomoll/nabyscape/releases/download/v2.0.0/SentoBar-win-x64-Portable.zip) |
-| ARM64 | [Скачать EXE](https://github.com/MrBogomoll/nabyscape/releases/download/v2.0.0/SentoBar-win-arm64-Setup.exe) | [Portable ZIP](https://github.com/MrBogomoll/nabyscape/releases/download/v2.0.0/SentoBar-win-arm64-Portable.zip) |
+| x64 | [Скачать EXE](https://github.com/MrBogomoll/SentoBar/releases/download/v2.0.0/SentoBar-win-x64-Setup.exe) | [Portable ZIP](https://github.com/MrBogomoll/SentoBar/releases/download/v2.0.0/SentoBar-win-x64-Portable.zip) |
+| ARM64 | [Скачать EXE](https://github.com/MrBogomoll/SentoBar/releases/download/v2.0.0/SentoBar-win-arm64-Setup.exe) | [Portable ZIP](https://github.com/MrBogomoll/SentoBar/releases/download/v2.0.0/SentoBar-win-arm64-Portable.zip) |
 
 ## Сама панель
 
@@ -62,7 +64,7 @@
 
 Поддерживаются Windows 10 версии 2004 и новее и Windows 11. Среда .NET входит в комплект.
 
-1. Выберите установщик для архитектуры своего ПК. [Файлы релиза и контрольные суммы](https://github.com/MrBogomoll/nabyscape/releases/tag/v2.0.0)
+1. Выберите установщик для архитектуры своего ПК. [Файлы релиза и контрольные суммы](https://github.com/MrBogomoll/SentoBar/releases/tag/v2.0.0)
 2. Если панель уже запущена, завершите её через значок в области уведомлений.
 3. Запустите установщик и откройте SentoBar через меню «Пуск». Для запуска без установки распакуйте Portable ZIP и откройте `SentoBar.exe`.
 
@@ -72,7 +74,7 @@ Portable-сборка хранит данные в профиле Windows. Ус�
 
 SentoBar хранит настройки, заметки и задачи в `%LOCALAPPDATA%\SentoBar`. При переходе с прежней русской сборки её профиль из `%LOCALAPPDATA%\NabyScape` копируется в новый, а исходный остаётся резервной копией. Заметки и задачи — в файле `productivity.json`. Папку можно открыть из раздела **«Общие»**. Для резервной копии завершите приложение и скопируйте эту папку.
 
-Автоматические обновления оригинального проекта отключены, чтобы они не заменили изменения форка. Новые версии устанавливаются вручную из [релизов этого репозитория](https://github.com/MrBogomoll/nabyscape/releases).
+Автоматические обновления оригинального проекта отключены, чтобы они не заменили изменения форка. Новые версии устанавливаются вручную из [релизов этого репозитория](https://github.com/MrBogomoll/SentoBar/releases).
 
 Автоматическое скрытие и исключения уже доступны. Дальнейшая доработка поведения панели при разделённом экране остаётся отдельной задачей.
 
@@ -94,6 +96,6 @@ SentoBar хранит настройки, заметки и задачи в `%LO
 
 ## Обратная связь и лицензия
 
-Ошибки и предложения можно оставить в [Issues](https://github.com/MrBogomoll/nabyscape/issues). Укажите версию, тему оформления и шаги, после которых возникает проблема.
+Ошибки и предложения можно оставить в [Issues](https://github.com/MrBogomoll/SentoBar/issues). Укажите версию, тему оформления и шаги, после которых возникает проблема.
 
-SentoBar вырос из NabyScape. Форк распространяется по [лицензии MIT](LICENSE). Исходный проект — [BillyNabil/nabyscape](https://github.com/BillyNabil/nabyscape). Уведомления автора и лицензии зависимостей сохранены в [licenses](licenses).
+Форк распространяется по [лицензии MIT](LICENSE). Исходный проект — [BillyNabil/nabyscape](https://github.com/BillyNabil/nabyscape). Уведомления автора и лицензии зависимостей сохранены в [licenses](licenses).

@@ -18,7 +18,7 @@
     <Product>SentoBar</Product>
     <Company>SentoBar</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/MrBogomoll/nabyscape</RepositoryUrl>
+    <RepositoryUrl>https://github.com/MrBogomoll/SentoBar</RepositoryUrl>
     <!-- WPF owns DPI awareness; WinForms is used only for Screen and NotifyIcon. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
     <StartupObject>SentoBar.App</StartupObject>

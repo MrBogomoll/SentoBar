@@ -2,7 +2,7 @@
 
 ## Install and update
 
-Download the x64 or ARM64 installer or portable ZIP. Starting with 2.0.0, the executable is `SentoBar.exe`. [SentoBar releases](https://github.com/MrBogomoll/nabyscape/releases) Install updates manually. Close the app through its tray menu before replacing a running portable copy.
+Download the x64 or ARM64 installer or portable ZIP. Starting with 2.0.0, the executable is `SentoBar.exe`. [SentoBar releases](https://github.com/MrBogomoll/SentoBar/releases) Install updates manually. Close the app through its tray menu before replacing a running portable copy.
 
 ## Use the panel
 

@@ -16,7 +16,7 @@ internal sealed record OfficialRelease(Version Version,string Tag,Uri Notes,Uri 
 internal sealed class UpdateState { public DateTimeOffset LastAttempt {get;set;} }
 internal sealed class OfficialUpdates : IDisposable
 {
-    internal const string ProjectPath="MrBogomoll/nabyscape";
+    internal const string ProjectPath="MrBogomoll/SentoBar";
     internal const string Repository="https://github.com/"+ProjectPath;
     internal static readonly Uri Endpoint=new("https://api.github.com/repos/"+ProjectPath+"/releases/latest");
     internal static Version InstalledVersion=>new(typeof(App).Assembly.GetName().Version!.ToString(3));

@@ -21,10 +21,10 @@ InstallerSwitches:
 UpgradeBehavior: install
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/MrBogomoll/nabyscape/releases/download/v$Version/SentoBar-win-x64-Setup.exe
+  InstallerUrl: https://github.com/MrBogomoll/SentoBar/releases/download/v$Version/SentoBar-win-x64-Setup.exe
   InstallerSha256: $hash
 - Architecture: arm64
-  InstallerUrl: https://github.com/MrBogomoll/nabyscape/releases/download/v$Version/SentoBar-win-arm64-Setup.exe
+  InstallerUrl: https://github.com/MrBogomoll/SentoBar/releases/download/v$Version/SentoBar-win-arm64-Setup.exe
   InstallerSha256: $arm64Hash
 ManifestType: installer
 ManifestVersion: 1.10.0
@@ -45,9 +45,9 @@ PackageLocale: en-US
 Publisher: MrBogomoll
 PackageName: SentoBar
 License: MIT
-LicenseUrl: https://github.com/MrBogomoll/nabyscape/blob/main/LICENSE
+LicenseUrl: https://github.com/MrBogomoll/SentoBar/blob/main/LICENSE
 ShortDescription: A desktop island for music, focus, and everyday tools.
-PackageUrl: https://github.com/MrBogomoll/nabyscape
+PackageUrl: https://github.com/MrBogomoll/SentoBar
 ManifestType: defaultLocale
 ManifestVersion: 1.10.0
 "@ | Set-Content -LiteralPath (Join-Path $OutputDirectory "$base.locale.en-US.yaml") -Encoding utf8

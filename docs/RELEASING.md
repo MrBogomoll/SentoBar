@@ -1,6 +1,6 @@
 # SentoBar releases
 
-The stable Windows builds are distributed through the [fork’s GitHub releases](https://github.com/MrBogomoll/nabyscape/releases). SentoBar receives manual updates. The inherited upstream updater is disabled in production.
+The stable Windows builds are distributed through the [fork’s GitHub releases](https://github.com/MrBogomoll/SentoBar/releases). SentoBar receives manual updates. The inherited upstream updater is disabled in production.
 
 Local betas use the last stable version plus `_b.N` and stay local until explicitly approved for publication. Stable tags use `vX.Y.Z`. Agree on the stable version with the project owner and update the project version before packaging.
 
