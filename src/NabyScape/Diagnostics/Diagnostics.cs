@@ -139,6 +139,7 @@ internal static class Diagnostics
             if(Environment.GetCommandLineArgs().Contains("--assistant-transform-only")){await AssistantTransformDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--panel-backdrop-only")){await PanelBackdropDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--mini-layout-only")){await MiniLayoutDiagnostics.Run(app,overlay,directory,Check);return;}
+            if(Environment.GetCommandLineArgs().Contains("--shortcut-drop-only")){await ShortcutDropDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--hover-responsiveness-only")){await HoverResponsivenessDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--recent-ux-only")){await RecentUxDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--welcome-only")){await WelcomeDiagnostics.Run(app,directory,Check);return;}

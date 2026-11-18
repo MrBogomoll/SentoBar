@@ -69,7 +69,7 @@ public sealed partial class OverlayWindow
     {
         var ids=hoverDeckCache??=HoverPagePolicy.Pages(app.Settings);
 
-        if((fileDragActive || shelfDropBrowsing) && !ids.Contains("files"))ids=ids.Append("files").ToArray();
+        if((fileDragActive && !shortcutDropActive || shelfDropBrowsing) && !ids.Contains("files"))ids=ids.Append("files").ToArray();
         return ids;
     }
     private static string PeekName(string id)=>id=="media"?Localization.Text("Music"):Localization.Text(Settings.Names.GetValueOrDefault(id)??id);
@@ -191,7 +191,7 @@ public sealed partial class OverlayWindow
         {
             var view=id switch
             {
-                "stopwatch"=>(FrameworkElement)new StopwatchView(app,centered:true),"calendar"=>BuildPeekCalendar(),"notes"=>BuildPeekNote(),"files"=>BuildPeekShelf(),"system"=>BuildPeekSystem(),"clips" or "tasks"=>BuildToolPeek(id),_=>BuildExtraPeek(id)
+                "stopwatch"=>(FrameworkElement)new StopwatchView(app),"calendar"=>BuildPeekCalendar(),"notes"=>BuildPeekNote(),"files"=>BuildPeekShelf(),"system"=>BuildPeekSystem(),"clips" or "tasks"=>BuildToolPeek(id),_=>BuildExtraPeek(id)
             };
             AddPeekView(id,view);
         }
@@ -290,9 +290,8 @@ public sealed partial class OverlayWindow
         foreach(var pair in peekViews)
         {
             pair.Value.Width=safe.Width;
-            bool centered=peekDetailed && pair.Key is "battery" or "shortcuts" or "clock" or "power" or "voice" or "volume" or "system" or "stopwatch" or "awake";
-            pair.Value.Height=centered?double.NaN:contentHeight;
-            pair.Value.VerticalAlignment=centered?VerticalAlignment.Center:VerticalAlignment.Top;
+            pair.Value.Height=contentHeight;
+            pair.Value.VerticalAlignment=VerticalAlignment.Top;
             if(peekClocks.TryGetValue(pair.Key,out var countdown))
                 countdown.Status.Visibility=safe.Width>=320?Visibility.Visible:Visibility.Collapsed;
             if(pair.Value is Panel page)foreach(FrameworkElement child in page.Children)
@@ -546,11 +545,11 @@ public sealed partial class OverlayWindow
         app.SaveSession();
     }
     private FrameworkElement BuildPeekSystem()
-    {var page=PeekSummary("system");peekSystem.TextAlignment=TextAlignment.Center;peekSystem.Margin=new(0,7,0,0);page.Children.Add(peekSystem);return page;}
+    {var page=PeekSummary("system");peekSystem.Margin=new(0,7,0,0);page.Children.Add(peekSystem);return page;}
     private FrameworkElement BuildPeekCalendar()
     {
         var page=new StackPanel();peekEventTime.Margin=new(0,3,0,9);page.Children.Add(peekEventTime);peekEventTitle.MaxHeight=43;peekEventTitle.TextWrapping=TextWrapping.NoWrap;peekEventTime.TextWrapping=TextWrapping.NoWrap;peekEventTime.TextTrimming=TextTrimming.CharacterEllipsis;peekShelfCount.TextWrapping=TextWrapping.NoWrap;peekShelfCount.TextTrimming=TextTrimming.CharacterEllipsis;peekEventTitle.TextTrimming=TextTrimming.CharacterEllipsis;page.Children.Add(peekEventTitle);
-        var actions=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center,Margin=new(0,10,0,0)};peekJoin=GlassPeekButton("Join preview meeting","Join meeting",()=>{if(peekEvent?.MeetingUrl.Length>0)try{ShortcutService.Open(new(){Target=peekEvent.MeetingUrl});}catch(Exception ex){app.Notify(Localization.Text("Could not open meeting"),ex.Message);}});peekJoin.Content=Localization.Text("Join meeting");peekJoin.FontSize=12;peekJoin.Margin=new(0,0,6,4);actions.Children.Add(peekJoin);var open=GlassPeekButton("Open local calendar","Calendar",()=>ShowTools("calendar"));open.FontSize=12;actions.Children.Add(open);page.Children.Add(actions);return page;
+        var actions=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,10,0,0)};peekJoin=GlassPeekButton("Join preview meeting","Join meeting",()=>{if(peekEvent?.MeetingUrl.Length>0)try{ShortcutService.Open(new(){Target=peekEvent.MeetingUrl});}catch(Exception ex){app.Notify(Localization.Text("Could not open meeting"),ex.Message);}});peekJoin.Content=Localization.Text("Join meeting");peekJoin.FontSize=12;peekJoin.Margin=new(0,0,6,4);actions.Children.Add(peekJoin);var open=GlassPeekButton("Open local calendar","Calendar",()=>ShowTools("calendar"));open.FontSize=12;actions.Children.Add(open);page.Children.Add(actions);return page;
     }
     private FrameworkElement BuildPeekNote()
     {
@@ -563,7 +562,7 @@ public sealed partial class OverlayWindow
         var save=GlassPeekButton("Save preview note","Save note",SavePeekNote);save.FontSize=12;peekNoteSave=save;save.IsEnabled=!string.IsNullOrWhiteSpace(peekNote.Text);
         var open=GlassPeekButton("Open all notes","All notes",()=>{FlushNotes();app.ShowSettings("Notes");});open.FontSize=12;
         var actions=GlassDockAppearance.ActionRow(save,open);
-        actions.HorizontalAlignment=HorizontalAlignment.Center;
+        actions.HorizontalAlignment=HorizontalAlignment.Left;
         actions.Margin=new(0,9,0,0);
         page.Children.Add(actions);
         return page;
@@ -586,7 +585,7 @@ public sealed partial class OverlayWindow
         var page=new StackPanel();peekShelfCount.Margin=new(0,3,0,9);page.Children.Add(peekShelfCount);
         peekShelfFile=PlainPeekButton(Localization.Text("Open or drag preview shelf file"),()=>{if(peekFilePath!=null)try{ShortcutService.Open(new(){Target=peekFilePath});}catch(Exception ex){app.Notify(Localization.Text("Could not open file"),ex.Message);}});peekShelfName.TextTrimming=TextTrimming.CharacterEllipsis;peekShelfName.TextWrapping=TextWrapping.NoWrap;var fileRow=new DockPanel();fileRow.Children.Add(peekShelfArt);fileRow.Children.Add(peekShelfName);peekShelfFile.Content=fileRow;peekShelfFile.HorizontalContentAlignment=HorizontalAlignment.Left;peekShelfFile.Padding=new(0);peekShelfFile.Height=48;page.Children.Add(peekShelfFile);Point start=default;
         peekShelfFile.PreviewMouseLeftButtonDown+=(_,e)=>start=e.GetPosition(peekShelfFile);peekShelfFile.PreviewMouseMove+=(_,e)=>{var delta=e.GetPosition(peekShelfFile)-start;if(e.LeftButton==MouseButtonState.Pressed && peekFilePath!=null && (System.IO.File.Exists(peekFilePath) || System.IO.Directory.Exists(peekFilePath)) && (Math.Abs(delta.X)>SystemParameters.MinimumHorizontalDragDistance || Math.Abs(delta.Y)>SystemParameters.MinimumVerticalDragDistance))DragDrop.DoDragDrop(peekShelfFile,new DataObject(DataFormats.FileDrop,new[]{peekFilePath}),DragDropEffects.Copy|DragDropEffects.Link);};
-        var open=GlassPeekButton("Open full file shelf","Open shelf",()=>ShowTools("files"));open.FontSize=12;open.HorizontalAlignment=HorizontalAlignment.Center;open.Margin=new(0,8,0,0);page.Children.Add(open);return page;
+        var open=GlassPeekButton("Open full file shelf","Open shelf",()=>ShowTools("files"));open.FontSize=12;open.HorizontalAlignment=HorizontalAlignment.Left;open.Margin=new(0,8,0,0);page.Children.Add(open);return page;
     }
     private async System.Threading.Tasks.Task LoadPeekShelfArtwork(string path)
     {var target=new Image();await LoadShelfThumbnail(path,target);if(peekShelfArtPath==path)peekShelfArt.Source=target.Source;}

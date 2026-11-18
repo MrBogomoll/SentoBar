@@ -232,7 +232,7 @@ public sealed partial class OverlayWindow : Window
                 case "system":small=true;cpuBar.Foreground=ramBar.Foreground=Brushes.White;cpuBar.Background=ramBar.Background=UI.Brush("#3A3A3C");card=UI.Card(Localization.Text("System"),cpu,cpuBar,ram,ramBar);break;
                 case "battery":small=true;card=UI.Card(Localization.Text("Battery"),battery);batteryCard=card;break;
                 case "shortcuts":
-                    var shortcuts=new WrapPanel();foreach(var shortcut in app.Settings.Shortcuts){var button=LaunchButton(shortcut);shortcuts.Children.Add(button);}card=UI.Card(Localization.Text("Quick launch"),UI.Button(Localization.Text("Search commands  ·  Ctrl+K"),()=>ShowCommands()),shortcuts);break;
+                    var shortcuts=new WrapPanel();foreach(var shortcut in app.Settings.Shortcuts){var button=LaunchButton(shortcut);shortcuts.Children.Add(button);}card=UI.Card(Localization.Text("Quick launch"),UI.CaptionButton("Add shortcut",()=>app.ShowSettings("Launch")),UI.Button(Localization.Text("Search commands  ·  Ctrl+K"),()=>ShowCommands()),shortcuts);card.Tag="shortcut-drop";break;
                 case "tools":card=UI.Card(Localization.Text("Tools"),BuildToolsPage());break;
                 default:if(Settings.ToolNames.ContainsKey(widget.Id)){string toolId=widget.Id;card=UI.Card(Localization.Text(Settings.ToolNames[toolId]),UI.Button(Localization.Text("Open ")+Localization.Text(Settings.ToolNames[toolId]),()=>ShowTools(toolId)));}else continue;break;
             }

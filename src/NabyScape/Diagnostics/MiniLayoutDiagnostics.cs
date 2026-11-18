@@ -124,7 +124,7 @@ internal static class MiniLayoutDiagnostics
                         string actionId=id=="battery"?"Power settings":id=="power"?"Choose a plan":"All shortcuts";
                         var action=Diagnostics.Descendants(viewport).OfType<Button>().Single(b=>b.IsVisible && UI.Identity(b)==actionId);
                         var bounds=action.TransformToAncestor(viewport).TransformBounds(new Rect(action.RenderSize));
-                        check(scenario+" centers the action within the content width",Math.Abs(bounds.Left+bounds.Width/2-viewport.ActualWidth/2)<.75);
+                        check(scenario+" aligns the action with the left content edge",Math.Abs(bounds.Left)<.75);
                     }
                     if(style=="Dots")
                     {
@@ -170,7 +170,7 @@ internal static class MiniLayoutDiagnostics
             var tiles=Field<Grid>("peekShortcutTiles");
             var singleShortcut=tiles.Children.OfType<Button>().Single();
             var shortcutBounds=singleShortcut.TransformToAncestor(tiles).TransformBounds(new Rect(singleShortcut.RenderSize));
-            check("A single shortcut is centered",Math.Abs(shortcutBounds.Left+shortcutBounds.Width/2-tiles.ActualWidth/2)<.75);
+            check("A single shortcut starts at the left content edge",Math.Abs(shortcutBounds.Left)<.75);
             s.Shortcuts=previousShortcuts;app.ChangeSettings();island.Collapse();island.PreviewActivity();
 
             foreach(string id in new[]{"timer","focus"})

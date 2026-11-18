@@ -27,7 +27,6 @@ public sealed partial class OverlayWindow
         var page=PeekSummary(id);
         var detail=UI.Text("",id=="clock"?30:12,UI.Muted);
         detail.Margin=new(0,6,0,id=="clock"?3:8);
-        detail.TextAlignment=TextAlignment.Center;
         page.Children.Add(detail);extraPeekLabels[id]=detail;
         if(id=="volume")
         {
@@ -38,13 +37,12 @@ public sealed partial class OverlayWindow
         {
             detail.FontWeight=FontWeights.SemiBold;
             peekDate=UI.Text("",11,UI.Muted);
-            peekDate.TextAlignment=TextAlignment.Center;
             peekDate.Margin=new(0,0,0,8);
             page.Children.Add(peekDate);
         }
         string caption=id=="power"?"Choose a plan":Localization.Text("Open ")+PeekName(id);
         var open=GlassPeekButton(caption,caption,OpenPeekPage);
-        open.HorizontalAlignment=HorizontalAlignment.Center;
+        open.HorizontalAlignment=HorizontalAlignment.Left;
         if(id=="clock")open.Margin=new(0,3,0,0);
         page.Children.Add(open);
         return page;
@@ -53,7 +51,6 @@ public sealed partial class OverlayWindow
     {
         var page=new StackPanel();
         var heading=UI.Heading(PeekName(id),13);
-        heading.TextAlignment=TextAlignment.Center;
         page.Children.Add(heading);
         return page;
     }
@@ -96,15 +93,13 @@ public sealed partial class OverlayWindow
     {
         var page=PeekSummary("battery");
         var summary=new StackPanel{Margin=new(0,6,0,0)};
-        peekBatteryValue.TextAlignment=peekBatteryStatus.TextAlignment=TextAlignment.Center;
         peekBatteryStatus.Margin=new(0,3,0,0);
         summary.Children.Add(peekBatteryValue);
         summary.Children.Add(peekBatteryStatus);
         page.Children.Add(summary);
-        peekBatteryLevel.MaxWidth=270;
         page.Children.Add(peekBatteryLevel);
         var settings=GlassPeekButton("Power settings","Power settings",()=>OpenPowerSettings());
-        settings.HorizontalAlignment=HorizontalAlignment.Center;
+        settings.HorizontalAlignment=HorizontalAlignment.Left;
         settings.Margin=new(0,8,0,0);
         page.Children.Add(settings);
         return page;
@@ -125,15 +120,13 @@ public sealed partial class OverlayWindow
         DetachMediaControl(batteryOverviewValue);
         DetachMediaControl(batteryOverviewStatus);
         DetachMediaControl(batteryOverviewLevel);
-        var heading=UI.Caption("Battery",17);heading.TextAlignment=TextAlignment.Center;page.Children.Add(heading);
-        batteryOverviewValue.TextAlignment=batteryOverviewStatus.TextAlignment=TextAlignment.Center;
-        batteryOverviewLevel.MaxWidth=320;
+        page.Children.Add(UI.Caption("Battery",17));
         batteryOverviewValue.Margin=new(0,8,0,3);
         page.Children.Add(batteryOverviewValue);
         page.Children.Add(batteryOverviewStatus);
         page.Children.Add(batteryOverviewLevel);
         var settings=UI.CaptionButton("Power settings",OpenPowerSettings);
-        settings.HorizontalAlignment=HorizontalAlignment.Center;
+        settings.HorizontalAlignment=HorizontalAlignment.Left;
         settings.Margin=new(0,10,0,0);
         page.Children.Add(settings);
         UpdateBatteryOverview();
@@ -172,15 +165,16 @@ public sealed partial class OverlayWindow
     private FrameworkElement BuildPeekShortcuts()
     {
         var page=PeekSummary("shortcuts");
-        for(int i=0;i<4;i++)peekShortcutTiles.ColumnDefinitions.Add(new());
+        for(int i=0;i<2;i++)peekShortcutTiles.ColumnDefinitions.Add(new());
         peekShortcutTiles.Margin=new(0,6,0,0);
-        peekShortcutTiles.MaxWidth=480;
         page.Children.Add(peekShortcutTiles);
         var open=GlassPeekButton("All shortcuts","All shortcuts",OpenPeekPage);
-        open.HorizontalAlignment=HorizontalAlignment.Center;
-        open.Margin=new(0,4,0,0);
+        open.HorizontalAlignment=HorizontalAlignment.Left;
         open.FontSize=11;
-        page.Children.Add(open);
+        var add=GlassPeekButton("Add shortcut","Add shortcut",()=>app.ShowSettings("Launch"));
+        var actions=GlassDockAppearance.ActionRow(open,add);
+        actions.Margin=new(0,4,0,0);
+        page.Children.Add(actions);
         return page;
     }
 
@@ -195,8 +189,7 @@ public sealed partial class OverlayWindow
         if(shortcuts.Length==0)
         {
             var empty=UI.Caption("Add shortcuts in Settings.",11,UI.Muted);
-            empty.TextAlignment=TextAlignment.Center;
-            Grid.SetColumnSpan(empty,4);
+            Grid.SetColumnSpan(empty,2);
             peekShortcutTiles.Children.Add(empty);
             return;
         }
@@ -218,7 +211,7 @@ public sealed partial class OverlayWindow
             button.HorizontalContentAlignment=HorizontalAlignment.Stretch;
             button.Padding=new(8,2,6,2);
             button.Height=31;
-            button.Margin=new(3,0,3,4);
+            button.Margin=new(0,0,6,4);
             button.ToolTip=name;
             var row=new DockPanel{LastChildFill=true,IsHitTestVisible=false};
             var icon=new ShortcutIcon(shortcut);
@@ -234,12 +227,8 @@ public sealed partial class OverlayWindow
             label.VerticalAlignment=VerticalAlignment.Center;
             row.Children.Add(label);
             button.Content=row;
-            bool single=shortcuts.Length==1;
-            bool loneLast=i==shortcuts.Length-1 && i%2==0;
             Grid.SetRow(button,i/2);
-            Grid.SetColumn(button,loneLast && !single?1:i%2*2);
-            Grid.SetColumnSpan(button,single?4:2);
-            if(single)button.MaxWidth=210;
+            Grid.SetColumn(button,i%2);
             peekShortcutTiles.Children.Add(button);
         }
     }
@@ -249,7 +238,6 @@ public sealed partial class OverlayWindow
         var page=PeekSummary("awake");
         var status=UI.Text("",11,UI.Muted);
         status.Margin=new(0,4,0,2);
-        status.TextAlignment=TextAlignment.Center;
         page.Children.Add(status);
         var duration=CreateAwakeDuration();
         duration.MinHeight=26;
@@ -263,7 +251,7 @@ public sealed partial class OverlayWindow
             MutateUtility(()=>{if(app.Awake.Active)app.Awake.Stop();else StartAwake(duration,display);});
             refreshPeekAwake?.Invoke();
         });
-        toggle.HorizontalAlignment=HorizontalAlignment.Center;
+        toggle.HorizontalAlignment=HorizontalAlignment.Left;
         toggle.FontSize=11;
         page.Children.Add(duration);
         page.Children.Add(display);
@@ -294,7 +282,7 @@ internal sealed class WeatherGlance : UserControl
     private bool busy;
     internal WeatherGlance(App app)
     {
-        this.app=app;var content=new Grid{Margin=new(8),VerticalAlignment=VerticalAlignment.Center};content.ColumnDefinitions.Add(new());content.ColumnDefinitions.Add(new(){Width=new GridLength(90)});var info=new StackPanel();info.Children.Add(UI.Text(Localization.Text("Weather"),10,UI.Muted));info.Children.Add(temperature);info.Children.Add(detail);content.Children.Add(info);Grid.SetColumn(art,1);content.Children.Add(art);scene.Children.Add(content);Content=scene;
+        this.app=app;var content=new Grid{VerticalAlignment=VerticalAlignment.Top};content.ColumnDefinitions.Add(new());content.ColumnDefinitions.Add(new(){Width=new GridLength(90)});var info=new StackPanel();info.Children.Add(UI.Heading(Localization.Text("Weather"),13));info.Children.Add(temperature);info.Children.Add(detail);content.Children.Add(info);Grid.SetColumn(art,1);content.Children.Add(art);scene.Children.Add(content);Content=scene;
         Loaded+=(_,_)=>{lifetime??=new();app.Updated-=Update;app.SettingsChanged-=Changed;app.Updated+=Update;app.SettingsChanged+=Changed;Watch(IsVisible);Changed();};
         Unloaded+=(_,_)=>{Watch(false);app.Updated-=Update;app.SettingsChanged-=Changed;lifetime?.Cancel();lifetime?.Dispose();lifetime=null;};
         IsVisibleChanged+=(_,_)=>{if(!IsLoaded)return;Watch(IsVisible);if(IsVisible)Changed();};

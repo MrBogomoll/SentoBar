@@ -269,7 +269,7 @@ public sealed partial class OverlayWindow
             return WidgetOn("media")?WrapMediaLyrics(controls):controls;
         }
         if(page=="voice")return new AssistantVoiceView(app);
-        if(page=="stopwatch")return new StopwatchView(app,centered:true);
+        if(page=="stopwatch")return new StopwatchView(app);
         if(page is "timer" or "focus")
             return new CountdownView(app,page=="focus");
         if(page=="status")return BuildSystemMonitor();
@@ -278,7 +278,6 @@ public sealed partial class OverlayWindow
             var clockPage=new StackPanel();
             if(clock.Parent is Panel clockOwner)clockOwner.Children.Remove(clock);
             if(date.Parent is Panel dateOwner)dateOwner.Children.Remove(date);
-            clock.TextAlignment=date.TextAlignment=TextAlignment.Center;
             clockPage.Children.Add(clock);
             date.Margin=new(0,3,0,12);
             clockPage.Children.Add(date);
@@ -290,8 +289,15 @@ public sealed partial class OverlayWindow
         }
         if(page=="battery")return BuildBatteryOverview();
         if(page=="volume")return BuildVolumePage();
-        var launch=new StackPanel{Margin=new(0,2,0,8)};var search=UI.CaptionButton("Search commands  ·  Ctrl+K",()=>ShowCommands());search.Padding=new(12,8,12,8);search.Margin=new(0,0,0,16);search.HorizontalContentAlignment=HorizontalAlignment.Stretch;var searchRow=new DockPanel();var keys=UI.Caption("Ctrl+K",10);keys.ClearValue(TextBlock.ForegroundProperty);keys.Opacity=.72;DockPanel.SetDock(keys,Dock.Right);searchRow.Children.Add(keys);var searchIcon=Icons.Create("search",16,UI.Muted);searchIcon.Margin=new(0,0,12,0);DockPanel.SetDock(searchIcon,Dock.Left);searchRow.Children.Add(searchIcon);var searchLabel=UI.Caption("Search commands",12);searchLabel.ClearValue(TextBlock.ForegroundProperty);searchRow.Children.Add(searchLabel);search.Content=searchRow;launch.Children.Add(search);
-        var shortcuts=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Center};KeyboardNavigation.SetDirectionalNavigation(shortcuts,KeyboardNavigationMode.Cycle);launch.Children.Add(shortcuts);foreach(var shortcut in app.Settings.Shortcuts)
+        var launch=new StackPanel{Margin=new(0,2,0,8)};
+        var addShortcut=UI.CaptionButton("Add shortcut",()=>app.ShowSettings("Launch"));
+        addShortcut.HorizontalAlignment=HorizontalAlignment.Left;
+        launch.Children.Add(addShortcut);
+        var dropHelp=UI.Caption("Drop a file or folder here to add a shortcut.",11,UI.Muted);
+        dropHelp.Margin=new(0,2,0,8);
+        launch.Children.Add(dropHelp);
+        var search=UI.CaptionButton("Search commands  ·  Ctrl+K",()=>ShowCommands());search.Padding=new(12,8,12,8);search.Margin=new(0,0,0,16);search.HorizontalContentAlignment=HorizontalAlignment.Stretch;var searchRow=new DockPanel();var keys=UI.Caption("Ctrl+K",10);keys.ClearValue(TextBlock.ForegroundProperty);keys.Opacity=.72;DockPanel.SetDock(keys,Dock.Right);searchRow.Children.Add(keys);var searchIcon=Icons.Create("search",16,UI.Muted);searchIcon.Margin=new(0,0,12,0);DockPanel.SetDock(searchIcon,Dock.Left);searchRow.Children.Add(searchIcon);var searchLabel=UI.Caption("Search commands",12);searchLabel.ClearValue(TextBlock.ForegroundProperty);searchRow.Children.Add(searchLabel);search.Content=searchRow;launch.Children.Add(search);
+        var shortcuts=new WrapPanel();KeyboardNavigation.SetDirectionalNavigation(shortcuts,KeyboardNavigationMode.Cycle);launch.Children.Add(shortcuts);foreach(var shortcut in app.Settings.Shortcuts)
         {
             shortcuts.Children.Add(LaunchButton(shortcut));
         }

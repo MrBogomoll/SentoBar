@@ -321,9 +321,11 @@ public sealed partial class SettingsWindow : Window
     {
         var s=app.Settings;
         page.Children.Add(Section("Launch display",StyleChoice("Launch appearance",s.LaunchStyle,v=>s.LaunchStyle=v)));
-        var shortcuts=new StackPanel();shortcuts.Children.Add(UI.CaptionButton("Add installed app",()=>new AppPicker(this,shortcut=>
+        var shortcuts=new StackPanel();
+        shortcuts.Children.Add(UI.Caption("Drop a file or folder on the Shortcuts tab to add a shortcut.",12,UI.Muted));
+        shortcuts.Children.Add(UI.CaptionButton("Add installed app",()=>new AppPicker(this,shortcut=>
         {
-            if(s.Shortcuts.Count>=40){Accessibility.Announce(status,Localization.Text("You can add up to 40 shortcuts."));return;}
+            if(s.Shortcuts.Count>=ShortcutService.MaximumShortcuts){Accessibility.Announce(status,Localization.Text("You can add up to 40 shortcuts."));return;}
             s.Shortcuts.Add(shortcut);Save();Navigate(current);
         }).ShowDialog()));
         for(int i=0;i<s.Shortcuts.Count;i++)
@@ -341,7 +343,7 @@ public sealed partial class SettingsWindow : Window
         shortcuts.Children.Add(UI.CaptionButton("Add shortcut",()=>
         {
             if(string.IsNullOrWhiteSpace(name.Text) || string.IsNullOrWhiteSpace(targetInput.Text)){Accessibility.Announce(status,Localization.Text("Enter a name and destination first."));return;}
-            if(s.Shortcuts.Count>=40){Accessibility.Announce(status,Localization.Text("You can add up to 40 shortcuts."));return;}
+            if(s.Shortcuts.Count>=ShortcutService.MaximumShortcuts){Accessibility.Announce(status,Localization.Text("You can add up to 40 shortcuts."));return;}
             s.Shortcuts.Add(new(){Name=name.Text.Trim(),Target=targetInput.Text.Trim()});Save();Navigate(current);
         },true));page.Children.Add(Section("Shortcuts",shortcuts));
     }

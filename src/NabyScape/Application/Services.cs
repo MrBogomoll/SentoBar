@@ -343,6 +343,28 @@ public static class StartupService
 }
 public static class ShortcutService
 {
+    internal const int MaximumShortcuts=40;
+
+    internal static Shortcut[] FromDroppedPaths(IEnumerable<string> paths,IReadOnlyCollection<Shortcut> existing)
+    {
+        int remaining=MaximumShortcuts-existing.Count;
+        if(remaining<=0)return Array.Empty<Shortcut>();
+        var targets=new HashSet<string>(existing.Select(shortcut=>shortcut.Target),StringComparer.OrdinalIgnoreCase);
+        var additions=new List<Shortcut>();
+        foreach(var path in paths)
+        {
+            if(string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))continue;
+            bool folder=Directory.Exists(path);
+            if(!folder && !File.Exists(path))continue;
+            string target=Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+            if(!targets.Add(target))continue;
+            string name=folder?Path.GetFileName(target):Path.GetFileNameWithoutExtension(target);
+            additions.Add(new Shortcut{Name=name.Length==0?target:name,Target=target});
+            if(additions.Count==remaining)break;
+        }
+        return additions.ToArray();
+    }
+
     internal static ProcessStartInfo InstalledAppStartInfo(string appId)
     {
         if(!WindowsAppCatalog.ValidAppId(appId))throw new ArgumentException(Localization.Text("This installed app shortcut is invalid. Remove it and add the app again in Settings."));
