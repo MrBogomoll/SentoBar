@@ -146,6 +146,20 @@ internal static class MediaExperienceTests
         });
         test("New preference limits and sound generation stay valid",()=>
         {var s=new Settings{WaveformSensitivity=double.NaN,LyricsOffset=99,CountdownSoundVolume=-1,CountdownSound="bad",WaveformSource="bad",LyricsAnimation="bad",Top=2900};s.Normalize();Assert(s.WaveformSensitivity==1.35 && s.LyricsOffset==10 && s.CountdownSoundVolume==0 && s.CountdownSound=="Chime" && s.WaveformSource=="Spectrum" && s.LyricsAnimation=="Slide" && s.Top==2900);Assert(CountdownAudio.Tone("Chime").Length==88200 && CountdownAudio.Tone("Bell").Any(b=>b!=0));});
+        test("Completion sound is independently controlled during quiet hours",()=>
+        {
+            DateTimeOffset now=new DateTimeOffset(DateTime.Today.AddHours(1));
+            var settings=new Settings{QuietHours=true,QuietStart=22,QuietEnd=7,CountdownSound="Bell"};
+            Assert(NotificationPolicy.Quiet(settings,now) && CountdownAudio.EnabledForCompletion(settings,false,now));
+            settings.CountdownSoundDuringQuietHours=false;
+            Assert(!CountdownAudio.EnabledForCompletion(settings,false,now) && CountdownAudio.EnabledForCompletion(settings,false,now.AddHours(8)));
+            settings.CountdownSoundDuringQuietHours=true;
+            settings.NotificationsSnoozedUntil=now.AddMinutes(10);
+            Assert(!CountdownAudio.EnabledForCompletion(settings,false,now));
+            settings.NotificationsSnoozedUntil=null;
+            settings.NotifyTimer=false;
+            Assert(!CountdownAudio.EnabledForCompletion(settings,false,now) && CountdownAudio.EnabledForCompletion(settings,true,now));
+        });
         test("Side lyrics expand only within the working area and restore the saved panel width",()=>
         {var s=new Settings{PanelWidth=526,PanelPadding=26,PanelScale=1.04};Assert(MediaLyricsLayout.Width(s,1900,true)>800 && MediaLyricsLayout.Width(s,1900,false)==526 && s.PanelWidth==526);Assert(MediaLyricsLayout.Width(s,600,true)==600);Assert(MediaLyricsLayout.Width(s,480,true)==480);});
         test("Lyrics avoid squeezing two columns into a narrow scaled working area",()=>

@@ -94,6 +94,8 @@ public sealed class ProductivityService : IDisposable
     private bool _disposed, _writingClipboard;
     private uint _lastWriteSequence;
     private string _note="",_noteTitle="";
+    private (string Text,string Title) persistedDraft;
+    internal bool DraftNeedsSave=>persistedDraft!=(_note,_noteTitle);
     private bool _paused;
     private readonly uint[] _excludedFormats;
     public event Action? Changed;
@@ -138,13 +140,19 @@ public sealed class ProductivityService : IDisposable
         _noteTitle=BoundDraftTitle(data.NoteTitle);
         Notes.AddRange(data.Notes ?? new());Tasks.AddRange(data.Tasks ?? new()); Shelf.AddRange(data.Shelf ?? new()); Clips.AddRange(data.Clips ?? new());
         Normalize();
+        persistedDraft=(_note,_noteTitle);
         PurgeOrphanImages();
     }
 
     public bool Save()
     {
         if(_disposed)return false;
-        try { Normalize(); _store.Save("productivity",new ProductivityData{Note=_note,NoteTitle=_noteTitle,Notes=Notes,Tasks=Tasks,Shelf=Shelf,Clips=Clips});LastError=null;return true; }
+        try
+        {
+            Normalize();
+            _store.Save("productivity",new ProductivityData{Note=_note,NoteTitle=_noteTitle,Notes=Notes,Tasks=Tasks,Shelf=Shelf,Clips=Clips});
+            persistedDraft=(_note,_noteTitle);LastError=null;return true;
+        }
         catch(Exception ex) { ReportError(ex); return false; }
     }
 
@@ -276,7 +284,6 @@ public sealed class ProductivityService : IDisposable
             {
                 var classified=SmartClipboard.Classify(clip);
                 if(textVariant!=null && textVariant!=clip.Text &&
-                    !(classified.Kind==SmartClipKind.Link && textVariant==classified.CleanedLink) &&
                     !(classified.Kind==SmartClipKind.Color && (textVariant==classified.Hex || textVariant==classified.Rgb)))return false;
                 // SetText exports only Unicode text, without HTML/RTF or simulated paste.
                 System.Windows.Clipboard.SetText(textVariant ?? clip.Text);

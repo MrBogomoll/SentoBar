@@ -5,7 +5,7 @@ using System.Windows.Controls;
 namespace NabyScape;
 public sealed partial class SettingsWindow
 {
-    private readonly IslandSurface ambientPreview=new(){Fill=System.Windows.Media.Brushes.Transparent,Notch=false,IsHitTestVisible=false};
+    private readonly IslandSurface ambientPreview=new(){Fill=System.Windows.Media.Brushes.Transparent,Notch=false,IsHitTestVisible=false,UseGlassDock=true};
     private void InitializeAmbientPreview()
     {
         ambientPreview.SizeChanged+=(_,_)=>{ambientPreview.BeginUpdate();ambientPreview.SurfaceWidth=ambientPreview.ActualWidth;ambientPreview.SurfaceHeight=ambientPreview.ActualHeight;ambientPreview.EndUpdate();};
@@ -15,12 +15,25 @@ public sealed partial class SettingsWindow
     private void RefreshAmbientPreview()
     {
         var s=app.Settings;
-        string widget=previewMode=="Closed"?"closed":previewContent switch{"Music"=>"media","Timer"=>"timer","Focus"=>"focus","Stopwatch"=>"stopwatch","System"=>"system","Note"=>"notes","Tasks"=>"tasks","Calendar"=>"calendar","Shelf"=>"files","Smart clipboard"=>"clips","AI"=>"ai","Launch"=>"shortcuts",_=>"preview"};
+        bool compactLighting=previewMode is "Closed" or "Hover";
+        string widget=compactLighting?"closed":previewContent switch{"Music"=>"media","Timer"=>"timer","Focus"=>"focus","Stopwatch"=>"stopwatch","System"=>"system","Note"=>"notes","Tasks"=>"tasks","Calendar"=>"calendar","Shelf"=>"files","Smart clipboard"=>"clips","AI"=>"ai","Launch"=>"shortcuts",_=>"preview"};
         bool idle=previewMode=="Closed" && previewContent=="Music" && !(app.Media.Available && app.Media.Playing && s.ClosedMediaContent!="None" && s.Widgets.Any(w=>w.Id=="media" && w.Enabled)) && CompactDockPresentation.TimedKind(s,app.Session,DateTimeOffset.UtcNow).Length==0;
-        bool allowed=AmbientPolicy.Includes(s,widget,app.Media.SourceDisabled),moving=!idle && app.Media.Playing && s.LiveActivity && IsVisible && WindowState!=WindowState.Minimized && previewStage.IsVisible;
+        bool playing=app.Media.Available && app.Media.Playing && !app.Media.SourceDisabled;
+        bool live=!idle && playing && IsVisible && WindowState!=WindowState.Minimized && previewStage.IsVisible;
+        bool moving=live && s.LiveActivity && (!compactLighting || s.ClosedLightFollowsMusic);
+        bool reacting=AmbientPolicy.ReactsToAudio(s,live) && (previewMode!="Closed" || s.ClosedLightFollowsMusic);
+        bool allowed=AmbientPolicy.Includes(s,widget,app.Media.SourceDisabled,reacting);
+        var cover=app.AmbientAudio.CoverColors;
+        if(compactLighting && !playing && s.ClosedLightKeepsLastCover)cover=app.AmbientAudio.LastCoverColors;
+        var colors=compactLighting?AmbientPolicy.ClosedColors(s,cover,playing):AmbientPolicy.ColorsFor(s,cover);
         ambientPreview.Radius=s.Radius;
-        ambientPreview.SetAmbient(AmbientPolicy.ColorsFor(s,app.AmbientAudio.CoverColors),allowed?s.AmbientStrength:0,s.AmbientSpread,s.AmbientMotion,moving,AmbientLook.From(s));
-        app.AmbientAudio.Set(ambientPreview,allowed && moving);
+        ambientPreview.GlassStyle=s.GlassStyle;
+        ambientPreview.GlassStrength=s.GlassStrength;
+        ambientPreview.SetPanelBackdrop(app.PanelBackground.Get(s,app.Store.DirectoryPath));
+        ambientPreview.SetGlassDockPalette(UI.Brush(s.Background).Color,allowed?colors.Primary:System.Windows.Media.Colors.Transparent);
+        ambientPreview.Refresh();
+        ambientPreview.SetAmbient(colors,allowed?s.AmbientStrength:0,s.AmbientSpread,s.AmbientMotion,moving,AmbientLook.From(s));
+        app.AmbientAudio.Set(ambientPreview,allowed && reacting);
     }
     private FrameworkElement PremiumChoice(string name,string value,string[] values,Action<string> change)
     {
@@ -34,7 +47,7 @@ public sealed partial class SettingsWindow
     {
         var s=app.Settings;var controls=new StackPanel();
         controls.Children.Add(Check("Ambient light",s.CoverAmbient,v=>s.CoverAmbient=v));
-        controls.Children.Add(Check("Show ambience on closed dock",s.ClosedAmbient,v=>s.ClosedAmbient=v));
+
         var widgets=new StackPanel();
         foreach(var pair in Settings.Names.Where(p=>p.Key!="tools").Concat(new[]{new System.Collections.Generic.KeyValuePair<string,string>("ai","AI companion")}))
         {
@@ -61,9 +74,16 @@ public sealed partial class SettingsWindow
         controls.Children.Add(Advanced("Fine-tune light",fine));
         controls.Children.Add(PremiumChoice("Ambient audio response",s.AmbientAudioResponse,new[]{"Off","Soft","Responsive","Punchy"},v=>s.AmbientAudioResponse=v));
         AddSlider(controls,"Ambient sensitivity",s.AmbientSensitivity*100,50,300,v=>s.AmbientSensitivity=v/100,"%",5);
-        controls.Children.Add(UI.Caption("Light follows the selected app's measured volume. Soft fades gently; Responsive follows transients; Punchy reacts faster. Sensitivity helps quiet tracks. Your microphone is never used.",11,UI.Muted));
+        controls.Children.Add(UI.Caption("When music plays, audio response applies to every widget panel. The scope above sets static lighting. Soft fades gently, Responsive follows changes in volume, and Punchy reacts faster.",11,UI.Muted));
         controls.Children.Add(PremiumChoice("Ambient movement",s.AmbientMotion,new[]{"Still","Breathe","Drift"},v=>s.AmbientMotion=v));
         controls.Children.Add(UI.Caption("Still keeps the glow in place. Breathe and Drift add gentle motion during playback. Audio response works with all three. Motion stops when paused, hidden, tucked, or Reduce motion is on; Live activity also controls audio response.",11,UI.Muted));
+        var closedControls=new StackPanel();
+        closedControls.Children.Add(Check("Show ambience on closed dock",s.ClosedAmbient,v=>s.ClosedAmbient=v));
+        closedControls.Children.Add(Check("Follow album artwork during playback",s.ClosedLightFollowsMusic,v=>s.ClosedLightFollowsMusic=v));
+        closedControls.Children.Add(Check("Keep the last album color when idle",s.ClosedLightKeepsLastCover,v=>s.ClosedLightKeepsLastCover=v));
+        closedControls.Children.Add(UI.Caption("The notch and mini panel share this color when album colors are off or artwork is unavailable.",11,UI.Muted));
+        ColorControl(closedControls,"Closed dock light color",s.ClosedLightColor,v=>s.ClosedLightColor=v,new[]{"#7AA8DC","#D9A46D","#B4A0DC","#73BFA6"});
+        page.Children.Add(Section("Closed dock lighting",closedControls));
         page.Children.Add(Section("Ambient light",controls));
     }
     private void NotificationPresentationSettings()

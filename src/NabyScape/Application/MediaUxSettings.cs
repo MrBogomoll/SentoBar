@@ -17,6 +17,7 @@ public sealed partial class Settings
     public string CountdownSound {get;set;}="Chime";
     public double CountdownSoundVolume {get;set;}=.7;
     public string CountdownSoundFile {get;set;}="";
+    public bool CountdownSoundDuringQuietHours {get;set;}=true;
     private void NormalizeMediaUx()
     {
         if(WaveformSource is not ("Spectrum" or "Envelope"))WaveformSource="Spectrum";

@@ -29,6 +29,7 @@ public sealed partial class OverlayWindow
             // itself (included above), rather than reporting invisible offscreen glyphs as controls.
             if(control is TextBlock {Parent:MarqueeLabel {ClipToBounds:true},TextTrimming:TextTrimming.None} text && double.IsFinite(text.Width))continue;
             // Pages remain attached during slide-out; inspect the selected page and footer only.
+            if(peekTabScroll.IsAncestorOf(control))continue;
             if(peekViews.Any(pair=>pair.Key!=peekId && (pair.Value==control || pair.Value.IsAncestorOf(control))))continue;
             if(peekViews.TryGetValue(peekId,out var selected) && selected.IsAncestorOf(control))
             {

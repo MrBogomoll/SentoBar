@@ -8,8 +8,9 @@ namespace NabyScape;
 public sealed partial class OverlayWindow
 {
     private readonly bool idleDockReady;
-    private readonly TextBlock idleDate=new(){FontSize=11,FontWeight=FontWeights.Medium,Foreground=UI.Muted,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Center,TextWrapping=TextWrapping.NoWrap,ClipToBounds=true,Visibility=Visibility.Collapsed};
+    private readonly TextBlock idleDate=new(){FontSize=11,FontWeight=FontWeights.Medium,Foreground=UI.Muted,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Left,Margin=new(14,0,0,0),TextWrapping=TextWrapping.NoWrap,ClipToBounds=true,Visibility=Visibility.Collapsed};
     private DateTime idleDateDay;
+    private Button idlePrompt=null!;
     private bool idleClosed;
     private double lastClosedWidth=double.NaN;
     private bool? idleLayoutState;
@@ -40,10 +41,16 @@ public sealed partial class OverlayWindow
             UpdateAmbientMotion();
         }
         if(idleClosed)summary.Visibility=Visibility.Collapsed;
-        // Equal side clearance keeps the date on the dock's center, independent of the clock or character.
+        // Reserve room for the time and Naby before showing the date.
         double dateRoom=CompactDockPresentation.DateRoom(ClosedContentWidth,compactClock.ActualWidth);
         idleDate.MaxWidth=Math.Max(0,dateRoom);
-        idleDate.Visibility=idleClosed && app.Settings.ShowDate && WidgetOn("clock") && compactClock.Visibility==Visibility.Visible && dateRoom>=80?Visibility.Visible:Visibility.Collapsed;
+        RefreshClosedAssistantVisibility();
+        if(idlePrompt!=null)
+        {
+            double reserve=compactClock.ActualWidth+24+(AssistantCharacterAvailable?assistantHeaderSpace.Width:0);
+            idlePrompt.MaxWidth=Math.Max(0,ClosedContentWidth-reserve);
+        }
+        idleDate.Visibility=idleClosed && app.Settings.ClosedIdleContent=="Clock" && app.Settings.ShowDate && WidgetOn("clock") && compactClock.Visibility==Visibility.Visible && dateRoom>=80?Visibility.Visible:Visibility.Collapsed;
         if(idleDate.Visibility==Visibility.Visible && idleDateDay!=DateTime.Today)
         {
             idleDateDay=DateTime.Today;CompactDockPresentation.FillDate(idleDate,idleDateDay);

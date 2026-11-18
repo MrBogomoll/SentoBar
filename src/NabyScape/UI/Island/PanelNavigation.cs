@@ -14,38 +14,41 @@ public sealed partial class OverlayWindow
     private static bool PanelGestureBlocked(DependencyObject? source)
     {for(var node=source;node!=null;node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node))if(node is ButtonBase or TextBoxBase or Slider or Thumb or ScrollBar or ComboBox or DurationPicker || node is FrameworkElement f && f.Tag as string is "file-drag" or "media-popover")return true;return false;}
     private bool CanPanelSwipe=>expanded && app.Settings.CompactLayout && app.Settings.PanelSwipe && !commandOpen && !assistantOpen;
-    internal bool RoutePanelWheel(int delta,bool horizontal,DependencyObject? source)
+    internal bool RoutePanelWheel(int delta,bool horizontal,DependencyObject? source,bool? scrollContent=null)
     {
         if(!CanPanelSwipe)return false;
-        bool countdownEditor=false;Control? editor=null;
-        for(var parent=source;parent!=null;parent=parent is Visual?VisualTreeHelper.GetParent(parent):LogicalTreeHelper.GetParent(parent))
-        {
-            if(parent is DurationPicker)return false;
-            if(parent is CountdownView)countdownEditor=true;
-            if(editor==null && parent is (TextBoxBase or PasswordBox))editor=(Control)parent;
-        }
-        if(mediaControls?.IsOpen==true && mediaControls.ContainsControl(source))return false;
-        // Hovering an input is navigation. Only an actively edited, overflowing
-        // multiline document needs native vertical scrolling; horizontal gestures leave it.
-        if(!countdownEditor && !horizontal && editor?.IsKeyboardFocusWithin==true)
-        {
-            if(editor is TextBox text && text.AcceptsReturn && text.ExtentHeight>text.ViewportHeight+1)return false;
-            if(editor is RichTextBox rich && rich.Template.FindName("PART_ContentHost",rich) is ScrollViewer content && content.ScrollableHeight>1)return false;
-        }
-        bool insideEditor=editor!=null;
+        if(!horizontal && (scrollContent??Keyboard.Modifiers.HasFlag(ModifierKeys.Control)))
+            return ScrollPanelContent(delta,source);
+        int direction=panelWheel.Push(horizontal?delta:-delta,Environment.TickCount64);
+        if(direction!=0)CyclePage(direction,true);
+        return true;
+    }
+
+    private bool ScrollPanelContent(int delta,DependencyObject? source)
+    {
         for(var node=source;node!=null;node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node))
         {
-            if(node==editor){insideEditor=false;continue;}
-            // Ignore the input's own template viewport when the editor does not own this wheel.
-            if(insideEditor)continue;
-            // The outer panel viewport must not steal wheel gestures from its navigation.
-            // An inner content viewport (even at its end) owns vertical wheel input.
-            if(!horizontal && node is FrameworkElement region && region.Tag as string=="panel-navigation")break;
-            if(!horizontal && node is ScrollViewer viewer && (viewer.ScrollableHeight>1 && !(viewer==scroll && activePage=="focus" && bodyWidth>=310 && viewer.ScrollableHeight<48)))return false;
+            // A duration field uses the wheel to edit its current number.
+            if(node is DurationPicker picker){picker.ScrollPart(source,delta);return true;}
+            if(node is TextBoxBase editor)
+            {
+                if(editor.Template?.FindName("PART_ContentHost",editor) is ScrollViewer content && content.ScrollableHeight>1)
+                {
+                    content.ScrollToVerticalOffset(content.VerticalOffset-delta*.35);
+                    return true;
+                }
+                continue;
+            }
+            if(node is not ScrollViewer viewer || viewer.ScrollableHeight<=1)continue;
+            // At the task list boundary, a very short panel may still have room to scroll outside it.
+            if(viewer==taskViewport && (delta<0?viewer.ScrollableHeight-viewer.VerticalOffset<=.5:viewer.VerticalOffset<=.5))continue;
+            if(viewer==clipboardScroll)ScrollClipboardWheel(delta);
+            else viewer.ScrollToVerticalOffset(viewer.VerticalOffset-delta*.35);
+            return true;
         }
-        int direction=panelWheel.Push(horizontal?delta:-delta,Environment.TickCount64);
-        if(direction!=0)CyclePage(direction,true);return true;
+        return true;
     }
+
     private void InitializePanelSwipe()
     {
         root.PreviewMouseLeftButtonDown+=(_,e)=>{panelDown=null;panelSwiped=false;if(CanPanelSwipe && !PanelGestureBlocked(e.OriginalSource as DependencyObject))panelDown=e.GetPosition(root);};

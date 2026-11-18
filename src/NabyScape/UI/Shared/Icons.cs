@@ -56,6 +56,7 @@ internal static class Icons
         ["trash"]="M3,6 H21 M9,6 V3 H15 V6 M6,6 L7,21 H17 L18,6 M10,10 V17 M14,10 V17",
         ["stop"]="M6,6 H18 V18 H6 Z",
         ["back"]="M15,5 L8,12 15,19",
+        ["pushpin"]="M8,3 H16 M9,3 V9 L6,13 V15 H18 V13 L15,9 V3 M12,15 V21",
         ["paperclip"]="M21,11 L12,20 A6,6 0 0 1 4,12 L14,2 A4,4 0 0 1 20,8 L10,18 A2,2 0 0 1 7,15 L16,6",
         ["file-text"]="M14,2 H6 Q4,2 4,4 V20 Q4,22 6,22 H18 Q20,22 20,20 V8 Z M14,2 V8 H20 M8,13 H16 M8,17 H14",
         ["image"]="M5,3 H19 Q21,3 21,5 V19 Q21,21 19,21 H5 Q3,21 3,19 V5 Q3,3 5,3 Z M3,16 L9,10 16,17 M14,15 L17,12 21,16 M14,7 A1,1 0 1 1 13.99,7",
@@ -69,6 +70,8 @@ internal static class Icons
         ["nav-focus"]="M9,2 H15 M12,2 V5 M12,5 A8,8 0 1 1 11.99,5 M12,9 V13 L15,15 M18,6 L20,4",
         ["nav-status"]="M5,4 H19 Q21,4 21,6 V15 Q21,17 19,17 H5 Q3,17 3,15 V6 Q3,4 5,4 Z M8,21 H16 M12,17 V21 M7,12 L10,9 13,12 17,8",
         ["nav-launch"]="M 4.0 3.0 H 9.0 Q 10.0 3.0 10.0 4.0 V 9.0 Q 10.0 10.0 9.0 10.0 H 4.0 Q 3.0 10.0 3.0 9.0 V 4.0 Q 3.0 3.0 4.0 3.0 Z M 15.0 3.0 H 20.0 Q 21.0 3.0 21.0 4.0 V 9.0 Q 21.0 10.0 20.0 10.0 H 15.0 Q 14.0 10.0 14.0 9.0 V 4.0 Q 14.0 3.0 15.0 3.0 Z M 15.0 14.0 H 20.0 Q 21.0 14.0 21.0 15.0 V 20.0 Q 21.0 21.0 20.0 21.0 H 15.0 Q 14.0 21.0 14.0 20.0 V 15.0 Q 14.0 14.0 15.0 14.0 Z M 4.0 14.0 H 9.0 Q 10.0 14.0 10.0 15.0 V 20.0 Q 10.0 21.0 9.0 21.0 H 4.0 Q 3.0 21.0 3.0 20.0 V 15.0 Q 3.0 14.0 4.0 14.0 Z",
+        ["nav-tasks"]="M4,6 L6,8 9,4 M12,6 H20 M4,12 L6,14 9,10 M12,12 H20 M4,18 L6,20 9,16 M12,18 H20",
+        ["nav-power"]="M8,3 V8 M16,3 V8 M6,8 H18 V11 A6,6 0 0 1 6,11 Z M12,17 V22",
         ["nav-tools"]="M5,7 H19 Q21,7 21,9 V18 Q21,20 19,20 H5 Q3,20 3,18 V9 Q3,7 5,7 Z M8,7 V5 Q8,3 10,3 H14 Q16,3 16,5 V7 M3,12 Q12,17 21,12 M12,13 V16",
         ["nav-settings"]="M 14 17 H 5 M 19 7 h -9 M 20.0 17.0 A 3.0 3.0 0 1 1 14.0 17.0 A 3.0 3.0 0 1 1 20.0 17.0 M 10.0 7.0 A 3.0 3.0 0 1 1 4.0 7.0 A 3.0 3.0 0 1 1 10.0 7.0",
         ["mixer"]="M 10 5 H 3 M 12 19 H 3 M 14 3 v 4 M 16 17 v 4 M 21 12 h -9 M 21 19 h -5 M 21 5 h -7 M 8 10 v 4 M 8 12 H 3",
@@ -94,8 +97,13 @@ internal static class Icons
     public static Button Button(string icon,string name,System.Action action,bool primary=false,double size=42)
     {
         var button=UI.CaptionButton(name,action,primary);var glyph=Create(icon,20,primary?Brushes.Black:Brushes.White);button.Content=glyph;
-        void Follow(Shape shape)=>System.Windows.Data.BindingOperations.SetBinding(shape,shape.Stroke!=null?Shape.StrokeProperty:Shape.FillProperty,new System.Windows.Data.Binding("Foreground"){Source=button});
-        if(glyph is Shape shape)Follow(shape);else if(glyph is Viewbox {Child:Canvas canvas})foreach(var child in canvas.Children)if(child is Shape part)Follow(part);
+        FollowForeground(glyph,button);
         button.Width=size;button.Height=size;button.MinHeight=size;button.Tag=new CornerRadius(size/2);button.Padding=new(System.Math.Max(4,(size-20)/2));button.ToolTip=Localization.Text(name);return button;
+    }
+    internal static void FollowForeground(FrameworkElement glyph,Button button)
+    {
+        void Follow(Shape shape)=>System.Windows.Data.BindingOperations.SetBinding(shape,shape.Stroke!=null?Shape.StrokeProperty:Shape.FillProperty,new System.Windows.Data.Binding("Foreground"){Source=button});
+        if(glyph is Shape shape)Follow(shape);
+        else if(glyph is Viewbox {Child:Canvas canvas})foreach(var child in canvas.Children)if(child is Shape part)Follow(part);
     }
 }

@@ -1,0 +1,163 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+
+namespace NabyScape;
+
+internal static class PanelBackdropDiagnostics
+{
+    private const BindingFlags Fields=BindingFlags.Instance|BindingFlags.NonPublic;
+    internal static async Task Run(App app,OverlayWindow island,string directory,Action<string,bool> check)
+    {
+        var s=app.Settings;
+        s.ReduceMotion=true;s.HoverPeek=true;s.TwoStageHover=false;s.HoverFollowsWidgets=true;s.DetachablePreviews=true;
+        s.HideFullscreen=s.HideMaximized=s.AlwaysTucked=s.SmartActivities=s.CoverAmbient=s.ClosedAmbient=false;
+        s.CompactLayout=true;s.PanelNavigationStyle="Dots";s.PanelWidth=730;s.PanelMaxHeight=570;s.HoverWidth=430;
+        s.Background="#111620";s.Preset="iPhone";
+        foreach(var w in s.Widgets)w.Enabled=true;
+        foreach(var w in s.HoverViews)w.Enabled=true;
+        var options=s.PanelBackdrop;options.Enabled=true;
+        options.Gradient="Two soft lights";options.Opacity=.84;options.Strength=.8;options.Image="No image";
+        app.ChangeSettings();
+        island.DiagnosticPointerPresent=true;
+        var surface=(IslandSurface)typeof(OverlayWindow).GetField("surface",Fields)!.GetValue(island)!;
+        async Task Settle(){await Task.Delay(120);island.UpdateLayout();}
+        static RenderTargetBitmap Capture(FrameworkElement element)
+        {
+            var result=new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth),(int)Math.Ceiling(element.ActualHeight),96,96,PixelFormats.Pbgra32);
+            result.Render(element);return result;
+        }
+        static Color Sample(BitmapSource source,int x,int y)
+        {
+            byte[] pixel=new byte[4];source.CopyPixels(new Int32Rect(x,y,1,1),pixel,4,0);
+            return Color.FromArgb(pixel[3],pixel[2],pixel[1],pixel[0]);
+        }
+        void Save(string name,BitmapSource picture)
+        {
+            var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(picture));
+            using var file=File.Create(Path.Combine(directory,name+".png"));encoder.Save(file);
+        }
+        bool Corners(BitmapSource image,Rect area)
+        {
+            var left=Sample(image,(int)(area.Left+area.Width*.15),(int)(area.Top+area.Height*.80));
+            var right=Sample(image,(int)(area.Left+area.Width*.85),(int)(area.Top+area.Height*.80));
+            return left.B>left.R+20 && right.R>right.B+20 && Math.Abs(left.A-options.Opacity*255)<3;
+        }
+        void InspectDock(string phase)
+        {
+            check(phase+" shares the selected blue and gold corner colors and background opacity",
+                island.Opacity==1 && Corners(Capture(surface),surface.Contour.Bounds));
+            var window=Capture(island);
+            int width=(int)Math.Ceiling(island.PaintedWidth),height=(int)Math.Ceiling(island.PaintedHeight);
+            Save(phase,new CroppedBitmap(window,new Int32Rect((window.PixelWidth-width)/2,0,width,height)));
+        }
+
+        island.Collapse();await Settle();InspectDock("closed");
+        island.PreviewActivity();island.SelectPeek("notes");await Settle();InspectDock("mini");
+        island.Reveal(false);island.SelectPage("calendar",false);await Settle();InspectDock("expanded");
+        var header=Diagnostics.Descendants(island).OfType<Grid>().Single(g=>Equals(g.Tag,"panel-navigation"));
+        var scroller=Diagnostics.Descendants(header).OfType<ScrollViewer>().Single();
+        var row=(StackPanel)scroller.Content;
+        var center=row.TransformToAncestor(header).Transform(new Point(row.ActualWidth/2,0));
+        check("Expanded navigation dots are geometrically centered",Math.Abs(center.X-header.ActualWidth/2)<1 && scroller.ScrollableWidth<.75);
+        Button FindDate(DateTime date)=>Diagnostics.Descendants(island).OfType<Button>().Single(b=>b.IsVisible &&
+            UI.Identity(b)==date.ToString("dddd, d MMMM yyyy",Localization.Culture));
+        var today=DateTime.Today;
+        var other=MinimalWidgets.Week(today).First(day=>day!=today);
+        FindDate(other).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();
+        var todayWeek=FindDate(today);
+        check("Today's week cell keeps its circular outline when another date is selected",
+            AutomationProperties.GetItemStatus(todayWeek)==Localization.Text("Today") &&
+            Diagnostics.Descendants(todayWeek).OfType<Border>().Any(b=>b.CornerRadius.TopLeft==15 &&
+                b.BorderThickness.Left>0 && b.BorderBrush==GlassDockAppearance.Accent));
+        Diagnostics.Descendants(island).OfType<Button>().Single(b=>b.IsVisible && UI.Identity(b)==Localization.Text("Toggle calendar month"))
+            .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();
+        var todayMonth=FindDate(today);
+        check("Today's monthly cell has the accent outline without changing its label",
+            AutomationProperties.GetItemStatus(todayMonth)==Localization.Text("Today") &&
+            todayMonth.BorderThickness.Left>0 && todayMonth.BorderBrush==GlassDockAppearance.Accent &&
+            todayMonth.Content is string);
+        Save("calendar-today",Capture(island));
+        foreach(string id in new[]{"awake","power"})
+        {
+            island.ShowTools(id,false);await Settle();
+            var box=Diagnostics.Descendants(island).OfType<ComboBox>().Single(b=>b.IsVisible);
+            box.IsDropDownOpen=true;await Settle();
+            var popup=(Popup)box.Template.FindName("PART_Popup",box);
+            check(id+" dropdown uses shared palette and round edges",popup.IsOpen && popup.Child is Border
+                {Background:LinearGradientBrush,CornerRadius.TopLeft:>=12});
+            box.IsDropDownOpen=false;
+        }
+
+        island.OpenFeaturePage("voice");await Settle();
+        var voiceOptions=Diagnostics.Descendants(island).OfType<Button>().Single(b=>b.IsVisible && UI.Identity(b)=="Options");
+        voiceOptions.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Settle();
+        var nabyMenu=voiceOptions.ContextMenu;
+        check("Naby Options uses the same panel menu palette",nabyMenu.IsOpen && nabyMenu.Background is LinearGradientBrush &&
+            nabyMenu.BorderBrush==app.FindResource("MenuBorder"));
+        nabyMenu.IsOpen=false;
+
+        island.Collapse();
+        app.Previews.Open("notes");await Task.Delay(100);
+        var detached=Application.Current.Windows.OfType<DetachedPreviewWindow>().Single();
+        try
+        {
+            var frame=(Border)detached.Content;
+            var material=new System.Windows.Shapes.Rectangle{Fill=frame.Background};
+            material.Measure(new Size(frame.ActualWidth,frame.ActualHeight));
+            material.Arrange(new Rect(frame.RenderSize));
+            check("Detached windows share the same background",frame.Opacity==1 && Corners(Capture(material),new Rect(material.RenderSize)));
+        }
+        finally{detached.Close();}
+
+        var fixture=new DrawingVisual();
+        using(var context=fixture.RenderOpen())
+        {
+            context.DrawRectangle(Brushes.Black,null,new Rect(0,0,60,80));
+            context.DrawRectangle(Brushes.White,null,new Rect(60,0,60,80));
+        }
+        var image=new RenderTargetBitmap(120,80,96,96,PixelFormats.Pbgra32);
+        image.Render(fixture);Save("input-fixture",image);
+        PanelBackdropRenderer.ImportPicture(app.Store.DirectoryPath,Path.Combine(directory,"input-fixture.png"));
+        options.Image="Custom picture";options.ImageOpacity=1;options.Gradient="No gradient";options.Opacity=1;options.Blur=0;
+        var renderer=app.PanelBackground;
+        BitmapSource RenderPicture()
+        {
+            var drawing=new DrawingVisual();
+            using(var context=drawing.RenderOpen())renderer.Get(s,app.Store.DirectoryPath)!.Draw(context,new RectangleGeometry(new Rect(0,0,600,400)));
+            var bitmap=new RenderTargetBitmap(600,400,96,96,PixelFormats.Pbgra32);
+            bitmap.Render(drawing);return bitmap;
+        }
+        var sharp=RenderPicture();options.Blur=26;var soft=RenderPicture();
+        int sharpLeft=Sample(sharp,296,200).R,sharpRight=Sample(sharp,304,200).R;
+        int softLeft=Sample(soft,296,200).R,softRight=Sample(soft,304,200).R;
+        check($"The imported picture is drawn and blur softens edges ({sharpLeft}/{sharpRight} → {softLeft}/{softRight})",
+            sharpRight-sharpLeft>150 && softLeft>sharpLeft+30 && softRight<sharpRight-30 && softRight>softLeft);
+        Save("blurred-background",soft);
+        var layout=CustomizationProfile.Export(s);var clone=new Settings();
+        CustomizationProfile.Import(layout,clone);
+        check("The shared palette and picture effect settings survive a layout round trip with no file path",
+            clone.PanelBackdrop==s.PanelBackdrop && !layout.Contains(directory,StringComparison.Ordinal));
+        options.Image="No image";options.Gradient="Two soft lights";app.ChangeSettings();
+        var settingsWindow=new SettingsWindow(app){Width=1000,Height=785};
+        settingsWindow.Show();Diagnostics.NavigateSettings(settingsWindow,"Appearance");
+        try
+        {
+            await Task.Delay(150);
+            var controls=Diagnostics.LogicalDescendants(settingsWindow).OfType<FrameworkElement>();
+            check("Settings exposes independent background opacity, palette and picture controls",
+                new[]{"Panel background opacity","Panel gradient type","First gradient position","Second gradient position","Panel background image"}
+                    .All(name=>controls.Any(c=>UI.Identity(c)==name)));
+        }
+        finally{settingsWindow.Close();}
+        island.DiagnosticPointerPresent=false;
+    }
+}

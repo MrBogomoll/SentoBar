@@ -59,10 +59,19 @@ internal sealed class DetachedPreviewView : IDisposable
         var metadata=new Grid();metadata.ColumnDefinitions.Add(new(){Width=new GridLength(54)});metadata.ColumnDefinitions.Add(new());
         artwork=new Image{Width=42,Height=42,Stretch=Stretch.UniformToFill,HorizontalAlignment=HorizontalAlignment.Left,Clip=new RectangleGeometry(new Rect(0,0,42,42),6,6)};UI.Named(artwork,Localization.Text("Current album artwork"));metadata.Children.Add(artwork);
         var labels=new StackPanel{VerticalAlignment=VerticalAlignment.Center};title=UI.Text(Localization.Text("Nothing playing"),15);title.FontWeight=app.Settings.BoldMediaTitle?FontWeights.SemiBold:FontWeights.Normal;title.TextWrapping=TextWrapping.NoWrap;title.TextTrimming=TextTrimming.CharacterEllipsis;labels.Children.Add(title);detail=UI.Text("",11,UI.Muted);detail.TextWrapping=TextWrapping.NoWrap;detail.TextTrimming=TextTrimming.CharacterEllipsis;labels.Children.Add(detail);Grid.SetColumn(labels,1);metadata.Children.Add(labels);Add(metadata);
-        sessions=new ComboBox{MinHeight=28};sessions.SetResourceReference(Control.BackgroundProperty,"ControlFill");sessions.SetResourceReference(Control.BorderBrushProperty,"ControlBorder");UI.Named(sessions,Localization.Text("Media session"));sessions.SelectionChanged+=(_,_)=>{if(!updating && sessions.SelectedIndex>=0 && sessions.SelectedIndex<app.Media.Sessions.Count)app.Media.Select(app.Media.Sessions[sessions.SelectedIndex]);};Add(sessions);
-        previous=Action(Localization.Text("Previous"),()=>_=app.Media.Command("previous"));toggle=Action(Localization.Text("Play"),()=>_=app.Media.Command("toggle"));next=Action(Localization.Text("Next"),()=>_=app.Media.Command("next"));Add(UI.Row(previous,toggle,next));
+        sessions=new ComboBox{MinHeight=28};UI.Named(sessions,Localization.Text("Media session"));sessions.SelectionChanged+=(_,_)=>{if(!updating && sessions.SelectedIndex>=0 && sessions.SelectedIndex<app.Media.Sessions.Count)app.Media.Select(app.Media.Sessions[sessions.SelectedIndex]);};Add(sessions);
+        previous=Action(Localization.Text("Previous"),()=>_=app.Media.Command("previous"));toggle=Action(Localization.Text("Play"),()=>_=app.Media.Command("toggle"));next=Action(Localization.Text("Next"),()=>_=app.Media.Command("next"));
+        var transport=new WrapPanel();
+        foreach(var button in new[]{previous,toggle,next})
+        {
+            button.Margin=new(0,0,6,4);
+            transport.Children.Add(button);
+        }
+        Add(transport);
         seek=new Slider{Minimum=0,Maximum=1};UI.Named(seek,Localization.Text("Track position"));seek.ValueChanged+=(_,_)=>{if(!updating)_=app.Media.Seek(seek.Value);};Add(seek);
-        volume=new Slider{Minimum=0,Maximum=100};UI.Named(volume,Localization.Text("Output volume"));volume.ValueChanged+=(_,_)=>{if(!updating)app.Audio.SetVolume(volume.Value/100);};var volumeRow=new Grid();volumeRow.ColumnDefinitions.Add(new(){Width=new GridLength(52)});volumeRow.ColumnDefinitions.Add(new());volumeRow.Children.Add(UI.Text(Localization.Text("Volume"),11,UI.Muted));Grid.SetColumn(volume,1);volumeRow.Children.Add(volume);Add(volumeRow);
+        volume=new Slider{Minimum=0,Maximum=100};UI.Named(volume,Localization.Text("Output volume"));volume.ValueChanged+=(_,_)=>{if(!updating)app.Audio.SetVolume(volume.Value/100);};var volumeRow=new Grid();volumeRow.ColumnDefinitions.Add(new(){Width=GridLength.Auto});volumeRow.ColumnDefinitions.Add(new());
+        var volumeLabel=UI.Caption("Volume",11,UI.Muted);volumeLabel.TextWrapping=TextWrapping.NoWrap;volumeLabel.Margin=new(0,0,8,0);
+        volumeRow.Children.Add(volumeLabel);Grid.SetColumn(volume,1);volumeRow.Children.Add(volume);Add(volumeRow);
         var mute=Action(Localization.Text("Mute / unmute"),()=>app.Audio.ToggleMute());mute.FontSize=11;mute.Padding=new(8,4,8,4);mute.MinHeight=28;Add(mute);
     }
     private void BuildClock()=>Add(new CountdownView(app,kind=="focus"));
@@ -133,7 +142,7 @@ internal sealed class DetachedPreviewView : IDisposable
         for(int c=0;c<7;c++){var day=UI.Text(Localization.Culture.DateTimeFormat.AbbreviatedDayNames[(c+1)%7],10,UI.Muted);day.HorizontalAlignment=HorizontalAlignment.Center;Grid.SetColumn(day,c);days.Children.Add(day);}
         for(int d=1;d<=DateTime.DaysInMonth(shownMonth.Year,shownMonth.Month);d++)
         {
-            var date=shownMonth.AddDays(d-1);var button=Action(Localization.Text("Select date ")+date.ToString("yyyy-MM-dd"),()=>calendar.SelectedDate=date);button.Content=d.ToString();button.Padding=new(0);button.Margin=new(2);button.MinHeight=23;button.FontSize=11;button.Background=calendar.SelectedDate?.Date==date?UI.Brush("#373B45"):Brushes.Transparent;button.BorderThickness=new(date==DateTime.Today?1:0);button.BorderBrush=UI.Muted;button.IsTabStop=calendar.SelectedDate?.Date==date || d==1 && (calendar.SelectedDate?.Year!=shownMonth.Year || calendar.SelectedDate?.Month!=shownMonth.Month);
+            var date=shownMonth.AddDays(d-1);var button=Action(Localization.Text("Select date ")+date.ToString("yyyy-MM-dd"),()=>calendar.SelectedDate=date);button.Content=d.ToString();button.Padding=new(0);button.Margin=new(2);button.MinHeight=23;button.FontSize=11;button.Background=calendar.SelectedDate?.Date==date?UI.Brush("#373B45"):Brushes.Transparent;button.BorderThickness=new(0);CalendarVisuals.MarkToday(button,date);button.IsTabStop=calendar.SelectedDate?.Date==date || d==1 && (calendar.SelectedDate?.Year!=shownMonth.Year || calendar.SelectedDate?.Month!=shownMonth.Month);
             button.KeyDown+=(_,e)=>{int delta=e.Key switch{Key.Left=>-1,Key.Right=>1,Key.Up=>-7,Key.Down=>7,_=>0};if(delta==0)return;try{var selected=date.AddDays(delta);shownMonth=new(selected.Year,selected.Month,1);if(calendar.SelectedDate?.Date==selected){RenderMiniMonth(true);calendarKey="";RenderEvents();}else calendar.SelectedDate=selected;}catch(ArgumentOutOfRangeException){}e.Handled=true;};
             int cell=offset+d-1;Grid.SetColumn(button,cell%7);Grid.SetRow(button,cell/7+1);days.Children.Add(button);
         }

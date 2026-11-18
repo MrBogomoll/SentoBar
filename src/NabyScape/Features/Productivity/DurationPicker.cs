@@ -41,11 +41,29 @@ internal sealed class DurationPicker : Grid
             input.PreviewKeyDown+=(_,e)=>{if(e.Key is Key.Up or Key.Down){Step(index,e.Key==Key.Up?1:-1);e.Handled=true;}else if(e.Key==Key.Enter){Commit();input.SelectAll();e.Handled=true;}};
             column.Children.Add(input);column.Children.Add(Arrow(false));
             var label=UI.Caption(labels[part],9,UI.Muted);label.HorizontalAlignment=HorizontalAlignment.Center;column.Children.Add(label);
-            column.PreviewMouseWheel+=(_,e)=>{e.Handled=true;wheel[index]+=e.Delta;int steps=wheel[index]/120;wheel[index]%=120;if(steps!=0)Step(index,steps);};
+            column.PreviewMouseWheel+=(_,e)=>{e.Handled=true;WheelPart(index,e.Delta);};
             if(part<2){ColumnDefinitions.Add(new(){Width=new GridLength(8)});var colon=UI.Text(":",compact?18:22);colon.VerticalAlignment=VerticalAlignment.Center;colon.Margin=new(0,0,0,10);Grid.SetColumn(colon,part*2+1);Children.Add(colon);}
         }
         SetSeconds(seconds);
     }
+    internal void ScrollPart(DependencyObject? source,int delta)
+    {
+        for(var node=source;node!=null && node!=this;node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node))
+        {
+            if(node is not StackPanel column || !Children.Contains(column))continue;
+            WheelPart(GetColumn(column)/2,delta);
+            return;
+        }
+    }
+
+    private void WheelPart(int part,int delta)
+    {
+        wheel[part]+=delta;
+        int steps=wheel[part]/120;
+        wheel[part]%=120;
+        if(steps!=0)Step(part,steps);
+    }
+
     internal bool TrySeconds(out int seconds)
     {
         seconds=0;int[] values=new int[3];

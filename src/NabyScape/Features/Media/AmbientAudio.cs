@@ -9,12 +9,24 @@ namespace NabyScape;
 
 internal static class AmbientPolicy
 {
-    internal static bool Includes(Settings s,string widget,bool sourceDisabled=false)=>!sourceDisabled && s.CoverAmbient && s.AmbientStrength>0 && (widget=="closed"?s.ClosedAmbient:s.AmbientScope switch
+    internal static bool ReactsToAudio(Settings s,bool playing)
+        =>playing && s.LiveActivity && Motion.Enabled && s.AmbientAudioResponse!="Off";
+
+    internal static bool Includes(Settings s,string widget,bool sourceDisabled=false,bool reacting=false)
+        =>!sourceDisabled && s.CoverAmbient && s.AmbientStrength>0 && (widget=="closed"?s.ClosedAmbient:reacting || (s.AmbientScope switch
     {
-        "Music only"=>widget is "media" or "volume" or "closed",
+        "Music only"=>widget is "media" or "volume",
         "Selected widgets"=>s.AmbientWidgets.Contains(widget),
         _=>true
-    });
+    }));
+    internal static bool ClosedFollowsCover(Settings s,bool playing)=>playing?s.ClosedLightFollowsMusic:s.ClosedLightKeepsLastCover;
+    internal static CoverPalette ClosedColors(Settings s,CoverPalette cover,bool playing)
+    {
+        if(ClosedFollowsCover(s,playing) && cover.Primary.A>0)
+            return s.AmbientPalette=="Single color"?new(cover.Primary,cover.Primary):cover;
+        Color color=UI.Brush(s.ClosedLightColor).Color;
+        return new(color,color);
+    }
     internal static CoverPalette ColorsFor(Settings s,CoverPalette cover)
     {
         if(s.AmbientColorSource=="Album cover" && cover.Primary.A>0)return s.AmbientPalette=="Single color"?new(cover.Primary,cover.Primary):cover;
@@ -61,6 +73,7 @@ internal sealed class AmbientAudioDriver : IDisposable
     private static readonly DependencyProperty DemandProperty=DependencyProperty.RegisterAttached("AmbientDemand",typeof(bool),typeof(AmbientAudioDriver),new PropertyMetadata(false));
     private static readonly DependencyProperty AttachedProperty=DependencyProperty.RegisterAttached("AmbientAttached",typeof(bool),typeof(AmbientAudioDriver),new PropertyMetadata(false));
     internal AmbientAudioDriver(App app){this.app=app;timer.Tick+=Tick;app.Updated+=Changed;}
+    internal CoverPalette LastCoverColors {get;private set;}
     internal CoverPalette CoverColors
     {
         get
@@ -69,6 +82,7 @@ internal sealed class AmbientAudioDriver : IDisposable
             {
                 artwork=app.Media.Artwork;
                 try{palette=CoverPalette.Extract(artwork);}catch(Exception ex){app.Store.Log(ex);palette=default;}
+                if(palette.Primary.A>0)LastCoverColors=palette;
             }
             return palette;
         }
@@ -99,7 +113,7 @@ internal sealed class AmbientAudioDriver : IDisposable
     private void Changed(){if((app.CurrentUpdate&(RuntimeChange.Settings|RuntimeChange.Media))!=0)Reconcile();}
     internal void Reconcile()
     {
-        bool enabled=!disposed && app.Settings.CoverAmbient && app.Settings.LiveActivity && Motion.Enabled && app.Settings.AmbientAudioResponse!="Off" && app.Media.Playing && surfaces.Any(Active);
+        bool enabled=!disposed && app.Settings.CoverAmbient && AmbientPolicy.ReactsToAudio(app.Settings,app.Media.Playing) && surfaces.Any(Active);
         if(enabled){if(!timer.IsEnabled){lastStamp=Stopwatch.GetTimestamp();envelope.Reset();timer.Start();}}
         else{timer.Stop();envelope.Reset();}
         foreach(var surface in surfaces)if(!enabled || !Active(surface))surface.ResetAmbientAudio();
@@ -141,10 +155,12 @@ internal sealed class AmbientPresenter : IDisposable
     private void Changed(){if((app.CurrentUpdate&(RuntimeChange.Settings|RuntimeChange.Media))!=0)Refresh();}
     internal void Refresh()
     {
-        var s=app.Settings;bool allowed=AmbientPolicy.Includes(s,widget,app.Media.SourceDisabled);
+        var s=app.Settings;
         bool moving=app.Media.Playing && s.LiveActivity && surface.IsVisible && Window.GetWindow(surface)?.WindowState!=WindowState.Minimized;
+        bool reacting=AmbientPolicy.ReactsToAudio(s,moving);
+        bool allowed=AmbientPolicy.Includes(s,widget,app.Media.SourceDisabled,reacting);
         surface.SetAmbient(AmbientPolicy.ColorsFor(s,app.AmbientAudio.CoverColors),allowed?s.AmbientStrength:0,s.AmbientSpread,s.AmbientMotion,moving,AmbientLook.From(s));
-        app.AmbientAudio.Set(surface,allowed && moving);
+        app.AmbientAudio.Set(surface,allowed && reacting);
     }
     public void Dispose(){Unloaded(surface,new());surface.Loaded-=Loaded;surface.Unloaded-=Unloaded;surface.IsVisibleChanged-=VisibilityChanged;app.AmbientAudio.Remove(surface);}
 }

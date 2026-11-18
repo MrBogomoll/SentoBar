@@ -14,30 +14,73 @@ internal sealed class LyricsSourcesControl : StackPanel
     private readonly App app;
     private readonly Popup popup=new(){StaysOpen=false,AllowsTransparency=true,Placement=PlacementMode.Bottom,PopupAnimation=PopupAnimation.None};
     private readonly StackPanel menu=new();
+    private readonly ScrollViewer viewport;
+    private readonly Border popupFrame;
     private readonly Button trigger;
     private readonly Action retry,local;
     private CancellationTokenSource? pending;
     internal LyricsSourcesControl(App app,Action retry,Action local)
     {
         this.app=app;this.retry=retry;this.local=local;
-        trigger=UI.Button(Localization.Text("Choose lyrics provider"),()=>{if(popup.IsOpen){popup.IsOpen=false;return;}if(Window.GetWindow(this) is SettingsWindow)((FrameworkElement)popup.Child).Resources=SettingsPalette.Create(app.Settings);ShowSources();popup.IsOpen=true;});
-        var musicIcon=UI.Text("♫",13);musicIcon.Margin=new(0,0,6,0);var chevron=Icons.Create("chevron",8,UI.Muted);chevron.Margin=new(7,0,0,0);trigger.Content=UI.Row(musicIcon,UI.Text(Localization.Text("Lyrics"),11),chevron);trigger.MinHeight=28;trigger.Padding=new(8,4,8,4);trigger.Margin=new(0);trigger.HorizontalAlignment=HorizontalAlignment.Left;
-        trigger.SetResourceReference(Control.BackgroundProperty,"ControlFill");Children.Add(trigger);
-        var viewport=new ScrollViewer{Content=menu,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,MaxHeight=330};
-        var border=new Border{Child=viewport,BorderBrush=UI.Brush("#53565D"),BorderThickness=new(.7),CornerRadius=new(10),Padding=new(8),Width=264};
-        border.SetResourceReference(Border.BackgroundProperty,"PopupFill");UI.Named(border,Localization.Text("Lyrics source popover"));popup.Child=border;popup.PlacementTarget=trigger;popup.VerticalOffset=6;
-        popup.Opened+=(_,_)=>{System.Threading.Interlocked.Increment(ref openPopups);border.Opacity=Motion.Enabled?0:1;Motion.Fade(border,1,160);border.MoveFocus(new System.Windows.Input.TraversalRequest(System.Windows.Input.FocusNavigationDirection.First));};
-        System.Windows.Input.KeyboardNavigation.SetTabNavigation(border,System.Windows.Input.KeyboardNavigationMode.Cycle);
-        border.PreviewKeyDown+=(_,e)=>{if(e.Key==System.Windows.Input.Key.Escape){popup.IsOpen=false;trigger.Focus();e.Handled=true;}};
+        trigger=UI.CaptionButton("Choose lyrics provider",()=>
+        {
+            if(popup.IsOpen){popup.IsOpen=false;return;}
+            ApplyPopupAppearance();ShowSources();popup.IsOpen=true;
+        });
+        var musicIcon=Icons.Create("lyrics",12,UI.Muted);musicIcon.Margin=new(0,0,6,0);
+        var chevron=Icons.Create("chevron",8,UI.Muted);chevron.Margin=new(7,0,0,0);
+        trigger.Content=UI.Row(musicIcon,UI.Caption("Lyrics",11),chevron);
+        trigger.MinHeight=28;trigger.Padding=new(8,4,8,4);trigger.Margin=new(0);trigger.Tag=new CornerRadius(10);trigger.HorizontalAlignment=HorizontalAlignment.Left;
+        Children.Add(trigger);
+        viewport=new ScrollViewer{Content=menu,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,MaxHeight=326};
+        popupFrame=new Border{Child=viewport,BorderThickness=new(1),CornerRadius=new(16),Padding=new(10),Width=272};
+        UI.LocalizedName(popupFrame,"Lyrics source popover");popup.Child=popupFrame;popup.PlacementTarget=trigger;popup.VerticalOffset=6;
+        popup.Opened+=(_,_)=>{System.Threading.Interlocked.Increment(ref openPopups);popupFrame.Opacity=Motion.Enabled?0:1;Motion.Fade(popupFrame,1,160);popupFrame.MoveFocus(new System.Windows.Input.TraversalRequest(System.Windows.Input.FocusNavigationDirection.First));};
+        System.Windows.Input.KeyboardNavigation.SetTabNavigation(popupFrame,System.Windows.Input.KeyboardNavigationMode.Cycle);
+        popupFrame.PreviewKeyDown+=(_,e)=>{if(e.Key==System.Windows.Input.Key.Escape){popup.IsOpen=false;trigger.Focus();e.Handled=true;}};
         popup.Closed+=(_,_)=>{System.Threading.Interlocked.Decrement(ref openPopups);pending?.Cancel();menu.Children.Clear();AutomationPropertiesStatus(false);};Unloaded+=(_,_)=>{popup.IsOpen=false;pending?.Cancel();};
         viewport.PreviewMouseWheel+=(_,e)=>{viewport.ScrollToVerticalOffset(viewport.VerticalOffset-e.Delta*.35);e.Handled=true;};
     }
+    private bool InSettings=>Window.GetWindow(this) is SettingsWindow;
+
+    private void ApplyPopupAppearance()
+    {
+        if(InSettings)
+        {
+            popupFrame.Resources=SettingsPalette.Create(app.Settings);
+            popupFrame.SetResourceReference(Border.BackgroundProperty,"PopupFill");
+            popupFrame.SetResourceReference(Border.BorderBrushProperty,"ControlBorder");
+        }
+        else
+        {
+            GlassDockAppearance.ApplyControls(popupFrame);
+            popupFrame.Background=Accessibility.HighContrast?SystemColors.WindowBrush:
+                GlassDockAppearance.Material(UI.Brush(app.Settings.Background).Color,GlassDockAppearance.Accent.Color);
+            popupFrame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
+        }
+    }
+
     private void AutomationPropertiesStatus(bool open)=>System.Windows.Automation.AutomationProperties.SetItemStatus(trigger,open?Localization.Text("Expanded"):Localization.Text("Collapsed"));
-    private void Heading(string text){var label=UI.Text(text,11,UI.Muted);label.Margin=new(4,2,4,8);menu.Children.Add(label);}
+    private void Heading(string text)
+    {
+        viewport.ScrollToTop();
+        var label=UI.Text(text,12,UI.Muted);label.FontWeight=FontWeights.SemiBold;label.Margin=new(5,2,5,7);
+        menu.Children.Add(label);
+    }
     private Button Row(string name,string detail,Action click,bool selected=false)
     {
-        var button=UI.Button(name,click);button.Margin=new(0,1,0,1);button.Padding=new(7,6,7,6);if(selected)button.SetResourceReference(Control.BackgroundProperty,"SelectionFill");else button.Background=Brushes.Transparent;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;
-        var row=new DockPanel();var check=UI.Text(selected?"✓":"",13);check.Width=20;DockPanel.SetDock(check,Dock.Right);row.Children.Add(check);
+        var button=UI.Button(name,click);
+        button.Margin=new(0,1,0,1);button.Padding=new(8,5,8,5);button.Tag=new CornerRadius(8);
+        button.MinHeight=32;button.BorderThickness=new(0);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;
+        button.Background=Brushes.Transparent;
+        var row=new DockPanel();
+        if(selected)
+        {
+            if(InSettings || Accessibility.HighContrast)button.SetResourceReference(Control.BackgroundProperty,"SelectionFill");
+            else button.Background=GlassDockAppearance.Selected;
+            System.Windows.Automation.AutomationProperties.SetItemStatus(button,Localization.Text("Selected"));
+            var check=UI.Text("✓",13);check.Width=20;DockPanel.SetDock(check,Dock.Right);row.Children.Add(check);
+        }
         var labels=new StackPanel();labels.Children.Add(UI.Text(name,12));if(detail.Length>0)labels.Children.Add(UI.Text(detail,10,UI.Muted));row.Children.Add(labels);button.Content=row;menu.Children.Add(button);return button;
     }
     private void ShowSources()

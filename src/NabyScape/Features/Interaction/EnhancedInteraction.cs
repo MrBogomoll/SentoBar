@@ -41,7 +41,6 @@ public sealed partial class OverlayWindow
     private readonly Dictionary<Image,Image> previousArtwork=new();
     private readonly Dictionary<TextBlock,TextBlock> previousText=new();
     private readonly Dictionary<TextBlock,MarqueeLabel> marqueeLabels=new();
-    private ImageSource? tintedArtwork;
     private const int HotkeyId=0x4C55,VisibilityHotkeyId=0x4C56,TuckHotkeyId=0x4C57;
     internal string TuckHotkeyError {get;private set;}="";
     internal string VisibilityHotkeyError {get;private set;}="";
@@ -59,7 +58,7 @@ public sealed partial class OverlayWindow
         root.PreviewMouseWheel+=(_,e)=>
         {
             if(peeking){if(RoutePeekWheel(e.Delta,false,e.OriginalSource as DependencyObject))e.Handled=true;return;}
-            if(expanded){if(RoutePanelWheel(e.Delta,Keyboard.Modifiers.HasFlag(ModifierKeys.Shift),e.OriginalSource as DependencyObject))e.Handled=true;return;}
+            if(expanded){if(RoutePanelWheel(e.Delta,false,e.OriginalSource as DependencyObject))e.Handled=true;return;}
             if(app.Settings.WheelAction=="volume"){app.Audio.SetVolume(app.Audio.Volume+Math.Sign(e.Delta)*app.Settings.VolumeStep/100d);app.Audio.Read();Update();e.Handled=true;}
             else if(app.Settings.WheelAction=="pages"){Reveal();int steps=panelWheel.Push(e.Delta,Environment.TickCount64);if(steps!=0)CyclePage(steps,true);e.Handled=true;}
         };
@@ -126,31 +125,32 @@ public sealed partial class OverlayWindow
         if(previousText.TryGetValue(text,out var old)){old.FontWeight=text.FontWeight;old.Text=text.Text;old.BeginAnimation(OpacityProperty,null);old.Opacity=1;Motion.Fade(old,0,220);text.BeginAnimation(OpacityProperty,null);text.Opacity=Motion.Enabled?0:1;}
         if(marqueeLabels.TryGetValue(text,out var label))label.Reset();text.Text=value;Motion.Fade(text,1,220);
     }
-    private CoverPalette coverPalette;
     private void UpdateAmbientMotion()
     {
         var s=app.Settings;
-        bool Includes(string id)=>AmbientPolicy.Includes(s,id,app.Media.SourceDisabled);
-        bool allowed=!noticeShowing && (assistantOpen || assistantPeeking?Includes("ai"):commandOpen?Includes("shortcuts"):expanded?
-            PanelWidgets.Any(w=>(!s.CompactLayout || PageFor(w.Id)==activePage) && Includes(w.Id)):
-            peeking?Includes(peekId):Includes("closed"));
-        allowed &= (expanded || peeking || s.ClosedAmbient) && !IsTucked && !userHidden;
-        bool quiet=IsTucked || !expanded && !peeking && !IdleContent;
+        bool closed=!expanded && !peeking;
+        bool compactLighting=closed || peeking;
+        bool playing=app.Media.Available && app.Media.Playing && !app.Media.SourceDisabled;
+        bool live=playing && !IsTucked && !userHidden && IsVisible && WindowState!=WindowState.Minimized;
+        bool followClosedPlayback=s.ClosedLightFollowsMusic && (!closed || !IdleContent);
+        bool reacting=AmbientPolicy.ReactsToAudio(s,live) && (!closed || followClosedPlayback);
+        bool Includes(string id)=>AmbientPolicy.Includes(s,id,app.Media.SourceDisabled,reacting);
+        bool allowed=!noticeShowing && !IsTucked && !userHidden &&
+            (compactLighting?Includes("closed"):assistantOpen?Includes("ai"):commandOpen?Includes("shortcuts"):activePage=="mixer"?Includes("volume"):
+                PanelWidgets.Any(w=>(!s.CompactLayout || PageFor(w.Id)==activePage) && Includes(w.Id)));
+        bool quiet=IsTucked || closed && !IdleContent;
         var fill=quiet?Brushes.Black:UI.Brush(s.Background);bool glass=!quiet && s.GlassStyle;
         if(!ReferenceEquals(surface.Fill,fill) || surface.GlassStyle!=glass){surface.Fill=fill;surface.GlassStyle=glass;surface.InvalidateVisual();}
-        if(quiet)surface.AlbumTint=Colors.Transparent;
-        bool moving=(expanded || peeking || !IdleContent) && app.Media.Playing && s.LiveActivity && !IsTucked && !userHidden && IsVisible && WindowState!=WindowState.Minimized;
-        surface.SetAmbient(AmbientPolicy.ColorsFor(s,app.AmbientAudio.CoverColors),allowed?s.AmbientStrength:0,s.AmbientSpread,s.AmbientMotion,moving,AmbientLook.From(s));
-        app.AmbientAudio.Set(surface,allowed && moving);
-    }
-    private void UpdateAlbumTint()
-    {
-        if(!ReferenceEquals(tintedArtwork,app.Media.Artwork))
-        {
-            tintedArtwork=app.Media.Artwork;
-            coverPalette=app.AmbientAudio.CoverColors;
-        }
-        var tint=coverPalette.Primary;surface.AlbumTint=app.Settings.AlbumAccent && tint.A>0?Color.FromArgb(24,tint.R,tint.G,tint.B):Colors.Transparent;
-        UpdateAmbientMotion();
+        var palette=app.AmbientAudio.CoverColors;
+        if(compactLighting && !playing && s.ClosedLightKeepsLastCover)palette=app.AmbientAudio.LastCoverColors;
+        bool usesCover=!compactLighting || AmbientPolicy.ClosedFollowsCover(s,playing);
+        var tint=palette.Primary;
+        surface.AlbumTint=!quiet && usesCover && s.AlbumAccent && tint.A>0?Color.FromArgb(24,tint.R,tint.G,tint.B):Colors.Transparent;
+        bool moving=live && s.LiveActivity && (!compactLighting || followClosedPlayback);
+        var colors=compactLighting?AmbientPolicy.ClosedColors(s,palette,playing):AmbientPolicy.ColorsFor(s,palette);
+        if(surface.SuppressGlassDock!=IsTucked){surface.SuppressGlassDock=IsTucked;surface.InvalidateVisual();}
+        surface.SetGlassDockPalette(UI.Brush(s.Background).Color,allowed?colors.Primary:Colors.Transparent);
+        surface.SetAmbient(colors,allowed?s.AmbientStrength:0,s.AmbientSpread,s.AmbientMotion,moving,AmbientLook.From(s));
+        app.AmbientAudio.Set(surface,allowed && reacting);
     }
 }

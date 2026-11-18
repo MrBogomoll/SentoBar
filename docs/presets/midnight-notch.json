@@ -154,10 +154,6 @@
       {
         "Id": "awake",
         "Enabled": true
-      },
-      {
-        "Id": "links",
-        "Enabled": true
       }
     ]
   },

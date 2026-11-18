@@ -17,7 +17,7 @@ public sealed partial class SettingsWindow
         foreach(var box in SettingTree(page).OfType<ComboBox>())
         {
             if(current is not ("AI" or "Weather"))UI.LocalizeOptions(box);string name=UI.Identity(box);if(name.Length==0)continue;
-            string help=SettingDescription(name);if(help.Length>0)box.ToolTip=Localization.Text(help);
+            string help=SettingDescription(name);if(help.Length>0)AutomationProperties.SetHelpText(box,Localization.Text(help));
         }
         foreach(var section in sections)
         {

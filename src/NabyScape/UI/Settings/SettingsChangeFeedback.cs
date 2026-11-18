@@ -12,13 +12,16 @@ internal static class SettingsChangeFeedback
 {
     private static readonly Dictionary<string,string> Labels=new()
     {
+        ["Background"]="Island color",["PanelNavigationStyle"]="Panel navigation style",
+        ["DetachablePreviews"]="Show Detach button",["GlassStyle"]="Dock reflections",["GlassStrength"]="Reflection strength",
+        ["AlbumAccent"]="Tint with album artwork",["PanelSwipe"]="Switch expanded tabs with wheel or drag",
         ["WindowTheme"]="Window theme",["WindowGlass"]="Transparency and blur",["WindowLargeCorners"]="Window corners",["WindowEffects"]="Interface effects",["WindowCompact"]="Compact mode",["WindowHoverAccents"]="Show hover accents",
         ["CoverAmbient"]="Ambient light",["ClosedAmbient"]="Closed dock ambience",
         ["AmbientStrength"]="Ambient intensity",["AutoCheckUpdates"]="Automatic update checks",
         ["AutoDownloadUpdates"]="Automatic update downloads",["Width"]="Closed dock width",
         ["Height"]="Closed dock height",["TuckEdge"]="Tucked edge height",["Widgets"]="Widgets & order",
         ["HoverViews"]="Hover pages",["Tools"]="Tools & order",["Shortcuts"]="Shortcuts",
-        ["Performance"]="Animation performance",["AutoStart"]="Start with Windows",["SettingsShowAll"]="Show all settings"
+        ["Performance"]="Animation performance",["AutoStart"]="Start with Windows",["ClosedIdleContent"]="Idle dock content"
     };
     internal static string Describe(JsonElement before,Settings settings)
     {

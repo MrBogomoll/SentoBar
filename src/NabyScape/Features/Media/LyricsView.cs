@@ -10,8 +10,8 @@ namespace NabyScape;
 internal sealed class LyricsView : Grid
 {
     private readonly App app;
-    private readonly TextBlock previous=UI.Text("",11,UI.Muted),current=UI.Text("",18),next=UI.Text("",12,UI.Muted),credit=UI.Text("",9,UI.Muted),highlight=UI.Text("",18);
-    private readonly Grid line=new(){MinHeight=42,ClipToBounds=true};
+    private readonly TextBlock previous=UI.Text("",11,UI.Muted),current=UI.Text("",20),next=UI.Text("",12,UI.Muted),credit=UI.Text("",9,UI.Muted),highlight=UI.Text("",20);
+    private readonly Grid line=new(){ClipToBounds=true};
     private readonly RectangleGeometry sweep=new();
     private readonly DispatcherTimer tick=new(){Interval=TimeSpan.FromMilliseconds(100)};
     private readonly Button retry;
@@ -26,15 +26,18 @@ internal sealed class LyricsView : Grid
     internal LyricsView(App app)
     {
         this.app=app;Height=158;Margin=new(0,6,0,12);ClipToBounds=true;
-        for(int i=0;i<4;i++)RowDefinitions.Add(new(){Height=i==1?new GridLength(1,GridUnitType.Star):GridLength.Auto});
-        previous.TextTrimming=next.TextTrimming=TextTrimming.CharacterEllipsis;previous.TextWrapping=next.TextWrapping=TextWrapping.NoWrap;previous.Opacity=.4;next.Opacity=.6;previous.Margin=new(0,0,0,5);next.Margin=new(0,5,0,8);
-        foreach(var text in new[]{current,highlight}){text.FontWeight=FontWeights.SemiBold;text.VerticalAlignment=VerticalAlignment.Center;text.MaxHeight=52;text.TextTrimming=TextTrimming.CharacterEllipsis;}
+        RowDefinitions.Add(new());RowDefinitions.Add(new(){Height=GridLength.Auto});
+        previous.TextTrimming=next.TextTrimming=TextTrimming.CharacterEllipsis;previous.TextWrapping=next.TextWrapping=TextWrapping.NoWrap;previous.Opacity=.72;next.Opacity=.72;previous.Margin=new(0,0,0,6);next.Margin=new(0,6,0,0);
+        foreach(var text in new[]{current,highlight}){text.FontWeight=FontWeights.SemiBold;text.VerticalAlignment=VerticalAlignment.Center;text.TextWrapping=TextWrapping.Wrap;}
         highlight.IsHitTestVisible=false;highlight.Clip=sweep;line.Children.Add(current);line.Children.Add(highlight);
-        Children.Add(previous);SetRow(line,1);var lineScroll=new ScrollViewer{Content=line,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};SetRow(lineScroll,1);Children.Add(lineScroll);SetRow(next,2);Children.Add(next);
-        var footer=new StackPanel();
+        var verse=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
+        verse.Children.Add(previous);verse.Children.Add(line);verse.Children.Add(next);
+        var reading=new Grid();reading.Children.Add(verse);
+        Children.Add(new ScrollViewer{Content=reading,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+        var footer=new StackPanel{Margin=new(0,8,0,0)};
         retry=UI.Button(Localization.Text("Retry lyrics"),()=>{app.Lyrics.Retry();Refresh();});
         var sources=new LyricsSourcesControl(app,()=>{app.Lyrics.Retry();Refresh();},()=>{credit.Text=LyricsFiles.Import(app,Window.GetWindow(this));});
-        credit.FontSize=11;credit.TextWrapping=TextWrapping.Wrap;credit.Margin=new(0,7,0,0);footer.Children.Add(sources);footer.Children.Add(credit);SetRow(footer,3);Children.Add(footer);
+        credit.FontSize=11;credit.TextWrapping=TextWrapping.Wrap;credit.Margin=new(0,7,0,0);footer.Children.Add(sources);footer.Children.Add(credit);SetRow(footer,1);Children.Add(footer);
         Loaded+=(_,_)=>Attach();Unloaded+=(_,_)=>Detach();IsVisibleChanged+=(_,_)=>{if(IsVisible)Attach();else Detach();};
         tick.Tick+=(_,_)=>Paint();
     }
@@ -59,14 +62,16 @@ internal sealed class LyricsView : Grid
     {
         if(!attached || !ElementVisibility.InViewport(this)){tick.Stop();return;}var result=fixture?.Result??app.Lyrics.Result;var lines=result.Lines;var position=app.Media.Timeline();double at=(fixture?.At??position.elapsed)+app.Settings.LyricsOffset;
         int now=LyricTiming.Index(lines,at);bool change=now!=index || !ReferenceEquals(last,result) || style!=app.Settings.LyricsAnimation;index=now;last=result;style=app.Settings.LyricsAnimation;
-        credit.Text=result.Status;retry.Visibility=lines.Length==0 && !result.Status.StartsWith(Localization.Text("Finding"))?Visibility.Visible:Visibility.Collapsed;
+        credit.Text=result.Status;credit.Visibility=lines.Length==0 && result.Plain.Length==0?Visibility.Visible:Visibility.Collapsed;retry.Visibility=lines.Length==0 && !result.Status.StartsWith(Localization.Text("Finding"))?Visibility.Visible:Visibility.Collapsed;
         if(change)
         {
-            previous.Text=now>0?lines[now-1].Text:"";current.MaxHeight=lines.Length==0 && result.Plain.Length>0?double.PositiveInfinity:52;current.Text=highlight.Text=result.Plain.Length>0?result.Plain:now>=0?lines[now].Text:lines.Length>0?"♪":Localization.Text("No lyrics yet");next.Text=now+1<lines.Length?lines[now+1].Text:"";
-            current.Foreground=style=="Karaoke"?UI.Muted:Brushes.White;highlight.Visibility=style=="Karaoke" && now>=0?Visibility.Visible:Visibility.Collapsed;
+            previous.Text=now>0?lines[now-1].Text:""; current.Text=highlight.Text=result.Plain.Length>0?result.Plain:now>=0?lines[now].Text:lines.Length>0?"♪":Localization.Text("No lyrics yet");next.Text=now+1<lines.Length?lines[now+1].Text:"";
+            previous.Visibility=previous.Text.Length>0?Visibility.Visible:Visibility.Collapsed;
+            next.Visibility=next.Text.Length>0?Visibility.Visible:Visibility.Collapsed;
+            current.SetResourceReference(TextBlock.ForegroundProperty,style=="Karaoke"?"MutedText":"BodyText");highlight.Visibility=style=="Karaoke" && now>=0?Visibility.Visible:Visibility.Collapsed;
             if(Motion.Enabled && !app.Settings.ReduceMotion)
             {
-                if(style=="Slide"){var move=new TranslateTransform(0,10);line.RenderTransform=move;Motion.To(move,TranslateTransform.YProperty,0,260);Motion.Fade(line,1,200);}
+                if(style=="Slide"){var move=new TranslateTransform(0,5);line.RenderTransform=move;Motion.To(move,TranslateTransform.YProperty,0,260);Motion.Fade(line,1,200);}
                 else if(style=="Focus"){var scale=new ScaleTransform(.97,.97);line.RenderTransformOrigin=new(0,.5);line.RenderTransform=scale;Motion.To(scale,ScaleTransform.ScaleXProperty,1,300);Motion.To(scale,ScaleTransform.ScaleYProperty,1,300);line.Opacity=.5;Motion.Fade(line,1,260);}
                 else{line.RenderTransform=Transform.Identity;line.Opacity=1;}
             }

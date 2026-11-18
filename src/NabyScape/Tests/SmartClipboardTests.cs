@@ -29,9 +29,9 @@ public static class SmartClipboardTests
         Check("links use existing validation and expose an explicit clean variant",()=>
         {
             var original="https://example.com/a?q=keep&utm_source=test#anchor";var clip=new ClipItem{Text=original};
-            var result=SmartClipboard.Classify(clip);Assert(result.Kind==SmartClipKind.Link && result.CleanedLink=="https://example.com/a?q=keep#anchor" && clip.Text==original && clip.Kind=="text");
+            var result=SmartClipboard.Classify(clip);Assert(result.Kind==SmartClipKind.Link && clip.Text==original && clip.Kind=="text");
             foreach(var value in new[]{"file:///C:/private.txt","javascript:alert(1)","ftp://example.com","https://user:password@example.com","example.com","read https://example.com","https://example.com/\nsecret"})Assert(Classify(value).Kind==SmartClipKind.Text);
-            var signed="https://example.com/?sig=secret&utm_source=keep";Assert(Classify(signed).CleanedLink==signed);
+            var signed="https://example.com/?sig=secret&utm_source=keep";Assert(Classify(signed).Kind==SmartClipKind.Link);
             Assert(SmartClipboard.Classify(new(){Kind="image",Text="#fff"}).Kind==SmartClipKind.Image);
         });
         Check("native-free service preserves privacy and persists source data",()=>

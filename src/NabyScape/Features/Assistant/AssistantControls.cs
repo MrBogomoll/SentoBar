@@ -51,7 +51,7 @@ internal static class AssistantControls
         // Keep connection details in the menu so the footer stays one compact row.
         description=UI.Caption("",11,UI.Muted);description.MaxWidth=260;
         var menu=new ContextMenu{Placement=System.Windows.Controls.Primitives.PlacementMode.Top,MinWidth=230};
-        UI.LocalizedName(menu,"Naby options");menu.Items.Add(new MenuItem{Header=description,IsEnabled=false});menu.Items.Add(new Separator());
+        UI.LocalizedName(menu,"Naby options");menu.Items.Add(new MenuItem{Header=description,Focusable=false,IsHitTestVisible=false});menu.Items.Add(new Separator());
         menu.Items.Add(Option(Localization.Text("AI settings"),Localization.Text("Providers & API keys"),"settings",app.ShowAssistantProviders));
         menu.Items.Add(Option(Localization.Text("Voice settings"),Localization.Text("Models & microphone"),"mic",app.ShowVoiceSettings));
         menu.Items.Add(Option(Localization.Text("Connect Hermes"),Localization.Text("Connect or manage your own agent"),"link",app.ShowHermesSettings));

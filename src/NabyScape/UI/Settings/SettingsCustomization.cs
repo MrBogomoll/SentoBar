@@ -46,7 +46,9 @@ public sealed partial class SettingsWindow
     }
     private void AudioSettings()
     {
-        SpotifySettings();MediaAppearanceSettings();MediaExperienceSettings();AudioFeedbackSettings();
+        SpotifySettings();MediaExperienceSettings();AudioFeedbackSettings();
+        page.Children.Add(Section("Music on the dock",
+            UI.CaptionButton("Set dock content",()=>Navigate("ClosedDock"))));
         page.Children.Add(Section("Volume mixer",UI.Caption("In the compact media panel, choose the speaker button for volume and mute. The mixer icon opens Apps or Outputs; the chevron opens devices and microphone controls. Choose the media source button to switch playing apps. Tab to a button and press Enter or Space; Esc closes its popover.",12,UI.Muted),UI.CaptionButton("Open volume mixer",()=>app.OpenMixer())));
         var signal=new StackPanel();audioSignalWave=new ActivityVisual{WaveOnly=true,Width=96,Height=16,HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,4,0,12)};signal.Children.Add(new Border{Child=audioSignalWave,Background=UI.Brush("#303030"),BorderBrush=UI.Brush("#777777"),BorderThickness=new(1),CornerRadius=new(9),Padding=new(12,8,12,0),HorizontalAlignment=HorizontalAlignment.Left,Margin=new(0,5,0,8)});audioSignalState=UI.Caption("Reading selected app…",11,UI.Muted);signal.Children.Add(audioSignalState);
         page.Children.Add(Section("Live signal",UI.Caption("Follows the selected app across its active outputs. Spectrum includes other sounds sharing those outputs; Amplitude history reads the selected app level only.",11,UI.Muted),signal,UI.Caption("Spectrum shows 25 real frequency bands from low to high. If output capture is unavailable, the waveform uses measured amplitude history. Sensitivity changes the visible range without adding artificial beats.",11,UI.Muted)));
@@ -56,18 +58,18 @@ public sealed partial class SettingsWindow
     private void SystemSettings()
     {
         var s=app.Settings;page.Children.Add(Section("Monitor details",Check("Network transfer rates",s.MonitorNetwork,v=>s.MonitorNetwork=v),Check("Storage capacity",s.MonitorStorage,v=>s.MonitorStorage=v),Check("Processes by memory",s.MonitorProcesses,v=>s.MonitorProcesses=v),UI.Caption("Overview shows CPU, memory and uptime. Switch tabs for network, storage or processes. Sampling stops when Status is hidden.",11,UI.Muted)));
-        page.Children.Add(Section("Clock",Check("24-hour clock",s.Clock24Hour,v=>s.Clock24Hour=v),Check("Show seconds in Status",s.ClockSeconds,v=>s.ClockSeconds=v),Check("Show date",s.ShowDate,v=>s.ShowDate=v)));
+        page.Children.Add(Section("Clock",Check("24-hour clock",s.Clock24Hour,v=>s.Clock24Hour=v),Check("Show seconds in Clock",s.ClockSeconds,v=>s.ClockSeconds=v),Check("Show date",s.ShowDate,v=>s.ShowDate=v)));
     }
     private void HoverControls()
     {
-        var s=app.Settings;var timing=new StackPanel();AddSlider(timing,"Hover delay",s.HoverDelayMs,80,900,v=>s.HoverDelayMs=(int)v,"ms",10);AddSlider(timing,"Detail delay",s.HoverDetailDelayMs,200,1200,v=>s.HoverDetailDelayMs=(int)v,"ms",10);AddSlider(timing,"Swipe distance",s.SwipeDistance,24,100,v=>s.SwipeDistance=v,"px");page.Children.Add(Section("Hover & swipe",UI.Caption("Scroll anywhere on a preview to browse. Click to open its panel.",11,UI.Muted),Check("Preview on hover",s.HoverPeek,v=>s.HoverPeek=v),Check("Two-stage reveal",s.TwoStageHover,v=>s.TwoStageHover=v),Advanced("Hover timing",timing)));
+        var s=app.Settings;var timing=new StackPanel();AddSlider(timing,"Hover delay",s.HoverDelayMs,80,900,v=>s.HoverDelayMs=(int)v,"ms",10);AddSlider(timing,"Detail delay",s.HoverDetailDelayMs,200,1200,v=>s.HoverDetailDelayMs=(int)v,"ms",10);AddSlider(timing,"Swipe distance",s.SwipeDistance,24,100,v=>s.SwipeDistance=v,"px");page.Children.Add(Section("Hover & swipe",UI.Caption("Use the wheel to change mini-panel tabs. Hold Ctrl to scroll widget content or adjust timer fields.",11,UI.Muted),Check("Preview on hover",s.HoverPeek,v=>s.HoverPeek=v),Check("Two-stage reveal",s.TwoStageHover,v=>s.TwoStageHover=v),Advanced("Hover timing",timing)));
     }
     private void HoverPageSettings()
     {
         var s=app.Settings;
         var views=new StackPanel{Visibility=s.HoverFollowsWidgets?Visibility.Collapsed:Visibility.Visible};
         views.Children.Add(WidgetOrder(s.HoverViews,"hover"));
-        page.Children.Add(Section("Hover pages",Check("Show all active widgets in hover",s.HoverFollowsWidgets,v=>{s.HoverFollowsWidgets=v;views.Visibility=v?Visibility.Collapsed:Visibility.Visible;}),UI.Caption("Uses the same order as Your widgets. Turn this off to choose a separate hover order below.",11,UI.Muted),views));
+        page.Children.Add(Section("Hover pages",Check("Show all active widgets in hover",s.HoverFollowsWidgets,v=>{s.HoverFollowsWidgets=v;views.Visibility=v?Visibility.Collapsed:Visibility.Visible;}),UI.Caption("When enabled, widget switches also control their mini panels. Turn this off to choose mini panels separately.",11,UI.Muted),views));
     }
 
     private void RenderSettingsPreview()
@@ -76,37 +78,57 @@ public sealed partial class SettingsWindow
         string timedKind=CompactDockPresentation.TimedKind(s,app.Session,DateTimeOffset.UtcNow);
         bool closedMusic=closed && previewContent=="Music";
         bool musicActive=s.Widgets.Any(w=>w.Id=="media" && w.Enabled) && app.Media.Available && app.Media.Playing && s.ClosedMediaContent!="None";
-        bool previewIdle=closedMusic && !musicActive && timedKind.Length==0;
+        bool previewAssistantExample=closed && previewContent=="AI";
+        bool previewIdle=previewAssistantExample || closedMusic && !musicActive && timedKind.Length==0;
+        bool previewAskNaby=previewIdle && (previewAssistantExample || s.ClosedIdleContent=="Assistant");
         bool clockEnabled=s.Widgets.Any(w=>w.Id=="clock" && w.Enabled);
         bool detailExample=!closed && ((!hover && current!="Layout") || previewContent is "Control colors" or "Typography" or "Panel navigation" or "Drop zone" or "Detached preview" or "Cover gestures" or "Smart clipboard" or "Shelf" or "Visibility");
         if(detailExample){closed=false;hover=false;width=300;height=previewContent switch{"Control colors"=>330,"Smart clipboard"=>320,"Detached preview"=>260,"Typography"=>220,"Shelf"=>260,"Music"=>250,"System"=>210,"Navigation"=>160,_=>230};}
-        AnimatePreviewSize(width,height);preview.Opacity=Accessibility.HighContrast?1:s.Opacity;preview.Background=Accessibility.HighContrast?SystemColors.WindowBrush:closed && !previewIdle?Brushes.Black:UI.Brush(s.Background);RefreshPreviewClip();preview.Margin=new(0,s.Preset=="Mac"?0:Math.Clamp(s.Top,0,12),0,0);
+        var custom=app.PanelBackground.Get(s,app.Store.DirectoryPath);
+        AnimatePreviewSize(width,height);preview.Opacity=Accessibility.HighContrast || custom!=null?1:s.Opacity;
+        preview.Background=custom!=null?Brushes.Transparent:Accessibility.HighContrast?SystemColors.WindowBrush:closed && !previewIdle?Brushes.Black:UI.Brush(s.Background);
+        void PreviewSurface(Border material)
+        {
+            material.Visibility=custom==null && s.GlassStyle?Visibility.Visible:Visibility.Collapsed;
+            if(custom==null)material.Background=IslandSurface.Material(s.Background);
+            material.Opacity=(closed?.45:1)*s.GlassStrength;
+        }
+        RefreshPreviewClip();preview.Margin=new(0,s.Preset=="Mac"?0:Math.Clamp(s.Top,0,12),0,0);
         var inset=new Thickness(closed?(previewIdle?14:18):hover?32:s.PanelPadding,closed?0:15,closed?(previewIdle?14:18):hover?32:s.PanelPadding,0);
         previewDimensions.Text=detailExample?Localization.Text("Detail preview · your current appearance"):Localization.Format("{0:0} × {1:0} px · {2}",width,height,Localization.Text(s.Preset=="Mac"?"Notch":"Pill"));
-        int settingsKey=previewContent is "Music" or "Timer" or "Focus" or "System"?HashCode.Combine(s.ClosedMediaContent,s.ClosedMediaIcon,s.LiveActivity,s.BoldMediaTitle,s.BoldHeadings,s.FocusSeconds,s.BreakSeconds,s.TimerDurationSeconds):previewRevision;
+        int settingsKey=previewContent is "Music" or "Timer" or "Focus" or "System"?HashCode.Combine(HashCode.Combine(s.ClosedMediaContent,s.ClosedIdleContent),s.ClosedMediaIcon,s.LiveActivity,s.BoldMediaTitle,s.BoldHeadings,s.FocusSeconds,s.BreakSeconds,s.TimerDurationSeconds):previewRevision;
         int template=HashCode.Combine(HashCode.Combine(current,previewMode,previewContent,settingsKey,app.Media.Title,app.Media.Artist,app.Media.Artwork),app.Media.Playing,timedKind,clockEnabled,s.ShowDate,app.Assistant.Options.IslandCharacter);
         if(previewTemplateKey==template && previewLayout!=null && previewMaterial!=null)
-        {previewLayout.Margin=previewIdle?new Thickness(0):inset;previewMaterial.Visibility=s.GlassStyle?Visibility.Visible:Visibility.Collapsed;previewMaterial.Background=IslandSurface.Material(s.Background);previewMaterial.Opacity=(closed?.45:1)*s.GlassStrength;return;}
+        {previewLayout.Margin=previewIdle?new Thickness(0):inset;PreviewSurface(previewMaterial);return;}
         previewTemplateKey=template;previewFrames.Clear();previewRealtimeFrames.Clear();hasPreviewWave=false;
         var content=new StackPanel{Margin=inset};previewLayout=content;var header=new DockPanel{Height=closed?height:23};var time=UI.Text(DateTime.Now.ToString(s.Clock24Hour?"HH:mm":"h:mm tt"),11);time.FontWeight=FontWeights.Bold;DockPanel.SetDock(time,Dock.Right);header.Children.Add(time);previewFrames.Add(_=>time.Text=DateTime.Now.ToString(s.Clock24Hour?"HH:mm":"h:mm tt"));var appName=UI.Text(closed && previewContent=="Music"?(app.Media.Available?app.Media.Title:""):Localization.Text(previewContent),11);appName.TextWrapping=TextWrapping.NoWrap;appName.TextTrimming=TextTrimming.CharacterEllipsis;appName.FontWeight=s.BoldHeadings?FontWeights.SemiBold:FontWeights.Normal;header.Children.Add(appName);if(closed || hover)content.Children.Add(header);
         previewClockLabel=time;previewSummaryLabel=appName;
-        if(closedMusic)
+        if(closedMusic || previewAssistantExample)
         {
             time.Visibility=CompactDockPresentation.ShowClock(clockEnabled,previewIdle,false)?Visibility.Visible:Visibility.Collapsed;
             if(previewIdle)
             {
-                appName.Text="";time.FontWeight=FontWeights.Medium;time.FontFamily=new FontFamily("Segoe UI Variable Text, Segoe UI");
+                appName.Text=previewAskNaby?Localization.Text("Ask Naby"):"";time.FontWeight=FontWeights.Medium;time.FontFamily=new FontFamily("Segoe UI Variable Text, Segoe UI");
                 double innerWidth=CompactDockPresentation.ContentWidth(width,s.PanelWidth,s.Preset=="Mac" && s.DockEdge=="Top");
-                bool companionVisible=app.Assistant.Options.IslandCharacter || app.Assistant.WakeListening;
+                bool companionVisible=previewAssistantExample || app.Assistant.Options.IslandCharacter || app.Assistant.WakeListening;
                 double size=Math.Clamp(s.Height-4,24,32);double companionSpace=companionVisible?size+9:0;
                 content.Children.Remove(header);content.Margin=new Thickness(0);
                 var idleHeader=new Grid{Width=innerWidth,Height=height,HorizontalAlignment=HorizontalAlignment.Center};
                 header.Children.Remove(time);time.HorizontalAlignment=HorizontalAlignment.Right;time.VerticalAlignment=VerticalAlignment.Center;time.Margin=new(0,0,14+companionSpace,0);idleHeader.Children.Add(time);
                 if(companionVisible)idleHeader.Children.Add(new AssistantOrb{Width=size,Height=size,ReduceMotion=s.ReduceMotion,Margin=new(0,0,9,0),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center});
                 time.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));double dateRoom=CompactDockPresentation.DateRoom(innerWidth,time.DesiredSize.Width);
-                if(clockEnabled && s.ShowDate && dateRoom>=80)
+                if(previewAskNaby)
                 {
-                    var date=new TextBlock{HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Center,TextWrapping=TextWrapping.NoWrap,ClipToBounds=true,IsHitTestVisible=false,MaxWidth=dateRoom};
+                    header.Children.Remove(appName);
+                    appName.HorizontalAlignment=HorizontalAlignment.Left;
+                    appName.VerticalAlignment=VerticalAlignment.Center;
+                    appName.Margin=new(14,0,0,0);
+                    appName.MaxWidth=Math.Max(0,innerWidth-time.DesiredSize.Width-companionSpace-34);
+                    idleHeader.Children.Add(appName);
+                }
+                else if(clockEnabled && s.ShowDate && dateRoom>=80)
+                {
+                    var date=new TextBlock{HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Left,Margin=new(14,0,0,0),TextWrapping=TextWrapping.NoWrap,ClipToBounds=true,IsHitTestVisible=false,MaxWidth=dateRoom};
                     DateTime day=DateTime.Today;CompactDockPresentation.FillDate(date,day);idleHeader.Children.Add(date);
                     previewFrames.Add(_=>{if(day!=DateTime.Today){day=DateTime.Today;CompactDockPresentation.FillDate(date,day);}});
                 }
@@ -118,10 +140,9 @@ public sealed partial class SettingsWindow
                 previewFrames.Add(_=>appName.Text=CompactDockPresentation.TimedText(s,app.Session,DateTimeOffset.UtcNow));
             }
         }
-        if(closed && previewContent=="AI"){appName.Text=Localization.Text("Ask Naby");var face=new AssistantOrb{Width=22,Height=22,ReduceMotion=s.ReduceMotion,Margin=new(0,0,8,0)};DockPanel.SetDock(face,Dock.Left);header.Children.Insert(0,face);}
         if(closedMusic && musicActive && timedKind.Length==0)
         {
-            FrameworkElement? icon=s.ClosedMediaIcon=="Artwork" && app.Media.Artwork!=null?new Border{Width=20,Height=20,CornerRadius=new(5),Clip=new RectangleGeometry(new Rect(0,0,20,20),5,5),Margin=new(0,0,8,0),VerticalAlignment=VerticalAlignment.Center,Child=new Image{Source=app.Media.Artwork,Stretch=Stretch.UniformToFill}}:s.LiveActivity && s.ClosedMediaIcon=="Waveform" && s.ClosedMediaContent=="Title"?PreviewWave():null;
+            FrameworkElement? icon=s.ClosedMediaIcon=="Artwork" && app.Media.Artwork!=null?new Border{Width=20,Height=20,CornerRadius=new(5),Clip=new RectangleGeometry(new Rect(0,0,20,20),5,5),Margin=new(0,0,8,0),VerticalAlignment=VerticalAlignment.Center,Child=new Image{Source=app.Media.Artwork,Stretch=Stretch.UniformToFill}}:s.ClosedMediaIcon=="Waveform"?PreviewWave(icon:true):null;
             if(icon!=null){DockPanel.SetDock(icon,Dock.Left);header.Children.Insert(0,icon);}
         }
         int vocalAt=LyricTiming.CanUse(app.Media)?LyricTiming.VocalIndex(app.Lyrics.Result.Lines,app.Media.Timeline().elapsed+s.LyricsOffset):-1;
@@ -130,7 +151,7 @@ public sealed partial class SettingsWindow
         {
             appName.Visibility=Visibility.Collapsed;var waveform=PreviewWave(true);waveform.Width=double.NaN;waveform.MaxWidth=72;waveform.Margin=new(0,0,8,0);waveform.HorizontalAlignment=HorizontalAlignment.Stretch;header.Children.Add(waveform);
         }
-        if(closedMusic && s.ClosedMediaContent=="None" && timedKind.Length==0)appName.Text=Localization.Text("");
+        if(closedMusic && !previewIdle && s.ClosedMediaContent=="None" && timedKind.Length==0)appName.Text=Localization.Text("");
         if(closedMusic && musicActive && timedKind.Length==0 && s.ClosedMediaContent=="Lyrics" && vocalAt>=0 && !lyricWave)
         {
             appName.Text=app.Lyrics.Result.Lines[vocalAt].Text;
@@ -147,8 +168,8 @@ public sealed partial class SettingsWindow
             else if(previewContent=="Visibility")detail.Children.Add(VisibilityExample());
             else if(previewContent is "Drop zone" or "Detached preview" or "Cover gestures" or "Smart clipboard" or "Control colors" or "Typography" or "Panel navigation")detail.Children.Add(FeaturePreview(previewContent));
             else if(previewContent=="Music"){var title=UI.Text(app.Media.Available?app.Media.Title:Localization.Text("Nothing playing"),15);title.FontWeight=s.BoldMediaTitle?FontWeights.SemiBold:FontWeights.Normal;title.TextWrapping=TextWrapping.NoWrap;title.TextTrimming=TextTrimming.CharacterEllipsis;detail.Children.Add(title);var artist=UI.Text(app.Media.Available?app.Media.Artist:Localization.Text("Windows media"),11,UI.Muted);artist.Margin=new(0,5,0,14);detail.Children.Add(artist);var transport=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center};foreach(string icon in new[]{"previous","play","next"}){var shape=Icons.Create(icon,icon=="play"?25:16,UI.Brush(s.Accent));shape.Margin=new(15,0,15,0);transport.Children.Add(shape);}detail.Children.Add(transport);var progress=new ProgressBar{Minimum=0,Maximum=1,Height=3,Margin=new(0,14,0,0)};detail.Children.Add(progress);detail.Children.Add(PreviewWave());previewRealtimeFrames.Add(_=>{var t=app.Media.Timeline();progress.Value=t.Item2>0?t.Item1/t.Item2:0;});}
-            else if(previewContent is "Timer" or "Focus"){var countdown=previewContent=="Focus"?app.Session.Focus:app.Session.Timer;var digits=UI.Text(countdown.Remaining(DateTimeOffset.UtcNow)>0?countdown.Display(DateTimeOffset.UtcNow):Countdown.FormatSeconds(previewContent=="Focus"?s.FocusSeconds:s.TimerDurationSeconds),32);detail.Children.Add(digits);previewFrames.Add(_=>{if(countdown.Remaining(DateTimeOffset.UtcNow)>0)digits.Text=countdown.Display(DateTimeOffset.UtcNow);});var start=UI.Caption("Start     +5 min",11,UI.Muted);start.Margin=new(0,18,0,0);detail.Children.Add(start);}
-            else if(previewContent=="Tasks"){detail.Children.Add(UI.Heading(Localization.Text("Tasks"),16));foreach(var task in app.Productivity.Tasks.Take(3)){var line=UI.Text((task.Done?"✓  ":"○  ")+task.Text,12);line.TextWrapping=TextWrapping.NoWrap;line.TextTrimming=TextTrimming.CharacterEllipsis;line.Margin=new(0,6,0,0);detail.Children.Add(line);}if(app.Productivity.Tasks.Count==0)detail.Children.Add(UI.Caption("Your tasks appear here. Add them in Tools → Tasks.",12,UI.Muted));}
+            else if(previewContent is "Timer" or "Focus"){var countdown=previewContent=="Focus"?app.Session.Focus:app.Session.Timer;var digits=UI.Text(countdown.Remaining(DateTimeOffset.UtcNow)>0?countdown.Display(DateTimeOffset.UtcNow):Countdown.FormatSeconds(previewContent=="Focus"?s.FocusSeconds:s.TimerDurationSeconds),32);detail.Children.Add(digits);previewFrames.Add(_=>{if(countdown.Remaining(DateTimeOffset.UtcNow)>0)digits.Text=countdown.Display(DateTimeOffset.UtcNow);});var start=UI.Caption(previewContent=="Timer"?"+1 min   −1 min   +1 sec   −1 sec":"Start     +5 min",11,UI.Muted);start.Margin=new(0,18,0,0);detail.Children.Add(start);}
+            else if(previewContent=="Tasks"){detail.Children.Add(UI.Heading(Localization.Text("Tasks"),16));foreach(var task in app.Productivity.Tasks.Take(3)){var line=UI.Text((task.Done?"✓  ":"○  ")+task.Text,12);line.TextWrapping=TextWrapping.NoWrap;line.TextTrimming=TextTrimming.CharacterEllipsis;line.Margin=new(0,6,0,0);detail.Children.Add(line);}if(app.Productivity.Tasks.Count==0)detail.Children.Add(UI.Caption("Add tasks in Widgets → Tasks or directly in the dock.",12,UI.Muted));}
             else if(previewContent=="Calendar"){detail.Children.Add(UI.Text(DateTime.Now.ToString("ddd, d MMM",Localization.Culture),11,UI.Muted));var next=app.Calendar.Events.Where(e=>e.End>DateTimeOffset.UtcNow).OrderBy(e=>e.Start).FirstOrDefault();var title=UI.Text(next?.Title??Localization.Text("No upcoming events"),15);title.Margin=new(0,12,0,0);detail.Children.Add(title);}
             else if(previewContent=="Note"){detail.Children.Add(UI.Caption("Quick note",11,UI.Muted));detail.Children.Add(new Border{Background=UI.Brush("#24262B"),CornerRadius=new(8),Padding=new(10),Margin=new(0,10,0,0),Child=UI.Text(app.Productivity.Note.Length>0?app.Productivity.Note[..Math.Min(90,app.Productivity.Note.Length)]:Localization.Text("Capture a thought…"),12)});}
             else if(previewContent=="Shelf")
@@ -157,19 +178,34 @@ public sealed partial class SettingsWindow
                 foreach(string file in new[]{"Design notes.pdf","Wallpaper.png"}){var row=new DockPanel{Margin=new(0,10,0,0)};var select=new CheckBox{IsChecked=false,Style=(Style)app.FindResource("TaskToggle"),Width=30};row.Children.Add(select);var icon=Icons.Create("file-text",24);icon.Margin=new(0,0,10,0);row.Children.Add(icon);row.Children.Add(UI.Text(file,12));detail.Children.Add(row);}
                 detail.Children.Add(UI.Caption("Example files · nothing is added to your shelf",10,UI.Muted));
             }
-            else if(previewContent=="Tools"){foreach(string tool in new[]{"File shelf","Notes","Clipboard","Calendar","Keep awake","Clean links"})detail.Children.Add(new Border{Height=30,Child=UI.Caption(tool,12)});}
-            else if(previewContent=="Launch" || previewContent=="Navigation")
+            else if(previewContent=="Tools"){foreach(string tool in new[]{"File shelf","Notes","Clipboard","Calendar","Keep awake"})detail.Children.Add(new Border{Height=30,Child=UI.Caption(tool,12)});}
+            else if(previewContent=="Navigation")detail.Children.Add(ControlExample("Panel navigation"));
+            else if(previewContent=="Launch")
             {
-                string style=previewContent=="Launch"?s.LaunchStyle:s.CategoryStyle;
-                var rows=new WrapPanel();var samples=previewContent=="Launch"?app.Settings.Shortcuts.Take(4).Select(x=>(x.Name,"arrow")).ToArray():new[]{("Media","nav-media"),("Focus","nav-focus"),("Status","nav-status"),("Launch","nav-launch"),("Tools","nav-tools")};
-                foreach(var (name,icon) in samples){var entry=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,12,14)};if(style!="Text")entry.Children.Add(Icons.Create(icon,16,UI.Brush(s.Accent)));if(style!="Icons"){var label=UI.Text(previewContent=="Navigation"?Localization.Text(name):name,11);label.Margin=new(style=="Text"?0:7,0,0,0);label.FontWeight=s.BoldHeadings?FontWeights.SemiBold:FontWeights.Normal;label.MaxWidth=96;label.TextWrapping=TextWrapping.NoWrap;label.TextTrimming=TextTrimming.CharacterEllipsis;entry.Children.Add(label);}rows.Children.Add(entry);}detail.Children.Add(rows);
+                string style=s.LaunchStyle;
+                var rows=new WrapPanel();
+                foreach(var shortcut in s.Shortcuts.Take(4))
+                {
+                    var entry=new StackPanel{Orientation=Orientation.Horizontal,Margin=new(0,0,12,14)};
+                    if(style!="Text")entry.Children.Add(Icons.Create("arrow",16,UI.Brush(s.Accent)));
+                    if(style!="Icons")
+                    {
+                        var label=UI.Text(shortcut.Name,11);
+                        label.Margin=new(style=="Text"?0:7,0,0,0);
+                        label.FontWeight=s.BoldHeadings?FontWeights.SemiBold:FontWeights.Normal;
+                        label.MaxWidth=96;label.TextWrapping=TextWrapping.NoWrap;label.TextTrimming=TextTrimming.CharacterEllipsis;
+                        entry.Children.Add(label);
+                    }
+                    rows.Children.Add(entry);
+                }
+                detail.Children.Add(rows);
             }
             else if(previewContent=="Startup"){detail.Children.Add(UI.Heading(Localization.Text("Start with Windows"),16));detail.Children.Add(new CheckBox{Content=Localization.Text(s.AutoStart?"Enabled":"Off"),IsChecked=s.AutoStart,IsHitTestVisible=false,Focusable=false});detail.Children.Add(UI.Caption("Closing Settings keeps NabyScape running. Quit from the tray.",11,UI.Muted));}
             else if(previewContent=="Volume feedback"){detail.Children.Add(Icons.Create("volume",24));detail.Children.Add(UI.Text($"{app.Audio.Volume*100:0}%",24));detail.Children.Add(new ProgressBar{Value=app.Audio.Volume*100,Height=4,Margin=new(0,14,0,0)});}
             else{var cpu=UI.Text(Localization.Format("CPU   {0:0}%",app.Usage.cpu),14);var memory=UI.Text(Localization.Format("Memory   {0:0.0} / {1:0.0} GB",app.Usage.used,app.Usage.total),12);var bar=new ProgressBar{Value=app.Usage.cpu,Maximum=100,Height=3,Margin=new(0,10,0,18),Foreground=Brushes.White,Background=UI.Brush("#40434B")};detail.Children.Add(cpu);detail.Children.Add(bar);detail.Children.Add(memory);previewFrames.Add(_=>{cpu.Text=Localization.Format("CPU   {0:0}%",app.Usage.cpu);bar.Value=app.Usage.cpu;memory.Text=Localization.Format("Memory   {0:0.0} / {1:0.0} GB",app.Usage.used,app.Usage.total);});}
             content.Children.Add(detail);
         }
-        content.ClipToBounds=true;var layers=new Grid{ClipToBounds=true};previewMaterial=new Border{Background=IslandSurface.Material(s.Background),Opacity=(closed?.45:1)*s.GlassStrength,Visibility=s.GlassStyle?Visibility.Visible:Visibility.Collapsed};layers.Children.Add(previewMaterial);if(ambientPreview.Parent is Panel previousAmbientHost)previousAmbientHost.Children.Remove(ambientPreview);layers.Children.Add(ambientPreview);layers.Children.Add(content);preview.Child=layers;previewDimensions.Text=detailExample?Localization.Text("Detail preview · your current appearance"):Localization.Format("{0:0} × {1:0} px · {2}",width,height,Localization.Text(s.Preset=="Mac"?"Notch":"Pill"));foreach(var entry in previewModeButtons){if(entry.Key==previewMode)entry.Value.SetResourceReference(Control.BackgroundProperty,"Accent");else entry.Value.Background=Brushes.Transparent;entry.Value.SetResourceReference(Control.ForegroundProperty,entry.Key==previewMode?"AccentText":"SettingsQuiet");}
+        content.ClipToBounds=true;var layers=new Grid{ClipToBounds=true};previewMaterial=new Border();PreviewSurface(previewMaterial);layers.Children.Add(previewMaterial);if(ambientPreview.Parent is Panel previousAmbientHost)previousAmbientHost.Children.Remove(ambientPreview);layers.Children.Add(ambientPreview);layers.Children.Add(content);preview.Child=layers;previewDimensions.Text=detailExample?Localization.Text("Detail preview · your current appearance"):Localization.Format("{0:0} × {1:0} px · {2}",width,height,Localization.Text(s.Preset=="Mac"?"Notch":"Pill"));foreach(var entry in previewModeButtons){if(entry.Key==previewMode)entry.Value.SetResourceReference(Control.BackgroundProperty,"Accent");else entry.Value.Background=Brushes.Transparent;entry.Value.SetResourceReference(Control.ForegroundProperty,entry.Key==previewMode?"AccentText":"SettingsQuiet");}
     }
     private void ExportCustomization()
     {var dialog=new Microsoft.Win32.SaveFileDialog{Title=Localization.Text("Export NabyScape layout"),Filter=Localization.Text("NabyScape layout|*.json"),FileName="NabyScape-layout.json"};if(dialog.ShowDialog(this)!=true)return;try{File.WriteAllText(dialog.FileName,CustomizationProfile.Export(app.Settings));status.Text=Localization.Text("Layout exported");}catch(Exception ex){status.Text=Localization.Text("Could not export layout");app.Store.Log(ex);}}

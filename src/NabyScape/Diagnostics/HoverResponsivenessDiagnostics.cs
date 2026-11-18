@@ -19,10 +19,12 @@ internal static class HoverResponsivenessDiagnostics
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
         var settings=app.Settings;settings.SmartActivities=false;settings.HideFullscreen=settings.HideMaximized=false;
-        settings.HoverPeek=settings.CompactLayout=true;settings.ReduceMotion=false;settings.AnimationMs=420;settings.TwoStageHover=false;
+        settings.HoverPeek=settings.CompactLayout=settings.PanelSwipe=settings.WheelWrapTabs=true;
+        settings.ClipboardHistory=true;settings.ReduceMotion=false;settings.AnimationMs=420;settings.TwoStageHover=false;
         foreach(var widget in settings.Widgets)widget.Enabled=true;
         foreach(var page in settings.HoverViews)page.Enabled=true;
         app.ChangeSettings();app.Media.DiagnosticPlayback(true);app.Audio.DiagnosticPeak=()=>.3f;
+        for(int i=0;i<30;i++)app.Productivity.IngestText("Synthetic clipboard row "+i);
         island.DiagnosticPointerPresent=true;await Task.Delay(500);
         var samples=new List<object>();var intervals=new List<double>();TimeSpan? previous=null;
         EventHandler frame=(_,args)=>{var time=((RenderingEventArgs)args).RenderingTime;if(previous is {} last && time>last)intervals.Add((time-last).TotalMilliseconds);previous=time;};
@@ -68,7 +70,42 @@ internal static class HoverResponsivenessDiagnostics
                 settings.DockEdge=edge;app.ChangeSettings();island.Collapse();island.PreviewActivity();await Task.Delay(700);
                 check("Hover: contour placement finishes on "+edge,!island.IsAnimating && double.IsFinite(island.Left) && double.IsFinite(island.Top) && Math.Abs(island.PaintedHeight-settings.HoverHeight)<.1);
             }
-            File.WriteAllText(Path.Combine(directory,"hover-timing.json"),JsonSerializer.Serialize(new{note="Isolated WPF invocation. Times exclude configured pointer dwell; rendering callbacks are not GPU presentation. No live microphones or clipboard capture.",configuredHoverDelayMs=settings.HoverDelayMs,samples},new JsonSerializerOptions{WriteIndented=true}));
+            var wheelSamples=new List<object>();
+            async Task MeasureWheel(string mode,string[] ids,Func<string> current,Func<bool> route)
+            {
+                const int steps=96;
+                var times=new List<double>(steps);
+                int start=Array.IndexOf(ids,current());
+                bool advanced=start>=0;
+                for(int step=1;step<=steps;step++)
+                {
+                    var watch=Stopwatch.StartNew();
+                    bool handled=route();
+                    island.UpdateLayout();
+                    times.Add(watch.Elapsed.TotalMilliseconds);
+                    advanced&=handled && current()==ids[(start+step)%ids.Length];
+                    await Task.Delay(16);
+                }
+                times.Sort();
+                check($"Wheel: {mode} applies all {steps} fast inputs in order",advanced);
+                wheelSamples.Add(new{mode,tabs=ids.Length,steps,p95InputAndLayoutMs=times[(int)((times.Count-1)*.95)],maxInputAndLayoutMs=times[^1]});
+            }
+            island.SelectPeek(island.HoverDeckIds[0]);await Task.Delay(350);island.UpdateLayout();
+            var miniPages=views.ToArray();
+            await MeasureWheel("mini",island.HoverDeckIds,()=>island.PeekPage,()=>island.RoutePeekWheel(-120,false,null,false));
+            check("Wheel: switching the mini panel reuses cached tabs",miniPages.Length==views.Count &&
+                miniPages.All(pair=>views.TryGetValue(pair.Key,out var view) && ReferenceEquals(view,pair.Value)));
+
+            island.Reveal(false);await Task.Delay(500);
+            var tabs=(Dictionary<string,Button>)typeof(OverlayWindow).GetField("compactTabs",flags)!.GetValue(island)!;
+            var pages=(Dictionary<string,FrameworkElement>)typeof(OverlayWindow).GetField("compactPages",flags)!.GetValue(island)!;
+            string[] expandedIds=tabs.Keys.ToArray();
+            foreach(string id in expandedIds){island.SelectPage(id,false);island.UpdateLayout();}
+            var expandedPages=expandedIds.Select(id=>(id,view:pages[id])).ToArray();
+            await MeasureWheel("expanded",expandedIds,()=>island.ActivePage,()=>island.RoutePanelWheel(-120,false,null,false));
+            check("Wheel: switching the expanded panel reuses its page containers",
+                expandedPages.All(page=>ReferenceEquals(pages[page.id],page.view)));
+            File.WriteAllText(Path.Combine(directory,"hover-timing.json"),JsonSerializer.Serialize(new{note="Isolated WPF invocation. Times exclude configured pointer dwell. Wheel timings include input routing and synchronous WPF layout, not GPU presentation. No live microphones or clipboard capture.",configuredHoverDelayMs=settings.HoverDelayMs,samples,wheelSamples},new JsonSerializerOptions{WriteIndented=true}));
         }
         finally{CompositionTarget.Rendering-=frame;island.DiagnosticPointerPresent=false;island.Collapse();}
     }

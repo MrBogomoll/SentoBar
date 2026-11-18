@@ -68,7 +68,7 @@ public sealed partial class SettingsWindow
             var button=UI.CaptionButton(light?"Light theme":"Dark theme",()=>{app.Settings.WindowTheme=id;ApplyWindowAppearance();Save();});
             button.Content=frame;button.Padding=new(0);button.Margin=new(column==0?0:6,0,column==0?6:0,0);button.Background=Brushes.Transparent;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;Grid.SetColumn(button,column++);choices.Children.Add(button);themeChoices.Add((id,button,frame,radio));
         }
-        var hint=UI.Caption("Choose the appearance of the app interface.",12,SettingsTheme.Quiet);
+        var hint=UI.Caption("This theme applies to the settings window.",12,SettingsTheme.Quiet);
         page.Children.Add(Section("Window theme",hint,choices));
         Border Row(string title,string description,FrameworkElement control)
         {

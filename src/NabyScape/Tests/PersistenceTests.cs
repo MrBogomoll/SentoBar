@@ -46,8 +46,9 @@ internal static class PersistenceTests
         {
             var store=new Store(root);var settings=new Settings{Width=333,Accent="#112233",SettingsMaterial="Native Mica",AutoStart=true,ClipboardHistory=true,Shortcuts=new(){new(){Name="Keep",Target="external"}}};
             store.Save("productivity",new ProductivityData{Note="keep",Tasks=new(){new(){Text="keep"}},Clips=new(){new(){Text="keep"}}});string before=File.ReadAllText(Path.Combine(root,"productivity.json"));
-            PreferenceReset.Reset(store,settings,"Appearance");Assert(settings.Width==333 && settings.Accent=="#FFFFFF" && SettingsBackdrop.Requested(settings)=="Solid" && settings.AutoStart && settings.ClipboardHistory && settings.Shortcuts[0].Target=="external");
+            PreferenceReset.Reset(store,settings,"Appearance");Assert(settings.Width==333 && settings.Accent=="#FFFFFF" && SettingsBackdrop.Requested(settings)=="Native Mica" && settings.AutoStart && settings.ClipboardHistory && settings.Shortcuts[0].Target=="external");
             PreferenceReset.Restore(store,settings);Assert(settings.Accent=="#112233" && settings.Width==333 && settings.SettingsMaterial=="Native Mica");
+            PreferenceReset.Reset(store,settings,"WindowAppearance");Assert(SettingsBackdrop.Requested(settings)=="Solid" && settings.Accent=="#112233");
             PreferenceReset.Reset(store,settings,null);Assert(settings.Width==400 && settings.Accent=="#FFFFFF" && settings.AutoStart && settings.ClipboardHistory && settings.Shortcuts[0].Target=="external" && before==File.ReadAllText(Path.Combine(root,"productivity.json")));
             settings.ClipboardHistory=false;settings.AutoStart=false;PreferenceReset.Restore(store,settings);Assert(settings.Width==333 && !settings.ClipboardHistory && !settings.AutoStart);
         });

@@ -20,6 +20,38 @@ public sealed partial class OverlayWindow
             }))).ToArray(),()=>app.Media.SourceSelectionId,BuildVolumePopover,WidgetOn("media")?new SpotifyLikeButton(app):null);
         mediaControls.LayoutRequested+=QueueMediaLayout;mediaControls.SizeChanged+=(_,_)=>QueueMediaLayout();RefreshMediaControls(true);return mediaControls;
     }
+    private FrameworkElement BuildVolumePage()
+    {
+        var page=new StackPanel();
+        var label=UI.Heading(Localization.Text("Volume"),17);
+        page.Children.Add(label);
+        var slider=new Slider{Minimum=0,Maximum=100,Margin=new(0,8,0,8)};
+        UI.Named(slider,Localization.Text("Windows volume"));
+        page.Children.Add(slider);
+        var toggle=UI.CaptionButton("Mute or unmute",()=>{app.Audio.ToggleMute();Update();});
+        var actions=new WrapPanel();
+        actions.Children.Add(toggle);
+        actions.Children.Add(UI.CaptionButton("Audio devices and microphone",OpenAudioMenu));
+        actions.Children.Add(UI.CaptionButton("Volume mixer",OpenMixer));
+        page.Children.Add(actions);
+        bool syncing=false;
+        void Refresh()
+        {
+            if(!page.IsVisible)return;
+            syncing=true;
+            if(!slider.IsMouseCaptureWithin && !slider.IsKeyboardFocusWithin)slider.Value=app.Audio.Volume*100;
+            slider.IsEnabled=toggle.IsEnabled=app.Audio.Available;
+            Motion.Text(label,app.Audio.Available?Localization.Format("Volume · {0:0}%",app.Audio.Volume*100):Localization.Text("No output device"));
+            toggle.Content=Localization.Text(app.Audio.Muted?"Unmute":"Mute");
+            syncing=false;
+        }
+        slider.ValueChanged+=(_,_)=>{if(!syncing){app.Audio.SetVolume(slider.Value/100);Refresh();}};
+        page.Loaded+=(_,_)=>{app.Updated+=Refresh;Refresh();};
+        page.IsVisibleChanged+=(_,_)=>Refresh();
+        page.Unloaded+=(_,_)=>app.Updated-=Refresh;
+        return page;
+    }
+
     private FrameworkElement BuildVolumePopover()
     {
         DetachMediaControl(volume);DetachMediaControl(volumeText);

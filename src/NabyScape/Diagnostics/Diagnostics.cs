@@ -39,9 +39,6 @@ internal static class Diagnostics
         Directory.CreateDirectory(directory);var report=new List<string>();int failures=0;
 
 
-        // Integration checks reach every Settings control; the gallery covers the essentials view.
-        app.Settings.SettingsShowAll=!Environment.GetCommandLineArgs().Contains("--settings-gallery-only");
-
         // Ignore physical input only inside this temporary diagnostic application's UI.
 
         // Programmatic RaiseEvent/Focus and native geometry checks remain available.
@@ -130,6 +127,7 @@ internal static class Diagnostics
             if(Environment.GetCommandLineArgs().Contains("--lyrics-language-live-only")){await LyricsPopoverDiagnostics.RunLanguageLive(app,directory);return;}
             if(Environment.GetCommandLineArgs().Contains("--lyrics-automatic-live-only")){await LyricsPopoverDiagnostics.RunAutomaticLive(app,directory);return;}
             if(Environment.GetCommandLineArgs().Contains("--lyrics-provider-live-only")){await LyricsPopoverDiagnostics.RunLive(app,directory);return;}
+            if(Environment.GetCommandLineArgs().Contains("--detached-appearance-only")){await DetachedAppearanceDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--lyrics-popover-only")){await LyricsPopoverDiagnostics.Run(app,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--lyrics-power-ui-only")){await LyricsPowerDiagnostics.Run(app,overlay,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--panel-wheel-only")){await PanelWheelDiagnostics.Run(app,overlay,Check);return;}
@@ -137,6 +135,8 @@ internal static class Diagnostics
             if(Environment.GetCommandLineArgs().Contains("--closed-lyrics-fallback-only")){await ClosedLyricsFallbackDiagnostics.Run(app,overlay,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--removed-activities-only")){await RemovedActivitiesDiagnostics.Run(app,overlay,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--assistant-transform-only")){await AssistantTransformDiagnostics.Run(app,overlay,directory,Check);return;}
+            if(Environment.GetCommandLineArgs().Contains("--panel-backdrop-only")){await PanelBackdropDiagnostics.Run(app,overlay,directory,Check);return;}
+            if(Environment.GetCommandLineArgs().Contains("--mini-layout-only")){await MiniLayoutDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--hover-responsiveness-only")){await HoverResponsivenessDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--recent-ux-only")){await RecentUxDiagnostics.Run(app,overlay,directory,Check);return;}
             if(Environment.GetCommandLineArgs().Contains("--welcome-only")){await WelcomeDiagnostics.Run(app,directory,Check);return;}
@@ -166,6 +166,7 @@ internal static class Diagnostics
 
             if(Environment.GetCommandLineArgs().Contains("--premium-notifications-only")){await Stage4Diagnostics.Run(app,overlay,directory,Check);return;}
 
+            if(Environment.GetCommandLineArgs().Contains("--panel-polish-only")){await PanelPolishDiagnostics.Run(app,overlay,Check,CaptureContour);return;}
             if(Environment.GetCommandLineArgs().Contains("--countdown-panel-only")){await CountdownPanelDiagnostics.Run(app,overlay,directory,Check);return;}
 
             if(Environment.GetCommandLineArgs().Contains("--visual-polish-only")){await VisualPolishDiagnostics.Run(app,overlay,directory,Check);return;}
@@ -386,7 +387,7 @@ internal static class Diagnostics
 
             Click("Start or pause preview timer");Check("Preview starts a five-minute timer",app.Session.Timer.Running && app.Session.Timer.Remaining(DateTimeOffset.UtcNow)>295);
 
-            Click("Start or pause preview timer");var pausedRemaining=app.Session.Timer.Remaining(DateTimeOffset.UtcNow);Click("Add five minutes to preview timer");Check("Extending a paused preview timer adds five minutes without resuming",!app.Session.Timer.Running && Math.Abs(app.Session.Timer.Remaining(DateTimeOffset.UtcNow)-pausedRemaining-300)<1);
+            Click("Start or pause preview timer");var pausedRemaining=app.Session.Timer.Remaining(DateTimeOffset.UtcNow);Click(Localization.Text("Add one minute to timer"));Check("The mini timer changes paused minutes without resuming",!app.Session.Timer.Running && Math.Abs(app.Session.Timer.Remaining(DateTimeOffset.UtcNow)-pausedRemaining-60)<1);
 
             Click("Reset preview timer");Check("Preview timer reset clears its saved deadline",app.Session.Timer.Remaining(DateTimeOffset.UtcNow)==0 && app.Store.Load<SessionState>("session").Timer.RemainingSeconds==0);
 
@@ -396,7 +397,7 @@ internal static class Diagnostics
 
             overlay.SelectPeek("notes");await Task.Delay(350);Entry("Preview note draft").Text="Draft stays while swiping";Check("Swipe recognition leaves buttons, sliders and writing fields to native controls",OverlayWindow.PeekGestureBlocked(Entry("Preview note draft")) && OverlayWindow.PeekGestureBlocked(ActionButton("Next preview")) && OverlayWindow.PeekGestureBlocked(Descendants(overlay).OfType<Slider>().Single(s=>AutomationProperties.GetName(s)=="Preview volume")) && !OverlayWindow.PeekGestureBlocked(new TextBlock()));overlay.SelectPeek("files");overlay.SelectPeek("notes");Check("Swiping away from quick capture preserves its draft",Entry("Preview note draft").Text=="Draft stays while swiping");Click("Save preview note");Check("Shared preview notes save locally without clearing the document",app.Store.Load<ProductivityData>("productivity").Note.Contains("Draft stays while swiping") && Entry("Preview note draft").Text==app.Productivity.Note);CaptureContour("hover-note");
 
-            overlay.SelectPeek("files");await Task.Delay(350);Check("Empty shelf preview provides a drop target and full-shelf action",ActionButton("Open full file shelf").IsVisible && Descendants(overlay).OfType<TextBlock>().Any(t=>t.Text=="Drop files onto the notch"));CaptureContour("hover-shelf");
+            overlay.SelectPeek("files");await Task.Delay(350);Check("Empty shelf preview provides a drop target and full-shelf action",ActionButton("Open full file shelf").IsVisible && Descendants(overlay).OfType<TextBlock>().Any(t=>t.Text==Localization.Text("Drop files onto this panel")));CaptureContour("hover-shelf");
 
             overlay.DragPeek(-120);overlay.FinishPeekSwipe(-26.4);Check("Swiping beyond the last preview stays within the deck",overlay.PeekPage=="files");
 
@@ -516,9 +517,9 @@ internal static class Diagnostics
 
             var launcherScroll=OuterScroll(ActionButton("File shelf"));report.Add($"INFO  Launcher content {launcherScroll.ExtentHeight:0.0} DIP; viewport {launcherScroll.ViewportHeight:0.0} DIP.");Check("All launcher tiles fit without scrolling",launcherScroll.ScrollableHeight<1);
 
-            Check("Tool launcher retains bounded compact rows without marketing copy",new[]{"File shelf","Notes","Clipboard","Calendar","Keep awake","Clean links"}.All(name=>ActionButton(name).ActualWidth>=300 && ActionButton(name).ActualHeight==32) && !Descendants(overlay).OfType<TextBlock>().Any(t=>t.Text.Contains("everyday essentials") || t.Text.Contains("Drop & collect")));
+            Check("Tool launcher retains bounded compact rows without marketing copy",new[]{"File shelf","Notes","Clipboard","Calendar","Keep awake"}.All(name=>ActionButton(name).ActualWidth>=300 && ActionButton(name).ActualHeight==32) && !Descendants(overlay).OfType<TextBlock>().Any(t=>t.Text.Contains("everyday essentials") || t.Text.Contains("Drop & collect")));
 
-            Check("Launcher exposes tools without a dropdown",new[]{"File shelf","Notes","Clipboard","Calendar","Keep awake","Clean links"}.All(name=>Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)==name)) && !Descendants(overlay).OfType<ComboBox>().Any(c=>AutomationProperties.GetName(c)=="Choose a tool"));
+            Check("Launcher exposes tools without a dropdown",new[]{"File shelf","Notes","Clipboard","Calendar","Keep awake"}.All(name=>Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)==name)) && !Descendants(overlay).OfType<ComboBox>().Any(c=>AutomationProperties.GetName(c)=="Choose a tool"));
 
             Click("Notes");Check("Launcher returns to the writing editor",Entry("Quick notes").IsVisible);
 
@@ -570,24 +571,6 @@ internal static class Diagnostics
 
                 Check("Calendar draft controls and all entered values survive productivity changes",draft.All(field=>ReferenceEquals(Entry(field.name),field.control) && Entry(field.name).Text==field.value));
 
-                overlay.ShowTools("links",false);var draftLink=Entry("Link to clean");var draftResult=Entry("Cleaned link");draftLink.Text="https://example.com/draft?sku=42&utm_source=diagnostic#details";
-
-                const string previewStatus="Tracking parameters removed · check the result below";var draftStatus=Descendants(overlay).OfType<TextBlock>().Single(t=>t.Text==previewStatus);var draftCopy=ActionButton("Copy cleaned link");
-
-                bool CleanerRetained()=>ReferenceEquals(Entry("Link to clean"),draftLink) && draftLink.Text=="https://example.com/draft?sku=42&utm_source=diagnostic#details" && ReferenceEquals(Entry("Cleaned link"),draftResult) && draftResult.Text=="https://example.com/draft?sku=42#details" && Descendants(overlay).Contains(draftStatus) && draftStatus.Text==previewStatus && ReferenceEquals(ActionButton("Copy cleaned link"),draftCopy) && draftCopy.IsEnabled;
-
-                changesBefore=productivityChanges;
-
-                Check("Clean-link refresh fixture emits a real productivity change",app.Productivity.IngestText(clipboardFixture+" links") && productivityChanges==changesBefore+1);
-
-                Check("Clean-link live input, result, status and copy choice survive productivity changes",CleanerRetained());
-
-                int clipCount=app.Productivity.Clips.Count;changesBefore=productivityChanges;
-
-                Check("Duplicate clean-link fixture exercises Touch and emits Changed",!app.Productivity.IngestText(clipboardFixture+" links") && app.Productivity.Clips.Count==clipCount && productivityChanges==changesBefore+1);
-
-                Check("Clean-link live preview also survives duplicate clipboard changes",CleanerRetained());
-
                 overlay.ShowTools("awake",false);var draftDuration=Descendants(overlay).OfType<ComboBox>().Single(c=>AutomationProperties.GetName(c)=="Keep awake duration");var draftDisplay=Descendants(overlay).OfType<CheckBox>().Single(c=>c.Content?.ToString()=="Keep the display on too");draftDuration.SelectedIndex=2;draftDisplay.IsChecked=true;
 
                 changesBefore=productivityChanges;
@@ -610,11 +593,11 @@ internal static class Diagnostics
 
             overlay.ShowTools("notes",false);await Task.Delay(200);outerScroll.ScrollToEnd();await Task.Delay(100);
 
-            overlay.ShowCommands(false);await Task.Delay(400);var search=Descendants(overlay).OfType<TextBox>().Single(t=>AutomationProperties.GetName(t)=="Search commands");search.Text="clean links";await Task.Delay(200);
+            overlay.ShowCommands(false);await Task.Delay(400);var search=Descendants(overlay).OfType<TextBox>().Single(t=>AutomationProperties.GetName(t)=="Search commands");search.Text="calendar";await Task.Delay(200);
 
             Check("Opening commands resets a long tool's scroll offset",outerScroll.VerticalOffset==0);
 
-            Check("Command bar filters existing actions inside compact bounds",overlay.CommandsOpen && Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Clean links") && !Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Open Settings") && overlay.PaintedHeight<=408.1);CaptureContour("command-bar");
+            Check("Command bar filters existing actions inside compact bounds",overlay.CommandsOpen && Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Calendar") && !Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Open Settings") && overlay.PaintedHeight<=408.1);CaptureContour("command-bar");
 
             search.Text="";await WaitUntil(()=>!overlay.IsAnimating);overlay.UpdateLayout();
 
@@ -656,7 +639,7 @@ internal static class Diagnostics
 
             finally{app.Settings.Shortcuts.Remove(longCommand);app.Settings.PanelWidth=commandWidth;app.Settings.PanelScale=commandScale;app.ChangeSettings();}
 
-            search=Entry("Search commands");search.Text="clean links";
+            search=Entry("Search commands");search.Text="calendar";
 
             var shortcutWidget=app.Settings.Widgets.Single(w=>w.Id=="shortcuts");var toolWidgets=app.Settings.Widgets.Where(w=>Settings.ToolNames.ContainsKey(w.Id)).Select(w=>(widget:w,enabled:w.Enabled)).ToArray();bool shortcutsEnabled=shortcutWidget.Enabled;var sentinel=new Shortcut{Name="Diagnostic shortcut sentinel",Target="https://example.com/never-open"};
 
@@ -670,31 +653,17 @@ internal static class Diagnostics
 
                 Check("Disabled shortcuts omit saved launch commands",!Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)==sentinel.Name));
 
-                Entry("Search commands").Text="clean links";Check("Disabled tools omit their commands",!Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Clean links"));
+                Entry("Search commands").Text="calendar";Check("Disabled tools omit their commands",!Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Calendar"));
 
                 Entry("Search commands").Text="Open Settings";Check("Settings remains searchable with shortcuts and tools disabled",Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Open Settings"));
 
             }
 
-            finally{app.Settings.Shortcuts.Remove(sentinel);shortcutWidget.Enabled=shortcutsEnabled;foreach(var item in toolWidgets)item.widget.Enabled=item.enabled;app.ChangeSettings();Entry("Search commands").Text="clean links";}
+            finally{app.Settings.Shortcuts.Remove(sentinel);shortcutWidget.Enabled=shortcutsEnabled;foreach(var item in toolWidgets)item.widget.Enabled=item.enabled;app.ChangeSettings();Entry("Search commands").Text="calendar";}
 
-            Descendants(overlay).OfType<Button>().Single(b=>AutomationProperties.GetName(b)=="Clean links").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(350);
-
-            Check("Command selection opens the requested tool",!overlay.CommandsOpen && overlay.ActivePage=="links" && Descendants(overlay).OfType<TextBox>().Any(t=>AutomationProperties.GetName(t)=="Link to clean"));
-
-            var linkInput=Descendants(overlay).OfType<TextBox>().Single(t=>AutomationProperties.GetName(t)=="Link to clean");linkInput.Text="https://example.com/product?sku=42&utm_source=NabyScape#info";
-
-            Check("Clean links previews preserved functional query and fragment without copying",Descendants(overlay).OfType<TextBox>().Single(t=>AutomationProperties.GetName(t)=="Cleaned link").Text=="https://example.com/product?sku=42#info");CaptureContour("tools-links");
-
-            await Task.Delay(350);overlay.UpdateLayout();var copyLink=ActionButton("Copy cleaned link");Check("Clean-link copy action fits the compact viewport",copyLink.TranslatePoint(new Point(0,copyLink.ActualHeight),overlay).Y<overlay.PaintedHeight-12);
-
-            var textHost=(ScrollViewer)linkInput.Template.FindName("PART_ContentHost",linkInput);var glyphs=new FormattedText(linkInput.Text,System.Globalization.CultureInfo.CurrentCulture,linkInput.FlowDirection,new Typeface(linkInput.FontFamily,linkInput.FontStyle,linkInput.FontWeight,linkInput.FontStretch),linkInput.FontSize,linkInput.Foreground,VisualTreeHelper.GetDpi(linkInput).PixelsPerDip);
-
-            Check("Clean-link input viewport fits its rendered text height",textHost.ViewportHeight>=glyphs.Height && linkInput.GetRectFromCharacterIndex(0).Height<=textHost.ViewportHeight);report.Add($"INFO  Clean-link text viewport {textHost.ViewportHeight:0.00} DIP; formatted text {glyphs.Height:0.00} DIP.");CaptureContour("tools-links-text-viewport");
-
-            foreach(var state in new[]{("invalid","not a URL",false),("empty","",false),("unchanged","https://example.com/product?sku=42#info",true)})
-
-            {linkInput.Text=state.Item2;await Task.Delay(350);overlay.UpdateLayout();double copyBottom=copyLink.TranslatePoint(new Point(0,copyLink.ActualHeight),overlay).Y;Check("Clean-link "+state.Item1+" state recalculates the compact copy viewport",copyLink.IsEnabled==state.Item3 && copyBottom<overlay.PaintedHeight-12 && copyLink.TranslatePoint(new Point(0,copyLink.ActualHeight),outerScroll).Y<=outerScroll.ActualHeight && overlay.PaintedHeight<=408.1 && outerScroll.VerticalOffset==0);report.Add($"INFO  Clean-link {state.Item1}: Copy bottom {copyBottom:0.00}, contour {overlay.PaintedHeight:0.00}, scroll offset {outerScroll.VerticalOffset:0.00} DIP.");CaptureContour("tools-links-"+state.Item1);}
+            Descendants(overlay).OfType<Button>().Single(b=>AutomationProperties.GetName(b)=="Calendar").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await Task.Delay(350);
+            Check("Command selection opens the requested tool",!overlay.CommandsOpen && overlay.ActivePage=="calendar");
 
             overlay.ShowTools("calendar",false);await Task.Delay(300);Check("Calendar exposes a local event action and remains compact",Descendants(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Add local event") && overlay.PaintedHeight<=408.1);CaptureContour("tools-calendar");
 

@@ -9,7 +9,7 @@ namespace NabyScape;
 // Static, local examples of the controls in this section. Repaint values without rebuilding editors.
 internal sealed class SettingsScene : FrameworkElement
 {
-    internal static readonly string[] Sections={"Window theme","Hide exceptions","Other apps","Feature usage","Your setup","Ambient light","Notification presentation","Visualizer","Lyrics","Move & resize","Completion sound","AI companion","Shape","Settings material","Color & material","Surface","Controls & outlines","Typography","Text and navigation","Motion","Animation performance","Dock placement","Display","Closed island","Open panel","Hover preview","Hover & swipe","Enabled widgets & order","Individual tools","Hover pages","Clipboard history","Focus sessions","Stopwatch","Automatic tucking","Manual tuck shortcut","Panel navigation","Drag to Island","Detachable previews","Closed cover gestures","Automatic activity","Notch gestures","Global hotkey","Hide or show the island","Closed media display","Waveform source","Live signal","Live feedback","Volume mixer","Audio behavior","Header wheel","Clock","Monitor details","Launch display","Shortcuts","Layout profile","Notifications","Downloads","Updates","Reset preferences","Behavior","Local storage","Language & accessibility","Private diagnostics","About NabyScape"};
+    internal static readonly string[] Sections={"Window theme","Hide exceptions","Other apps","Feature usage","Your setup","Ambient light","Notification presentation","Visualizer","Lyrics","Move & resize","Completion sound","AI companion","Shape","Settings material","Color & material","Surface","Controls & outlines","Typography","Motion","Animation performance","Dock placement","Display","Closed island","Open panel","Hover preview","Hover & swipe","Enabled widgets & order","Individual tools","Hover pages","Clipboard history","Focus sessions","Stopwatch","Automatic tucking","Manual tuck shortcut","Panel navigation","Drag to Island","Detachable previews","Closed cover gestures","Automatic activity","Notch gestures","Global hotkey","Hide or show the island","Closed media display","Waveform source","Live signal","Live feedback","Volume mixer","Audio behavior","Header wheel","Clock","Monitor details","Launch display","Shortcuts","Layout profile","Notifications","Downloads","Updates","Reset preferences","Behavior","Local storage","Language & accessibility","Private diagnostics","About NabyScape"};
     private readonly string kind;
     internal string Section=>kind;
     private readonly Settings s;
@@ -82,7 +82,7 @@ internal sealed class SettingsScene : FrameworkElement
             case "Settings material":
                 Box(22,18,168,65,IslandSurface.GlassMaterial);Caption("Settings window",34,31,13,true);Caption(SettingsBackdrop.Requested(s),34,55,11);Caption("Island stays independent",210,32,11);Note("Schematic only - actual status appears below");break;
             case "Color & material":
-                Box(22,19,216,68,UI.Brush(s.Background));Box(36,33,34,34,UI.Brush(s.Accent));Caption("Song title",82,34,14,true,UI.ContrastText(s.Background));Caption(s.GlassStyle?"Black glass":"Solid surface",82,57,11,false,UI.ContrastText(s.Background));Text(Localization.Format("Opacity {0:0}%",s.Opacity*100),256,28);Text(Localization.Format("Glass {0:0}%",s.GlassStrength*100),256,52);Note("Your island color and material");break;
+                Box(22,19,216,68,UI.Brush(s.Background));Box(36,33,34,34,UI.Brush(s.Accent));Caption("Song title",82,34,14,true,UI.ContrastText(s.Background));Caption(s.GlassStyle?"Dock reflections":"Reflections off",82,57,11,false,UI.ContrastText(s.Background));Text(Localization.Format("Opacity {0:0}%",s.Opacity*100),256,28);Text(Localization.Format("Glass {0:0}%",s.GlassStrength*100),256,52);Note("Your island color and material");break;
             case "Surface":
                 var glass=new LinearGradientBrush(UI.Brush(s.Background).Color,UI.Brush("#3E424A").Color,90){Opacity=.25+s.GlassStrength*.6};
                 Box(24,18,176,61,Brushes.Black);Box(224,18,176,61,glass);Caption("Solid",39,38,14,true);Caption("Glass",240,38,14,true);FormattedNote(Localization.Format("Glass intensity {0:0}% · black glass {1}",s.GlassStrength*100,Localization.Text(s.GlassStyle?"on":"off")));break;
@@ -91,7 +91,10 @@ internal sealed class SettingsScene : FrameworkElement
             case "Typography":
                 Caption("Song title",24,23,21,s.BoldMediaTitle);Caption("Artist name",24,54,12,false,muted);Caption("Panel heading",232,27,16,s.BoldHeadings);Caption("Body text stays regular",232,56,11,false,muted);Note("Current title weights; body text stays the same");break;
             case "Text and navigation":
-                foreach(var item in new[]{("Media",22d),("Focus",112d),("Status",202d),("Tools",292d)}){Box(item.Item2,22,76,46);if(s.CategoryStyle=="Dots"){dc.DrawEllipse(white,null,new Point(item.Item2+38,44),3,3);continue;}if(s.CategoryStyle!="Text")dc.DrawEllipse(null,new Pen(white,1.4),new Point(item.Item2+38,36),6,6);if(s.CategoryStyle!="Icons")Caption(item.Item1,item.Item2+14,s.CategoryStyle=="Text"?38:49,11);}FormattedNote(Localization.Format("Navigation · {0}",Localization.Text(s.CategoryStyle.Replace("IconsLabels","Icons + labels"))));break;
+                Box(18,18,380,55,GlassDockAppearance.Material(UI.Brush(s.Background).Color,Colors.Transparent),14);
+                Box(111,30,70,28,GlassDockAppearance.Selected,14);
+                Caption("Music",38,37,11);Caption("Timer",124,37,11,true);Caption("Focus",196,37,11);Caption("Widgets",317,37,11);
+                break;
             case "Motion":
                 Box(23,28,68,22,Brushes.Black);Caption("Music",34,33,9);Line(108,40,176,40);Box(193,16,135,63,Brushes.Black);Cover(203,25,22);Caption("Song title",234,28,10,true);Bar(204,65,112,.4);Caption(s.ReduceMotion?"Instant state change":Localization.Format("{0:0} ms transition",s.AnimationMs),23,78,11);Caption("Closed → open",193,87,11,false,muted);break;
             case "Animation performance":
@@ -143,7 +146,7 @@ internal sealed class SettingsScene : FrameworkElement
             case "Manual tuck shortcut":
                 Keys(s.TuckHotkeyModifiers,24,24,130);Keys(s.TuckHotkeyKey,166,24,40);Caption("Tuck / automatic",232,30,13,true);Note("First press tucks · second returns to automatic rules");break;
             case "Panel navigation":
-                Box(20,15,146,68,Brushes.Black);Caption("Media",35,28,14,true);Line(182,48,234,48);Box(252,15,146,68,Brushes.Black);Caption("Status",268,28,14,true);Note("Swipe empty space · Shift + wheel · Ctrl + Tab");break;
+                Box(20,15,146,68,Brushes.Black);Caption("Media",35,28,14,true);Line(182,48,234,48);Box(252,15,146,68,Brushes.Black);Caption("Status",268,28,14,true);Note("Mouse wheel · Drag sideways · Ctrl+Tab");break;
             case "Drag to Island":
                 for(int i=0;i<3;i++){Box(28+i*12,34-i*8,42,44,UI.Brush(i==2?"#737D8C":"#3C424C"),4);}Line(110,48,198,48);Box(218,19,180,64,Brushes.Black);Caption("Drop files here",239,32,14,true);Caption("References · originals stay",230,59,11);Note(s.DropReveal?"Dragging reveals the drop area":"Drop reveal disabled");break;
             case "Detachable previews":
@@ -173,7 +176,7 @@ internal sealed class SettingsScene : FrameworkElement
             case "Header wheel":
                 Caption("One wheel step",24,22,15,true);Caption($"+{s.VolumeStep}%",264,20,26,true);Bar(24,73,365,.6);Note("Volume change per notch when wheel action is Volume");break;
             case "Clock":
-                Caption(s.Clock24Hour?"14:35"+(s.ClockSeconds?":08":""):"2:35"+(s.ClockSeconds?":08":"")+" PM",26,18,30,true);Caption(s.ShowDate?"Friday, 16 October":"Date hidden",27,60,12,false,muted);Note("Format example · seconds appear in Status");break;
+                Caption(s.Clock24Hour?"14:35"+(s.ClockSeconds?":08":""):"2:35"+(s.ClockSeconds?":08":"")+" PM",26,18,30,true);Caption(s.ShowDate?"Friday, 16 October":"Date hidden",27,60,12,false,muted);Note("Clock widget format");break;
             case "Monitor details":
                 Caption("CPU · Memory",24,20,14,true);Caption("Always in Overview",24,47,11,false,muted);Text(Localization.Format("Network   {0}",Localization.Text(s.MonitorNetwork?"On":"Off")),244,17,11);Text(Localization.Format("Storage     {0}",Localization.Text(s.MonitorStorage?"On":"Off")),244,39,11);Text(Localization.Format("Processes  {0}",Localization.Text(s.MonitorProcesses?"On":"Off")),244,61,11);Note("Additional details are available in their Status tabs");break;
             case "Launch display":

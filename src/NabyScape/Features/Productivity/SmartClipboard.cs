@@ -7,7 +7,7 @@ namespace NabyScape;
 public enum SmartClipKind { Text, Link, Image, Color }
 
 /// <summary>Derived presentation only: the original clipboard text and persisted kind are never changed.</summary>
-public sealed record SmartClip(SmartClipKind Kind,string Hex="",string Rgb="",string CleanedLink="");
+public sealed record SmartClip(SmartClipKind Kind,string Hex="",string Rgb="");
 
 public static class SmartClipboard
 {
@@ -31,9 +31,7 @@ public static class SmartClipboard
             var rgb=RgbPattern.Match(text);
             if(!rgb.Success || !int.TryParse(rgb.Groups[1].Value,out r) || !int.TryParse(rgb.Groups[2].Value,out g) || !int.TryParse(rgb.Groups[3].Value,out b) || r>255 || g>255 || b>255)
             {
-                try { return new(SmartClipKind.Link,CleanedLink:CleanLink.Clean(text)); }
-                catch(ArgumentException) { return new(SmartClipKind.Text); }
-                catch(UriFormatException) { return new(SmartClipKind.Text); }
+                return new(WebLink.IsValid(text.Trim(),8192)?SmartClipKind.Link:SmartClipKind.Text);
             }
         }
         return new(SmartClipKind.Color,$"#{r:X2}{g:X2}{b:X2}",$"rgb({r}, {g}, {b})");

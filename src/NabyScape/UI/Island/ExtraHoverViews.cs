@@ -3,43 +3,244 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using Forms=System.Windows.Forms;
 using System.Windows.Media;
 namespace NabyScape;
 public sealed partial class OverlayWindow
 {
     private readonly Dictionary<string,TextBlock> extraPeekLabels=new();
+    private readonly TextBlock peekBatteryValue=UI.Text("",24);
+    private readonly TextBlock peekBatteryStatus=UI.Text("",11,UI.Muted);
+    private readonly ProgressBar peekBatteryLevel=new(){Minimum=0,Maximum=100,Height=5,BorderThickness=new(0),Margin=new(0,6,0,3)};
+    private readonly UniformGrid peekShortcutTiles=new(){Columns=2};
+    private Shortcut[] shownPeekShortcuts=Array.Empty<Shortcut>();
+    private Action? refreshPeekAwake;
+    private TextBlock? peekDate;
+
     private FrameworkElement BuildExtraPeek(string id)
     {
         if(id=="weather")return new WeatherGlance(app);
+        if(id=="awake")return BuildPeekAwake();
+        if(id=="battery")return BuildPeekBattery();
+        if(id=="shortcuts")return BuildPeekShortcuts();
         var page=new StackPanel();page.Children.Add(UI.Heading(PeekName(id),13));var detail=UI.Text("",id=="clock"?30:12,UI.Muted);detail.Margin=new(0,9,0,8);page.Children.Add(detail);extraPeekLabels[id]=detail;
         if(id=="volume")
         {
             var slider=new Slider{Minimum=0,Maximum=100,Height=26,Margin=new(0,4,0,4)};UI.Named(slider,Localization.Text("Hover output volume"));bool sync=false;slider.ValueChanged+=(_,_)=>{if(!sync)app.Audio.SetVolume(slider.Value/100);};
             page.IsVisibleChanged+=(_,_)=>{if(page.IsVisible){sync=true;slider.Value=app.Audio.Volume*100;sync=false;}};page.Children.Add(slider);
         }
-        else if(id=="shortcuts")
+        else if(id=="clock")
         {
-            var apps=new WrapPanel();foreach(var shortcut in app.Settings.Shortcuts.Take(4)){var target=shortcut;var b=PlainPeekButton(Localization.Text("Launch ")+target.Name,()=>ShortcutService.Open(target));b.Content=UI.Text(target.Name,11);b.Padding=new(7,3,7,3);apps.Children.Add(b);}page.Children.Add(apps);
+            detail.Margin=new(0,4,0,2);
+            detail.FontWeight=FontWeights.SemiBold;
+            peekDate=UI.Text("",11,UI.Muted);
+            page.Children.Add(peekDate);
         }
-        var open=PlainPeekButton(Localization.Text("Open ")+PeekName(id),OpenPeekPage);open.Content=Localization.Text("Open ")+PeekName(id);open.FontSize=10;open.Foreground=UI.Muted;open.HorizontalAlignment=HorizontalAlignment.Left;page.Children.Add(open);return page;
+        string caption=Localization.Text("Open ")+PeekName(id);var open=GlassPeekButton(caption,caption,OpenPeekPage);open.FontSize=10;open.HorizontalAlignment=HorizontalAlignment.Left;page.Children.Add(open);return page;
     }
     private void UpdateExtraPeek()
     {
         // Keep hidden previews dormant; values update when their page is selected.
+        if(peekId=="battery"){UpdatePeekBattery();return;}
+        if(peekId=="shortcuts"){UpdatePeekShortcuts();return;}
+        if(peekId=="awake"){refreshPeekAwake?.Invoke();return;}
         if(!extraPeekLabels.TryGetValue(peekId,out var label))return;
+        var now=DateTime.Now;
+        if(peekId=="clock" && peekDate!=null)
+        {
+            peekDate.Visibility=app.Settings.ShowDate?Visibility.Visible:Visibility.Collapsed;
+            Motion.Text(peekDate,DateLabel(now));
+        }
         string text=peekId switch
         {
-            "clock"=>DateTime.Now.ToString(app.Settings.Clock24Hour?"HH:mm":"h:mm tt"),
+            "clock"=>ExpandedClockText(now),
             "volume"=>app.Audio.Available?app.Audio.Volume.ToString("P0")+" · "+Localization.Text(app.Audio.Muted?"Muted":"Output volume"):Localization.Text("No output device"),
-            "battery"=>System.Windows.Forms.SystemInformation.PowerStatus.BatteryChargeStatus.HasFlag(System.Windows.Forms.BatteryChargeStatus.NoSystemBattery)?Localization.Text("Connected to power"):Localization.Format("{0:0}% battery",System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifePercent*100),
-            "shortcuts"=>Localization.Text("Your favorite apps, one click away"),
             "power"=>Localization.Text("Open to choose a Windows power plan"),
             "awake"=>Localization.Text("Keep your computer awake while you work"),
-            "links"=>Localization.Text("Remove tracking parameters from a link"),
             "voice"=>app.Assistant.VoiceConnected?Localization.Text("Voice session active"):Localization.Text("A dedicated space to talk with Naby"),
             _=>""
         };
         Motion.Text(label,text);
+    }
+
+    private string ExpandedClockText(DateTime now)
+    {
+        string format=app.Settings.Clock24Hour
+            ? (app.Settings.ClockSeconds?"HH:mm:ss":"HH:mm")
+            : (app.Settings.ClockSeconds?"h:mm:ss tt":"h:mm tt");
+        return now.ToString(format,Localization.Culture);
+    }
+
+    private static string DateLabel(DateTime now)=>now.ToString("ddd, dd MMM",Localization.Culture);
+
+    private FrameworkElement BuildPeekBattery()
+    {
+        var page=new StackPanel();
+        page.Children.Add(UI.Heading(PeekName("battery"),13));
+        var summary=new StackPanel{Margin=new(0,4,0,0)};
+        summary.Children.Add(peekBatteryValue);
+        summary.Children.Add(peekBatteryStatus);
+        page.Children.Add(summary);
+        page.Children.Add(peekBatteryLevel);
+        var settings=GlassPeekButton("Power settings","Power settings",()=>OpenPowerSettings());
+        settings.HorizontalAlignment=HorizontalAlignment.Left;
+        page.Children.Add(settings);
+        return page;
+    }
+
+    private void OpenPowerSettings()
+    {
+        try{ShortcutService.Open(new(){Target="ms-settings:powersleep"});}
+        catch(Exception ex){app.Notify(Localization.Text("Could not open shortcut"),ex.Message);}
+    }
+
+    private readonly TextBlock batteryOverviewValue=UI.Text("",28),batteryOverviewStatus=UI.Text("",12,UI.Muted);
+    private readonly ProgressBar batteryOverviewLevel=new(){Minimum=0,Maximum=100,Height=5,Margin=new(0,8,0,10),BorderThickness=new(0)};
+
+    private FrameworkElement BuildBatteryOverview()
+    {
+        var page=new StackPanel();
+        DetachMediaControl(batteryOverviewValue);
+        DetachMediaControl(batteryOverviewStatus);
+        DetachMediaControl(batteryOverviewLevel);
+        page.Children.Add(UI.Caption("Battery",17));
+        batteryOverviewValue.Margin=new(0,8,0,3);
+        page.Children.Add(batteryOverviewValue);
+        page.Children.Add(batteryOverviewStatus);
+        page.Children.Add(batteryOverviewLevel);
+        page.Children.Add(UI.CaptionButton("Power settings",OpenPowerSettings));
+        UpdateBatteryOverview();
+        return page;
+    }
+
+    private void UpdatePeekBattery()=>UpdateBatteryLabel(peekBatteryValue,peekBatteryStatus,peekBatteryLevel,24);
+    private void UpdateBatteryOverview()=>UpdateBatteryLabel(batteryOverviewValue,batteryOverviewStatus,batteryOverviewLevel,28);
+
+    private static void UpdateBatteryLabel(TextBlock value,TextBlock status,ProgressBar level,double size)
+    {
+        var power=Forms.SystemInformation.PowerStatus;
+        var charge=power.BatteryChargeStatus;
+        bool known=charge!=Forms.BatteryChargeStatus.Unknown;
+        bool present=known && !charge.HasFlag(Forms.BatteryChargeStatus.NoSystemBattery);
+        double percent=power.BatteryLifePercent*100;
+        bool showPercent=present && percent>=0 && percent<=100;
+        bool charging=present && charge.HasFlag(Forms.BatteryChargeStatus.Charging);
+        string source=charging?"Charging":power.PowerLineStatus switch
+        {
+            Forms.PowerLineStatus.Online=>"Connected to power",
+            Forms.PowerLineStatus.Offline=>"On battery",
+            _=>"Power source unavailable"
+        };
+        value.FontSize=showPercent?size:15;
+        Motion.Text(value,showPercent?Localization.Format("{0:0}%",percent):Localization.Text(present || !known?"Charge level unavailable":"No battery detected"));
+        var remaining=TimeSpan.FromSeconds(Math.Max(0,power.BatteryLifeRemaining));
+        string detail=Localization.Text(source);
+        if(present && power.PowerLineStatus==Forms.PowerLineStatus.Offline && remaining.TotalSeconds>0)
+            detail+=" · "+Localization.Format("About {0:0} min remaining",Math.Ceiling(remaining.TotalMinutes));
+        Motion.Text(status,detail);
+        level.Visibility=showPercent?Visibility.Visible:Visibility.Collapsed;
+        if(showPercent)level.Value=percent;
+    }
+
+    private FrameworkElement BuildPeekShortcuts()
+    {
+        var page=new StackPanel();
+        page.Children.Add(UI.Heading(PeekName("shortcuts"),13));
+        peekShortcutTiles.Margin=new(0,3,0,0);
+        page.Children.Add(peekShortcutTiles);
+        var open=GlassPeekButton("All shortcuts","All shortcuts",OpenPeekPage);
+        open.HorizontalAlignment=HorizontalAlignment.Left;
+        open.FontSize=11;
+        page.Children.Add(open);
+        return page;
+    }
+
+    private void UpdatePeekShortcuts()
+    {
+        if(!peekViews.ContainsKey("shortcuts"))return;
+        var shortcuts=app.Settings.Shortcuts.Take(4).ToArray();
+        if(peekShortcutTiles.Children.Count>0 && shownPeekShortcuts.SequenceEqual(shortcuts))return;
+        shownPeekShortcuts=shortcuts;
+        peekShortcutTiles.Children.Clear();
+        if(shortcuts.Length==0)
+        {
+            peekShortcutTiles.Children.Add(UI.Caption("Add shortcuts in Settings.",11,UI.Muted));
+            return;
+        }
+        foreach(var shortcut in shortcuts)
+        {
+            string name=shortcut switch
+            {
+                {Name:"Explorer",Target:"explorer.exe"}=>Localization.Text("File Explorer"),
+                {Name:"Settings",Target:"ms-settings:"}=>Localization.Text("Settings"),
+                _=>shortcut.Name
+            };
+            var button=PlainPeekButton(name,()=>
+            {
+                try{ShortcutService.Open(shortcut);Collapse();}
+                catch(Exception ex){app.Notify(Localization.Text("Could not open shortcut"),ex.Message);}
+            });
+            button.HorizontalContentAlignment=HorizontalAlignment.Stretch;
+            button.Padding=new(8,2,6,2);
+            button.Height=33;
+            button.Margin=new(0,0,5,3);
+            button.Background=UI.Brush("#1AFFFFFF");
+            button.ToolTip=name;
+            var row=new DockPanel{LastChildFill=true,IsHitTestVisible=false};
+            var icon=new ShortcutIcon(shortcut);
+            var fallback=Icons.Create(shortcut.Target=="explorer.exe"?"folder":"nav-launch",16);
+            icon.AvailabilityChanged+=available=>fallback.Visibility=available?Visibility.Collapsed:Visibility.Visible;
+            var plate=new Grid{Width=24,Height=24,Margin=new(0,0,7,0)};
+            plate.Children.Add(fallback);
+            plate.Children.Add(icon);
+            row.Children.Add(plate);
+            var label=UI.Text(name,11);
+            label.TextWrapping=TextWrapping.NoWrap;
+            label.TextTrimming=TextTrimming.CharacterEllipsis;
+            label.VerticalAlignment=VerticalAlignment.Center;
+            row.Children.Add(label);
+            button.Content=new Border{Background=button.Background,CornerRadius=new(7),Padding=new(8,2,6,2),Child=row};
+            button.Padding=new(0);
+            peekShortcutTiles.Children.Add(button);
+        }
+    }
+
+    private FrameworkElement BuildPeekAwake()
+    {
+        var page=new StackPanel();
+        page.Children.Add(UI.Heading(PeekName("awake"),13));
+        var status=UI.Text("",11,UI.Muted);
+        status.Margin=new(0,2,0,2);
+        page.Children.Add(status);
+        var duration=CreateAwakeDuration();
+        duration.MinHeight=26;
+        duration.Margin=new(0,2,0,2);
+        duration.Padding=new(7,2,7,2);
+        var display=new CheckBox{Content=UI.Caption("Keep the display on too",11)};
+        display.Margin=new(0,2,0,3);
+        UI.Named(display,Localization.Text("Keep the display on too"));
+        var toggle=GlassPeekButton("Start keep awake","Start keep awake",()=>
+        {
+            MutateUtility(()=>{if(app.Awake.Active)app.Awake.Stop();else StartAwake(duration,display);});
+            refreshPeekAwake?.Invoke();
+        });
+        toggle.HorizontalAlignment=HorizontalAlignment.Left;
+        toggle.FontSize=11;
+        page.Children.Add(duration);
+        page.Children.Add(display);
+        page.Children.Add(toggle);
+        refreshPeekAwake=()=>
+        {
+            bool active=app.Awake.Active;
+            Motion.Text(status,active?AwakeSummary(DateTimeOffset.UtcNow).Replace("\n"," · "):Localization.Text("Off"));
+            var optionVisibility=active?Visibility.Collapsed:peekDetailed?Visibility.Visible:Visibility.Hidden;
+            duration.Visibility=display.Visibility=optionVisibility;
+            string action=Localization.Text(active?"Stop keep awake":"Start keep awake");
+            if(!Equals(toggle.Content,action)){toggle.Content=action;UI.Named(toggle,action);}
+        };
+        refreshPeekAwake();
+        return page;
     }
 }
 

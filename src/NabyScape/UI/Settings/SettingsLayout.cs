@@ -15,14 +15,16 @@ public sealed partial class SettingsWindow
     private static string CategoryIcon(string id)=>id switch
     {
         "Home"=>"nav-launch","Appearance"=>"image","Ambience"=>"sun","Motion"=>"nav-focus","Layout"=>"screen","Visibility"=>"eye",
-        "Controls"=>"mouse","Widgets" or "Content"=>"nav-tools","Notes"=>"notes","Tasks"=>"notes","Timers"=>"nav-focus","Audio"=>"nav-media","Clipboard"=>"clipboard","Weather"=>"weather","System"=>"nav-status",
+        "ClosedDock"=>"nav-media","Controls"=>"mouse","WindowAppearance"=>"screen","Widgets" or "Content"=>"nav-tools","Notes"=>"notes","Tasks"=>"notes","Timers"=>"nav-focus","Audio"=>"nav-media","Clipboard"=>"clipboard","Weather"=>"weather","System"=>"nav-status",
         "Launch"=>"link","AI"=>"chat","Notifications"=>"bell",_=>"nav-settings"
     };
     // Plain-language purpose of each section, shown under its title.
     private static readonly Dictionary<string,string> SectionHints=new()
     {
         ["Shape"]="Pick how the dock looks at the top of your screen.",
-        ["Color & material"]="Choose the dock and highlight colors.",
+        ["Color & material"]="These colors apply to the closed dock, mini panel and expanded panel.",
+        ["Panel navigation"]="Choose how tabs look in both panels. Use Ctrl+Tab to switch tabs in the expanded panel.",
+        ["Detachable previews"]="Click the pushpin at the bottom right to open this widget in its own window. Drag the pushpin to position the window as it opens.",
         ["Ambient light"]="A soft glow around the dock that can follow your music.",
         ["Motion"]="How lively animations feel.",
         ["Display"]="Which screen shows the dock.",
@@ -43,7 +45,7 @@ public sealed partial class SettingsWindow
         ["Updates"]="Get new versions of NabyScape.",
         ["Local storage"]="Where your data lives, quitting and uninstalling.",
         ["About NabyScape"]="Version information.",
-        ["Notch gestures"]="What the mouse wheel and middle click do on the dock.",
+        ["Notch gestures"]="What the wheel and middle click do on the closed dock.",
         ["Global hotkey"]="A keyboard shortcut that opens the dock.",
         ["Clock"]="Time and date format.",
         ["Shortcuts"]="Apps, folders and websites you open often."

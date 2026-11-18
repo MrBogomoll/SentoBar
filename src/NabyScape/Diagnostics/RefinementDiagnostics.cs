@@ -58,12 +58,12 @@ internal static class RefinementDiagnostics
             Check("horizontal trackpad deltas accumulate into one page change",overlay.ActivePage!=before);
             overlay.OpenFeaturePage("notes");await Settle();
             var editor=Tree(overlay).OfType<TextBox>().First(t=>t.IsVisible && t.AcceptsReturn);editor.Text=string.Join("\n",Enumerable.Range(1,80).Select(i=>"Note line "+i));editor.Focus();await Settle();before=overlay.ActivePage;ResetWheel();
-            Check("focused overflowing text editor keeps its vertical wheel",editor.ExtentHeight>editor.ViewportHeight+1 && !overlay.RoutePanelWheel(-120,false,editor) && overlay.ActivePage==before);
+            Check("focused overflowing text editor scrolls with Ctrl and wheel",editor.ExtentHeight>editor.ViewportHeight+1 && overlay.RoutePanelWheel(-120,false,editor,true) && overlay.ActivePage==before);
             var rows=new StackPanel();for(int i=0;i<24;i++)rows.Children.Add(new TextBlock{Text="Native scrolling row "+i,Height=24});
             var longList=new ScrollViewer{Width=240,Height=96,Content=rows,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
             longList.Measure(new Size(240,96));longList.Arrange(new Rect(0,0,240,96));longList.UpdateLayout();before=overlay.ActivePage;ResetWheel();
-            bool nativeScroll=longList.ScrollableHeight>1 && !overlay.RoutePanelWheel(-120,false,rows.Children[0]) && overlay.ActivePage==before;
-            longList.LineDown();longList.UpdateLayout();Check("long list preserves native vertical scrolling",nativeScroll && longList.VerticalOffset>0);
+            bool nativeScroll=longList.ScrollableHeight>1 && overlay.RoutePanelWheel(-120,false,rows.Children[0],true) && overlay.ActivePage==before;
+            await Task.Delay(40);longList.UpdateLayout();Check("Ctrl with the wheel scrolls a long list",nativeScroll && longList.VerticalOffset>0);
             ResetWheel();Check("horizontal gesture can leave a long list",overlay.RoutePanelWheel(120,true,rows.Children[0]) && overlay.ActivePage!=before);
             s.PanelSwipe=false;before=overlay.ActivePage;ResetWheel();Check("PanelSwipe off leaves wheel unhandled",!overlay.RoutePanelWheel(-120,false,new TextBlock()) && !overlay.RoutePanelWheel(120,true,new TextBlock()) && overlay.ActivePage==before);s.PanelSwipe=true;
             var dragChild=new TextBlock();var dragTile=new Border{Tag="file-drag",Child=dragChild};

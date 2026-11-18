@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Automation;
 using System.Windows.Media;
 namespace NabyScape;
 public sealed partial class OverlayWindow
@@ -25,9 +26,9 @@ public sealed partial class OverlayWindow
         {
             var content=new StackPanel();var name=UI.Text(day.ToString("ddd",Localization.Culture),9,UI.Muted);name.HorizontalAlignment=HorizontalAlignment.Center;content.Children.Add(name);
             var number=UI.Text(day.Day.ToString(),15);number.HorizontalAlignment=HorizontalAlignment.Center;
-            var selected=new Border{Child=number,Width=30,Height=30,CornerRadius=new(15),Background=day==calendarDay?UI.Brush("#343745"):Brushes.Transparent,Margin=new(0,5,0,4)};content.Children.Add(selected);
+            var selected=new Border{Child=number,Width=30,Height=30,CornerRadius=new(15),Background=day==calendarDay?GlassDockAppearance.Selected:Brushes.Transparent,Margin=new(0,5,0,4)};content.Children.Add(selected);
             var dot=new Border{Width=3,Height=3,CornerRadius=new(2),Background=UI.Brush("#9AA7C2"),Opacity=DayEvents(day).Any()?1:0,HorizontalAlignment=HorizontalAlignment.Center};content.Children.Add(dot);
-            var button=UI.Button(day.ToString("dddd, d MMMM yyyy",Localization.Culture),()=>{calendarDay=day;calendarMonth=new(day.Year,day.Month,1);calendarMonthExpanded=false;RefreshTools();});button.Content=content;button.Background=Brushes.Transparent;button.BorderThickness=new(0);button.Padding=new(0);button.Margin=new(0);button.ToolTip=day.ToString("D");week.Children.Add(button);
+            var button=UI.Button(day.ToString("dddd, d MMMM yyyy",Localization.Culture),()=>{calendarDay=day;calendarMonth=new(day.Year,day.Month,1);calendarMonthExpanded=false;RefreshTools();});button.Content=content;button.Background=Brushes.Transparent;button.BorderThickness=new(0);button.Padding=new(0);button.Margin=new(0);button.ToolTip=day.ToString("D");CalendarVisuals.MarkToday(button,day,outline:selected);week.Children.Add(button);
         }
         return week;
     }
@@ -42,5 +43,26 @@ public sealed partial class OverlayWindow
         if(item.MeetingUrl.Length>0){var join=UI.Button(Localization.Text("Open meeting"),()=>{try{ShortcutService.Open(new(){Target=item.MeetingUrl});}catch(Exception ex){app.Notify(Localization.Text("Could not open meeting"),ex.Message);}});join.FontSize=10;join.MinHeight=26;join.Padding=new(0,5,8,5);join.Background=Brushes.Transparent;join.HorizontalAlignment=HorizontalAlignment.Left;labels.Children.Add(join);}
         Grid.SetColumn(labels,2);row.Children.Add(labels);
         var remove=MinimalWidgets.More(Localization.Text("Event actions · ")+item.Title,(Localization.Text("Delete event ")+item.Title,()=>MutateUtility(()=>app.Calendar.Remove(item.Id))));remove.Margin=new(0);Grid.SetColumn(remove,3);row.Children.Add(remove);MinimalWidgets.Reveal(remove,row);return row;
+    }
+}
+
+internal static class CalendarVisuals
+{
+    internal static void MarkToday(Button button,DateTime day,Border? outline=null,bool lightSelection=false)
+    {
+        if(day.Date!=DateTime.Today)return;
+        AutomationProperties.SetItemStatus(button,Localization.Text("Today"));
+        Brush stroke=Accessibility.HighContrast?SystemColors.HotTrackBrush:
+            lightSelection?GlassDockAppearance.AccentText:GlassDockAppearance.Accent;
+        if(outline!=null)
+        {
+            outline.BorderBrush=stroke;
+            outline.BorderThickness=new(1.4);
+        }
+        else
+        {
+            button.BorderBrush=stroke;
+            button.BorderThickness=new(1.4);
+        }
     }
 }

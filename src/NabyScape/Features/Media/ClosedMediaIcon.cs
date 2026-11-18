@@ -55,11 +55,15 @@ public sealed partial class OverlayWindow
         compact.Visibility=expanded?Visibility.Collapsed:Visibility.Visible;
         var now=DateTimeOffset.Now;
         bool countdown=(WidgetOn("focus") && app.Session.Focus.Remaining(now)>0 || WidgetOn("timer") && app.Session.Timer.Remaining(now)>0);
-        bool cover=!PrimaryFeedbackVisible && !countdown && !ClosedStopwatchActive && !ClosedVoiceActivity && app.Settings.ClosedMediaIcon=="Artwork" && ClosedMediaActive && app.Media.Artwork!=null;
-        bool waveform=UpdateClosedMediaWaveform();
+        bool showMediaIcon=!PrimaryFeedbackVisible && !countdown && !ClosedStopwatchActive && !ClosedVoiceActivity && ClosedMediaActive;
+        bool cover=showMediaIcon && app.Settings.ClosedMediaIcon=="Artwork" && app.Media.Artwork!=null;
+        bool centerWave=UpdateClosedMediaWaveform();
+        bool artworkFallback=app.Settings.ClosedMediaIcon=="Artwork" && !cover && !centerWave && app.Settings.ClosedMediaContent=="Title" && !FeedbackVisible;
+        bool showWaveIcon=showMediaIcon && (app.Settings.ClosedMediaIcon=="Waveform" || artworkFallback);
+        bool showCountdownIcon=countdown && !FeedbackVisible && !ClosedStopwatchActive && !ClosedVoiceActivity;
         if(!app.Media.Playing || app.Audio.MediaMeterMuted || app.Settings.ReduceMotion || !app.Settings.LiveActivity)closedTitleWave.Sample(0,1,0,false,false,false,0);
         closedCover.Visibility=cover?Visibility.Visible:Visibility.Collapsed;
-        activity.Visibility=FeedbackVisible || cover || waveform || ClosedVoiceActivity || ClosedStopwatchActive || ((app.Settings.ClosedMediaContent is "Lyrics" or "None" || app.Settings.ClosedMediaIcon=="None") && !countdown) || !(countdown || ClosedMediaActive)?Visibility.Collapsed:Visibility.Visible;
+        activity.Visibility=showWaveIcon || showCountdownIcon?Visibility.Visible:Visibility.Collapsed;
         if(cover)SwapArtwork(closedCoverImage,app.Media.Artwork);
         RefreshIdleDock();UpdateClosedLyricsDemand();
     }

@@ -10,6 +10,7 @@ internal sealed class AssistantWindow : Window
 {
     internal AssistantWindow(App app)
     {
+        GlassDockAppearance.ApplyControls(this);
         Title=Localization.Text("NabyScape · Companion");
         AssistantWindowChrome.Place(this,app.Settings,720,740);
         var view=new AssistantView(app);

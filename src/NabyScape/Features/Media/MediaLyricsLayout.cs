@@ -25,7 +25,7 @@ public sealed partial class OverlayWindow
     private FrameworkElement WrapMediaLyrics(FrameworkElement controls)
     {
         mediaLyricsLayout=new Grid();mediaLyricsLayout.ColumnDefinitions.Add(new());mediaLyricsLayout.ColumnDefinitions.Add(new(){Width=GridLength.Auto});mediaLyricsLayout.RowDefinitions.Add(new(){Height=GridLength.Auto});mediaLyricsLayout.RowDefinitions.Add(new(){Height=GridLength.Auto});
-        lyricsAside=new Border{Child=mediaLyrics,Visibility=Visibility.Collapsed,BorderBrush=UI.Brush("#303137")};mediaLyricsLayout.Children.Add(controls);mediaLyricsLayout.Children.Add(lyricsAside);ArrangeMediaLyrics();return mediaLyricsLayout;
+        lyricsAside=new Border{Child=mediaLyrics,Visibility=Visibility.Collapsed,BorderBrush=GlassDockAppearance.Stroke,Background=UI.Brush("#142F435D"),CornerRadius=new(13)};mediaLyricsLayout.Children.Add(controls);mediaLyricsLayout.Children.Add(lyricsAside);ArrangeMediaLyrics();return mediaLyricsLayout;
     }
     private void ArrangeMediaLyrics()
     {
@@ -33,7 +33,8 @@ public sealed partial class OverlayWindow
         bool visible=mediaLyrics.Visibility==Visibility.Visible,side=visible && bodyWidth>=MediaLyricsLayout.MinimumBodyWidth;
         lyricsAside.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
         Grid.SetColumn(lyricsAside,side?1:0);Grid.SetRow(lyricsAside,side?0:1);
-        lyricsAside.Width=side?256:double.NaN;lyricsAside.Margin=side?new Thickness(24,0,0,0):new Thickness(0,8,0,0);lyricsAside.Padding=side?new Thickness(20,0,0,0):new Thickness(0);lyricsAside.BorderThickness=side?new Thickness(1,0,0,0):new Thickness(0);
-        mediaLyrics.Height=side?200:130;mediaLyrics.Margin=side?new Thickness(0):new Thickness(0,6,0,12);mediaLyrics.VerticalAlignment=VerticalAlignment.Center;
+        lyricsAside.Width=side?258:double.NaN;lyricsAside.Margin=side?new Thickness(18,0,0,0):new Thickness(0,8,0,0);lyricsAside.Padding=new(13,10,13,10);lyricsAside.BorderThickness=new(1);
+        mediaLyrics.Height=side?240:140;
+        mediaLyrics.Margin=new(0);mediaLyrics.VerticalAlignment=VerticalAlignment.Stretch;
     }
 }

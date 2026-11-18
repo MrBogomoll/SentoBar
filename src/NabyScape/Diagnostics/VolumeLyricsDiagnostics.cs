@@ -49,6 +49,22 @@ internal static class VolumeLyricsDiagnostics
         check("Feedback expiry preserves lyrics and the persistent music percentage",dock.HeaderLabel.Text=="Следующая строка" && value?.IsVisible==true && value.Text.EndsWith("%",StringComparison.Ordinal));
         s.ClosedMediaContent="Title";app.ChangeSettings();dock.DiagnosticFeedFeedback(false,42);
         check("Song-title mode also keeps artwork beside volume",dock.HeaderLabel.Text==app.Media.Title && dock.ClosedCoverVisible && value?.Text=="42%");
+        s.ClosedMediaIcon="Waveform";s.Width=327;s.LiveActivity=true;s.ReduceMotion=false;
+        app.Audio.DiagnosticPeak=()=>.4f;
+        app.ChangeSettings();dock.DiagnosticFeedFeedback(false,42);await Task.Delay(160);dock.UpdateLayout();
+        var wave=Field("activity") as ActivityVisual;
+        check("Waveform replaces the cover and responds to the audio meter during volume changes",
+            wave?.IsVisible==true && wave.ActualWidth>0 && (s.ReduceMotion || !Motion.Enabled || wave.Envelope>.01) &&
+            !dock.ClosedCoverVisible && value?.Text=="42%" && dock.HeaderLabel.Text==app.Media.Title);
+        Capture("title-volume-wave-icon");
+        s.ClosedMediaContent="Lyrics";app.ChangeSettings();dock.DiagnosticFeedFeedback(false,42);
+        check("Waveform and inline volume stay visible beside lyrics",
+            wave?.IsVisible==true && value?.IsVisible==true && dock.HeaderLabel.Text=="Следующая строка");
+        s.ClosedMediaContent="Waveform";app.ChangeSettings();dock.DiagnosticFeedFeedback(false,42);
+        check("The left icon is independent of the center waveform",
+            wave?.IsVisible==true && dock.ClosedTitleWaveVisible && value?.IsVisible==true);
+        dock.DiagnosticFeedFeedback(true,70);
+        check("Standalone brightness still takes over the compact dock",wave?.IsVisible!=true && dock.HeaderLabel.Text=="70%");
         app.Media.DiagnosticPlayback(false);typeof(OverlayWindow).GetField("feedbackUntil",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(dock,DateTimeOffset.MinValue);Update();await Task.Delay(100);
         check("Stopping music restores the clock, hides the volume bar and keeps Naby",Field("compactClock")?.IsVisible==true && Field("feedbackLevel")?.IsVisible!=true && value?.IsVisible!=true && Field("closedAssistant")?.IsVisible==true);
         dock.DiagnosticFeedFeedback(false,43);check("Idle volume feedback still shows its percentage and keeps Naby",dock.HeaderLabel.Text=="43%" && Field("closedAssistant")?.IsVisible==true);

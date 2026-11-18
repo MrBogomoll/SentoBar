@@ -16,7 +16,7 @@ internal sealed record MediaSourceChoice(string Id,string Name,Action Select);
 // measures it as content, including when a short screen needs vertical scrolling.
 internal sealed class MediaControls : Grid
 {
-    private readonly Border popover=new(){Tag="media-popover",Background=UI.Brush("#111216"),BorderBrush=UI.Brush("#53565D"),BorderThickness=new(.7),CornerRadius=new(10),Padding=new(8),Margin=new(0,6,0,0),Visibility=Visibility.Collapsed};
+    private readonly Border popover=new(){Tag="media-popover",BorderThickness=new(1),CornerRadius=new(12),Padding=new(8),Margin=new(0,6,0,0),Visibility=Visibility.Collapsed};
     private readonly Grid footer=new(){Margin=new(0,8,0,0)};
     private readonly Button source,level;
     private readonly TextBlock sourceName=UI.Text(Localization.Text("Media"),11),levelText=UI.Text("—",11,UI.Muted);
@@ -36,6 +36,8 @@ internal sealed class MediaControls : Grid
     internal MediaControls(StackPanel content,bool media,bool volume,Func<IReadOnlyList<MediaSourceChoice>> sources,Func<string?> selected,Func<FrameworkElement> volumeContent,FrameworkElement? favorite=null)
     {
         this.sources=sources;this.selected=selected;this.volumeContent=volumeContent;
+        popover.SetResourceReference(Border.BackgroundProperty,"PopupFill");
+        popover.SetResourceReference(Border.BorderBrushProperty,"MenuBorder");
         footer.ColumnDefinitions.Add(new());footer.ColumnDefinitions.Add(new(){Width=GridLength.Auto});
         footer.ColumnDefinitions.Add(new(){Width=GridLength.Auto});if(media && favorite!=null){Grid.SetColumn(favorite,1);footer.Children.Add(favorite);}
         source=FooterButton(Localization.Text("Choose media source"),()=>Toggle("source"));

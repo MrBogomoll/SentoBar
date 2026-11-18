@@ -33,14 +33,13 @@ internal static class VisibilityPolicy
     // While a transient shell surface or NabyScape itself is foreground, the last external app still covers the display.
     internal static IntPtr RuleWindow(IntPtr externalForeground,IntPtr lastExternal,bool transientForeground)=>externalForeground!=IntPtr.Zero?externalForeground:transientForeground?lastExternal:IntPtr.Zero;
     internal static IntPtr RetainOverride(IntPtr current,IntPtr externalForeground)=>current!=IntPtr.Zero && externalForeground!=IntPtr.Zero && current!=externalForeground?IntPtr.Zero:current;
-    internal static bool CarouselOwnsWheel(bool peeking,bool horizontal,bool focusedNote,bool overNote)=>peeking && (horizontal || !focusedNote || !overNote);
 }
 internal static class PeekLayout
 {
-    internal static Rect SafeBounds(double width,double height,double radius,bool notch)
+    internal static Rect SafeBounds(double width,double height,double radius,bool notch,double bottomInset=20)
     {
         var geometry=IslandGeometry.Create(width,height,radius,notch);
-        double top=16,bottom=height-20,inset=32;
+        double top=16,bottom=height-bottomInset,inset=32;
         while(inset<width/2-1 && (!geometry.FillContains(new Point(inset,top)) || !geometry.FillContains(new Point(inset,bottom))))inset++;
         return new Rect(inset,top,Math.Max(1,width-2*inset),Math.Max(1,bottom-top));
     }
@@ -76,8 +75,6 @@ internal static class PeekInteractionTests
         test("Desktop or no foreground releases the tuck rule",VisibilityPolicy.RuleWindow(IntPtr.Zero,appA,false)==IntPtr.Zero);
         test("A real external foreground always decides the tuck rule",VisibilityPolicy.RuleWindow(appB,appA,true)==appB);
         test("Another external app clears foreground override",VisibilityPolicy.RetainOverride(appA,appB)==IntPtr.Zero);
-        test("Focused note keeps vertical wheel only over editor",!VisibilityPolicy.CarouselOwnsWheel(true,false,true,true) && VisibilityPolicy.CarouselOwnsWheel(true,false,true,false) && VisibilityPolicy.CarouselOwnsWheel(true,true,true,true));
-        test("Expanded and closed bypass preview wheel",!VisibilityPolicy.CarouselOwnsWheel(false,false,false,false));
         foreach(bool notch in new[]{false,true})foreach(double radius in new[]{0d,16d,40d})foreach(double height in new[]{100d,184d,280d})
         {
             var bounds=PeekLayout.SafeBounds(300,height,radius,notch);var contour=IslandGeometry.Create(300,height,radius,notch);

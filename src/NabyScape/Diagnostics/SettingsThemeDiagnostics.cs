@@ -14,7 +14,7 @@ internal static class SettingsThemeDiagnostics
 {
     internal static async Task Run(App app,OverlayWindow island,string directory,Action<string,bool> check)
     {
-        island.Hide();app.Settings.UiLanguage="ru";app.Settings.SettingsShowAll=true;app.Settings.HideAppExceptions=new(){"chatgpt.exe","explorer.exe"};Localization.Configure(app.Settings);
+        island.Hide();app.Settings.UiLanguage="ru";app.Settings.HideAppExceptions=new(){"chatgpt.exe","explorer.exe"};Localization.Configure(app.Settings);
         var window=new SettingsWindow(app){Width=1100,Height=900,ShowActivated=false};
         try
         {
@@ -65,12 +65,14 @@ internal static class SettingsThemeDiagnostics
             }
             finally{Marshal.FreeHGlobal(moveBuffer);}
 
+            window.OpenCategory("WindowAppearance");
+            string dockColor=app.Settings.Background;
             foreach(string theme in new[]{"Light","Dark","Light"})
             {
                 string caption=theme=="Light"?"Light theme":"Dark theme";
                 var button=Tree(window).OfType<Button>().First(b=>UI.Identity(b)==caption);
                 button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(100);window.UpdateLayout();
-                check("Window theme switches live to "+theme,app.Settings.WindowTheme==theme);
+                check("Window theme switches live to "+theme+" independently of dock color",app.Settings.WindowTheme==theme && app.Settings.Background==dockColor);
                 var text=(SolidColorBrush)window.FindResource("ControlText");var selected=(SolidColorBrush)window.FindResource("SettingsSelected");var ink=(SolidColorBrush)window.FindResource("SettingsSelectedText");
                 check(theme+" selected navigation remains readable",Contrast(selected.Color,ink.Color)>=7);
                 check(theme+" dropdown backgrounds are opaque",((SolidColorBrush)window.FindResource("PopupFill")).Color.A==255);
@@ -103,7 +105,7 @@ internal static class SettingsThemeDiagnostics
                 window.Width=600;await Task.Delay(60);Save(window,Path.Combine(directory,theme+"-compact-narrow.png"));
                 check(theme+" narrow preview retains all mode buttons",Tree(shared).OfType<Button>().Where(b=>UI.Identity(b).StartsWith("Preview ")).All(b=>b.ActualWidth>70));
                 advanced.IsExpanded=true;await Task.Delay(60);Save(window,Path.Combine(directory,theme+"-preview-advanced.png"));advanced.IsExpanded=false;shared.IsExpanded=false;
-                window.OpenCategory("Appearance");window.Width=600;window.Height=650;await Task.Delay(60);Save(window,Path.Combine(directory,theme+"-narrow.png"));
+                window.OpenCategory("WindowAppearance");window.Width=600;window.Height=650;await Task.Delay(60);Save(window,Path.Combine(directory,theme+"-narrow.png"));
                 check(theme+" narrow window retains theme choice",Tree(window).OfType<Button>().Any(b=>UI.Identity(b)=="Light theme" && b.ActualWidth>100));
                 window.Width=480;await Task.Delay(60);Save(window,Path.Combine(directory,theme+"-480.png"));
                 check(theme+" minimum width retains both choices",Tree(window).OfType<Button>().Where(b=>UI.Identity(b) is "Light theme" or "Dark theme").All(b=>b.ActualWidth>100));
@@ -202,19 +204,21 @@ internal static class SettingsThemeDiagnostics
             app.Session.Timer.Reset();app.Session.Stopwatch.Reset();app.PublishUpdate(RuntimeChange.Countdown);await Task.Delay(60);
             check("Stopping counters restores matching idle clocks",island.HeaderLabel.Text=="" && dockClock.Visibility==Visibility.Visible && PreviewClock().Visibility==Visibility.Visible && PreviewSummary().Text=="");window.Hide();
 
+            app.Settings.PanelNavigationStyle="Labels";app.ChangeSettings();
             island.PreviewActivity();island.SelectPeek("stopwatch");await Task.Delay(200);
-            var pageCaption=(TextBlock)typeof(OverlayWindow).GetField("peekPageName",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(island)!;
-            check("Russian stopwatch caption stays on one line",pageCaption.TextWrapping==TextWrapping.NoWrap && pageCaption.ActualHeight<20 && pageCaption.ActualWidth>=90);Save(island,Path.Combine(directory,"stopwatch-caption.png"));
+            var previewTabs=(System.Collections.Generic.Dictionary<string,Button>)typeof(OverlayWindow).GetField("peekDots",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(island)!;
+            check("Russian stopwatch tab stays on one line",previewTabs["stopwatch"].Content is TextBlock pageCaption &&
+                pageCaption.Text==Localization.Text("Stopwatch") && pageCaption.TextWrapping==TextWrapping.NoWrap && pageCaption.ActualHeight is >0 and <20 && pageCaption.ActualWidth>0);Save(island,Path.Combine(directory,"stopwatch-caption.png"));
             island.SelectPeek("notes");await Task.Delay(350);
             var peekDraft=Diagnostics.Descendants(island).OfType<TextBox>().Single(t=>UI.Identity(t)==Localization.Text("Preview note draft"));
             var peekTitle=Diagnostics.Descendants(island).OfType<TextBox>().Single(t=>UI.Identity(t)=="Note title" && t.IsVisible);peekTitle.Text="Заголовок из быстрого окна";
             peekDraft.Text="Быстрая заметка из свёрнутой панели";
-            var peekSave=Diagnostics.Descendants(island).OfType<Button>().Single(b=>UI.Identity(b)==Localization.Text("Save preview note"));peekSave.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var peekSave=Diagnostics.Descendants(island).OfType<Button>().Single(b=>UI.Identity(b)=="Save preview note");peekSave.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             check("Quick preview Save note archives text in the library",app.Store.Load<ProductivityData>("productivity").Notes.Any(n=>n.Text==peekDraft.Text) && (string?)peekSave.Content==Localization.Text("Saved"));
             check("Quick preview saved feedback is localized",(string?)peekSave.Content=="Сохранено");
             check("Quick preview saves the title and keeps its editor within the panel",app.Productivity.Notes.Single(n=>n.Text==peekDraft.Text).Title==peekTitle.Text && peekTitle.IsVisible && peekSave.TransformToAncestor(island).Transform(new Point(0,peekSave.ActualHeight)).Y<island.ActualHeight);
             int savedCount=app.Productivity.Notes.Count;peekSave.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));check("Quick preview repeated save does not duplicate the note",app.Productivity.Notes.Count==savedCount);Save(island,Path.Combine(directory,"quick-note-saved.png"));
-            Diagnostics.Descendants(island).OfType<Button>().Single(b=>UI.Identity(b)==Localization.Text("Open all notes")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(80);
+            Diagnostics.Descendants(island).OfType<Button>().Single(b=>UI.Identity(b)=="Open all notes").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(80);
             var noteSettings=Application.Current.Windows.OfType<SettingsWindow>().Single(w=>!ReferenceEquals(w,window));
             check("Quick preview All notes opens the saved library",(string?)typeof(SettingsWindow).GetField("current",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(noteSettings)=="Notes");noteSettings.Close();island.Hide();window.Show();
             window.Hide();island.Show();island.OpenFeaturePage("notes");await Task.Delay(350);
@@ -246,7 +250,7 @@ internal static class SettingsThemeDiagnostics
             check("Restoring settings restores the rounded outline ("+window.WindowState+", "+outer.CornerRadius.TopLeft+")",window.WindowState==WindowState.Normal && outer.CornerRadius.TopLeft>0);
             var restored=app.Store.Load<Settings>("settings");
             check("Theme change saves to the isolated profile",restored.WindowTheme==app.Settings.WindowTheme);
-            window.Width=1100;window.Height=780;window.OpenCategory("Appearance");await Task.Delay(60);
+            window.Width=1100;window.Height=780;window.OpenCategory("WindowAppearance");await Task.Delay(60);
             var glass=Tree(window).OfType<Slider>().First(s=>UI.Identity(s)=="Transparency and blur");glass.Value=40;await Task.Delay(70);
             check("Glass slider requests the real system blur",app.Settings.SettingsMaterial=="Native Acrylic" && app.Settings.WindowGlass==40);
             if(window.MaterialResult.Native)check("Native glass retains a translucent tint",((LinearGradientBrush)window.FindResource("SettingsCanvas")).GradientStops.All(s=>s.Color.A<255));
@@ -256,7 +260,7 @@ internal static class SettingsThemeDiagnostics
             check("Light island controls do not recolor ordinary island text",((SolidColorBrush)app.FindResource("ControlText")).Color.R<40 && ((SolidColorBrush)app.FindResource("BodyText")).Color.R>220);
             app.Settings.ControlFill=originalFill;app.ChangeSettings();
             window.OpenCategory("Application");await Task.Delay(80);
-            check("About and updates show the fork version without build hash",Version.TryParse(AppVersion.Display.Split('-')[0],out _) && !AppVersion.Display.Contains('+') && Tree(window).OfType<TextBlock>().Count(t=>t.Text.Contains(AppVersion.Display))>=2);
+            check("About and updates show the fork version without build hash",Version.TryParse(AppVersion.Display.Split('-','_')[0],out _) && !AppVersion.Display.Contains('+') && Tree(window).OfType<TextBlock>().Count(t=>t.Text.Contains(AppVersion.Display))>=2);
         }
         finally{window.Close();}
     }

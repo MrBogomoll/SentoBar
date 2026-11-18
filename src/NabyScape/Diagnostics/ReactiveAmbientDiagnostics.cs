@@ -41,10 +41,12 @@ internal static class ReactiveAmbientDiagnostics
             double max=Math.Max(palette.Primary.R,Math.Max(palette.Primary.G,palette.Primary.B)),min=Math.Min(palette.Primary.R,Math.Min(palette.Primary.G,palette.Primary.B));
             check(sample.Item1+" cover color survives large neutral artwork areas",max-min>140);
         }
+        s.AmbientScope="Music only";app.ChangeSettings();
         island.Reveal(false);
-        foreach(string page in new[]{"media","focus","status","notes","tasks","clips","calendar","files","access"})
+        foreach(string page in new[]{"media","focus","status","notes","tasks","clips","calendar","files","access","mixer"})
         {
-            island.SelectPage(page,false);await Task.Delay(50);check("All-widgets ambient appears on "+page,surface.AmbientVisible);
+            island.SelectPage(page,false);await Task.Delay(50);
+            check("Enabled audio response reaches "+page+" despite a narrow static scope",surface.AmbientVisible && app.AmbientAudio.Running);
         }
         island.SelectPage("notes",false);await Task.Delay(450);
         double quiet=surface.AmbientAudioGain;peak=.85f;await Task.Delay(450);double loud=surface.AmbientAudioGain;
@@ -56,8 +58,12 @@ internal static class ReactiveAmbientDiagnostics
         if(entry!=null){entry.Text="A quiet place to collect ideas.";entry.Select(2,5);}
         s.AmbientSpread=.9;s.AmbientStrength=.8;app.ChangeSettings();
         check("Ambient adjustments preserve controls and text selection",island.BodyBuilds==builds && (entry==null || entry.SelectionStart==2 && entry.SelectionLength==5));
-        s.AmbientScope="Selected widgets";s.AmbientWidgets=new(){"notes"};app.ChangeSettings();island.SelectPage("focus",false);check("Unselected widgets keep their existing surface",!surface.AmbientVisible);island.SelectPage("notes",false);check("Selected Notes retains ambient",surface.AmbientVisible);
-        s.AmbientScope="Music only";app.ChangeSettings();check("Music-only scope removes ambient from Notes",!surface.AmbientVisible);island.SelectPage("media",false);check("Music-only retains Media ambient",surface.AmbientVisible);
+        s.AmbientScope="Selected widgets";s.AmbientWidgets=new(){"notes"};s.AmbientAudioResponse="Off";app.ChangeSettings();
+        island.SelectPage("focus",false);check("With audio response Off unselected widgets keep their existing surface",!surface.AmbientVisible);
+        island.SelectPage("notes",false);check("Selected Notes retains static ambient",surface.AmbientVisible);
+        s.AmbientScope="Music only";app.ChangeSettings();check("Music-only static scope leaves Notes unlit",!surface.AmbientVisible);
+        island.SelectPage("media",false);check("Music-only retains Media ambient",surface.AmbientVisible);
+        s.AmbientAudioResponse="Responsive";app.ChangeSettings();
         var savedArtwork=app.Media.Artwork;double savedStrength=s.AmbientStrength;string savedSource=s.AmbientColorSource,savedMotion=s.AmbientMotion,savedResponse=s.AmbientAudioResponse;
         s.AmbientColorSource="Album cover";s.AmbientStrength=.85;s.AmbientMotion="Still";s.AmbientAudioResponse="Off";
         foreach(var sample in new[]{("rose","#F00085"),("teal","#00BFA3"),("blue","#008FD5"),("green","#32D10A")})
@@ -67,13 +73,23 @@ internal static class ReactiveAmbientDiagnostics
             app.PublishUpdate(RuntimeChange.Media);app.ChangeSettings();await Task.Delay(100);Capture(island,"media-bottom-glow-"+sample.Item1,1,true);
         }
         typeof(MediaService).GetProperty(nameof(MediaService.Artwork))!.SetValue(app.Media,savedArtwork);s.AmbientStrength=savedStrength;s.AmbientColorSource=savedSource;s.AmbientMotion=savedMotion;s.AmbientAudioResponse=savedResponse;app.PublishUpdate(RuntimeChange.Media);app.ChangeSettings();
-        island.Collapse();island.PreviewActivity();island.SelectPeek("notes");check("Hover navigation immediately applies the active widget scope",!surface.AmbientVisible);island.SelectPeek("media");check("Hover Media immediately restores its ambient",surface.AmbientVisible);island.Reveal(false);
+        s.ClosedAmbient=true;s.ClosedLightFollowsMusic=false;app.ChangeSettings();
+        island.Collapse();island.PreviewActivity();island.SelectPeek("notes");
+        await Task.Delay(150);
+        check("The mini Notes panel responds using its chosen color without following the album cover",
+            app.AmbientAudio.Running && surface.AmbientColor==UI.Brush(s.ClosedLightColor).Color && surface.AmbientAudioGain<.98);
+        s.ClosedAmbient=false;app.ChangeSettings();
+        check("Mini Notes respects the compact lighting switch",!surface.AmbientVisible);
+        island.SelectPeek("media");
+        check("Mini Media stays unlit when compact lighting is off",!surface.AmbientVisible);
+        island.Reveal(false);
+        check("Expanded Media keeps ambient when compact lighting is off",surface.AmbientVisible);
         s.AmbientScope="All widgets";s.AmbientColorSource="Accent color";s.Accent="#AF80DA";app.ChangeSettings();check("Accent source applies to actual surface",surface.AmbientColor==UI.Brush(s.Accent).Color);
         s.AmbientColorSource="Album cover";typeof(MediaService).GetProperty(nameof(MediaService.Artwork))!.SetValue(app.Media,null);app.PublishUpdate(RuntimeChange.Media);check("Missing cover falls back to accent on other widgets",surface.AmbientColor==UI.Brush(s.Accent).Color);
         s.AmbientColorSource="Custom color";app.ChangeSettings();island.SelectPage("notes",false);
         s.AmbientMotion="Drift";app.ChangeSettings();await Task.Delay(100);check("Drift animates the fade even with one custom color",surface.AmbientAnimating);s.AmbientMotion="Still";app.ChangeSettings();check("Still releases the drift animation",!surface.AmbientAnimating);
         s.AmbientAudioResponse="Off";app.ChangeSettings();await Task.Delay(100);check("Audio Off stops the ambient sampler and restores static intensity",!app.AmbientAudio.Running && surface.AmbientAudioGain==1);
-        s.AmbientAudioResponse="Punchy";app.ChangeSettings();peak=.5f;await Task.Delay(150);
+        s.AmbientScope="Music only";s.AmbientAudioResponse="Punchy";app.ChangeSettings();peak=.5f;await Task.Delay(150);
         app.Previews.Open("notes");app.Previews.Open("system");await Task.Delay(200);
         var mini=Application.Current.Windows.OfType<DetachedPreviewWindow>().ToArray();check("Notes and System mini windows share ambient",mini.Length==2 && mini.All(w=>Diagnostics.Descendants(w).OfType<IslandSurface>().Any(p=>p.AmbientVisible)) && app.AmbientAudio.ConsumerCount==3);
         long spectra=app.Audio.DiagnosticSpectrumSamples;
@@ -88,6 +104,7 @@ internal static class ReactiveAmbientDiagnostics
         await Task.Delay(80);check("Repeated mini open/close does not accumulate consumers or registered surfaces",app.AmbientAudio.ConsumerCount==1 && app.AmbientAudio.RegisteredCount==registered);
         island.ToggleTuck();await Task.Delay(150);check("Tucked island stops reactive sampling",!app.AmbientAudio.Running);island.ToggleTuck();await Task.Delay(150);
         island.ToggleVisibility();await Task.Delay(100);reads=app.Audio.DiagnosticMeterReads;await Task.Delay(250);check("Hidden island performs no ambient audio reads",!app.AmbientAudio.Running && app.Audio.DiagnosticMeterReads==reads);island.ToggleVisibility();island.Reveal(false);island.SelectPage("notes",false);
+        s.AmbientScope="All widgets";app.ChangeSettings();
         app.Media.DiagnosticPlayback(false);app.PublishUpdate(RuntimeChange.Media);check("Paused playback stops sampling and keeps a static glow",!app.AmbientAudio.Running && surface.AmbientVisible && surface.AmbientAudioGain==1);
         app.Media.DiagnosticPlayback(true);app.PublishUpdate(RuntimeChange.Media);s.ReduceMotion=true;app.ChangeSettings();check("Reduce motion stops ambient sampling and all ambient clocks",!app.AmbientAudio.Running && !surface.AmbientAnimating);
         s.ReduceMotion=false;s.LiveActivity=false;app.ChangeSettings();check("Live activity Off releases audio demand",!app.AmbientAudio.Running);s.LiveActivity=true;s.CoverAmbient=false;app.ChangeSettings();check("Ambient master Off stops light and sampling",!surface.AmbientVisible && !app.AmbientAudio.Running);

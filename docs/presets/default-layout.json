@@ -54,7 +54,6 @@
       "clips",
       "calendar",
       "awake",
-      "links",
       "closed",
       "ai"
     ],
@@ -146,10 +145,6 @@
         "Enabled": true
       },
       {
-        "Id": "links",
-        "Enabled": true
-      },
-      {
         "Id": "voice",
         "Enabled": true
       }
@@ -220,10 +215,6 @@
         "Enabled": true
       },
       {
-        "Id": "links",
-        "Enabled": true
-      },
-      {
         "Id": "voice",
         "Enabled": false
       }
@@ -236,6 +227,7 @@
     "LiveActivity": true,
     "ClosedMediaIcon": "Artwork",
     "ClosedMediaContent": "Waveform",
+    "ClosedIdleContent": "Clock",
     "Performance": "Maksimal",
     "WheelAction": "pages",
     "MiddleAction": "toggle",
@@ -283,10 +275,6 @@
       },
       {
         "Id": "awake",
-        "Enabled": true
-      },
-      {
-        "Id": "links",
         "Enabled": true
       },
       {

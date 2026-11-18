@@ -46,10 +46,10 @@ public sealed partial class Settings
     public bool GlassStyle { get; set; } = true;
     public string SettingsMaterial { get; set; } = "";
     // Settings opens in essentials mode; this reveals every section and detailed help.
-    public bool SettingsShowAll { get; set; }
     public bool LiveActivity { get; set; } = true;
     public string ClosedMediaIcon { get; set; }="Waveform";
     public string ClosedMediaContent { get; set; }="Title";
+    public string ClosedIdleContent { get; set; }="Clock";
     public bool ReactiveFeedback { get; set; } = true;
     public bool SmartActivities { get; set; } = true;
     public bool AlbumAccent { get; set; } = true;
@@ -74,7 +74,7 @@ public sealed partial class Settings
     public List<WidgetSetting> HoverViews { get; set; }=new[]{"media","timer","focus","calendar","notes","files","system"}.Select(id=>new WidgetSetting{Id=id,Enabled=id!="system"}).ToList();
     public bool ClipboardHistory { get; set; }
     public List<WidgetSetting> Tools {get;set;}=ToolNames.Keys.Select(id=>new WidgetSetting{Id=id}).ToList();
-    public static readonly Dictionary<string,string> ToolNames=new(){["files"]="File shelf",["notes"]="Notes",["tasks"]="Tasks",["clips"]="Clipboard",["calendar"]="Calendar",["awake"]="Keep awake",["links"]="Clean links",["power"]="Power plan",["weather"]="Weather"};
+    public static readonly Dictionary<string,string> ToolNames=new(){["files"]="File shelf",["notes"]="Notes",["tasks"]="Tasks",["clips"]="Clipboard",["calendar"]="Calendar",["awake"]="Keep awake",["power"]="Power plan",["weather"]="Weather"};
     public bool ToolEnabled(string id)=>Widgets.FirstOrDefault(t=>t.Id==id)?.Enabled ?? (Widgets.Any(w=>w.Id=="tools" && w.Enabled) && Tools.Any(t=>t.Id==id && t.Enabled));
     public string Performance { get; set; } = "Auto";
     public string WheelAction { get; set; } = "volume";
@@ -108,6 +108,7 @@ public sealed partial class Settings
     public string VisibilityHotkeyKey { get; set; }="H";
     public string VisibilityHotkeyModifiers { get; set; }="Ctrl+Alt";
     public string CategoryStyle { get; set; }="Dots";
+    public string PanelNavigationStyle { get; set; }="Dots";
     public string LaunchStyle { get; set; }="IconsLabels";
     public bool BoldMediaTitle { get; set; }=true;
     public bool BoldHeadings { get; set; }=true;
@@ -135,13 +136,14 @@ public sealed partial class Settings
     {
         ["voice"]="Naby voice", ["media"]="Media", ["volume"]="Volume", ["timer"]="Timer", ["stopwatch"]="Stopwatch", ["focus"]="Focus mode",
         ["clock"]="Clock & date", ["system"]="System monitor", ["battery"]="Battery", ["shortcuts"]="Shortcuts",["tools"]="Everyday tools",
-        ["files"]="File shelf",["notes"]="Notes",["tasks"]="Tasks",["clips"]="Clipboard",["calendar"]="Calendar",["awake"]="Keep awake",["links"]="Clean links",["power"]="Power plan",["weather"]="Weather"
+        ["files"]="File shelf",["notes"]="Notes",["tasks"]="Tasks",["clips"]="Clipboard",["calendar"]="Calendar",["awake"]="Keep awake",["power"]="Power plan",["weather"]="Weather"
     };
     public static List<WidgetSetting> Defaults() => Names.Keys.Where(id=>id!="tools").Select(id => new WidgetSetting { Id=id,Enabled=id is not ("stopwatch" or "voice" or "power") }).ToList();
     public void Normalize()
     {
         NormalizeLanguageAccessibility();NormalizeHideExceptions();
         NormalizeWindowTheme();
+        PanelBackdrop??=new();PanelBackdrop.Normalize();
         if(Array.IndexOf(SettingsBackdrop.Choices,SettingsMaterial)<0)SettingsMaterial="";
         if(NotificationDelivery is not ("Notch" or "Windows" or "Both" or "Off"))NotificationDelivery="Notch";
         ExternalNotificationMuted=(ExternalNotificationMuted??new()).Where(n=>!string.IsNullOrWhiteSpace(n)).Select(n=>n.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Take(100).ToList();
@@ -165,9 +167,11 @@ public sealed partial class Settings
         if(HotkeyModifiers is not ("Ctrl+Alt" or "Ctrl+Shift" or "Alt+Shift"))HotkeyModifiers="Ctrl+Alt";
         if(VisibilityHotkeyKey==null || VisibilityHotkeyKey.Length!=1 || VisibilityHotkeyKey[0]<'A' || VisibilityHotkeyKey[0]>'Z')VisibilityHotkeyKey="H";
         if(VisibilityHotkeyModifiers is not ("Ctrl+Alt" or "Ctrl+Shift" or "Alt+Shift"))VisibilityHotkeyModifiers="Ctrl+Alt";
+        if(ClosedIdleContent!="Assistant")ClosedIdleContent="Clock";
         if(ClosedMediaContent is not ("Title" or "Waveform" or "Lyrics" or "None"))ClosedMediaContent="Title";
         if(ClosedMediaIcon is not ("Waveform" or "Artwork" or "None"))ClosedMediaIcon="Waveform";
         CategoryStyle="Dots";
+        if(PanelNavigationStyle is not ("Labels" or "Dots" or "Icons"))PanelNavigationStyle="Dots";
         if(LaunchStyle is not ("IconsLabels" or "Icons" or "Text"))LaunchStyle="IconsLabels";
         RecentColors=(RecentColors??new()).Where(ValidColor).Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList();
         FocusMinutes=Math.Clamp(FocusMinutes,1,240); BreakMinutes=Math.Clamp(BreakMinutes,1,120);
@@ -210,6 +214,12 @@ public sealed class Countdown
     public double Remaining(DateTimeOffset now) => Math.Max(0,Deadline.HasValue ? (Deadline.Value-now).TotalSeconds : RemainingSeconds);
     public void Start(double seconds,DateTimeOffset now,string phase="",bool preserveRunId=false)
     { if(!preserveRunId)RunId=Guid.NewGuid();DurationSeconds=RemainingSeconds=Math.Max(1,seconds); Deadline=now.AddSeconds(RemainingSeconds); Phase=phase; }
+    internal TimeSpan? UntilDisplayChanges(DateTimeOffset now)
+    {
+        if(Deadline is not {} end)return null;
+        long remaining=(end-now).Ticks;
+        return TimeSpan.FromTicks(remaining<=0?0:(remaining-1)%TimeSpan.TicksPerSecond+1);
+    }
     public double Progress(DateTimeOffset now) => Math.Clamp(1-Remaining(now)/Math.Max(1,DurationSeconds>0?DurationSeconds:RemainingSeconds),0,1);
     public void Pause(DateTimeOffset now) { RemainingSeconds=Remaining(now); Deadline=null; }
     public void Resume(DateTimeOffset now) { if(RemainingSeconds>0) Deadline=now.AddSeconds(RemainingSeconds); }

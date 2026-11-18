@@ -10,21 +10,24 @@ internal static class PreferenceReset
 {
     internal static readonly Dictionary<string,string[]> Categories=new()
     {
-        ["Ambience"]="CoverAmbient ClosedAmbient AmbientStrength AmbientSpread AmbientMotion AmbientScope AmbientWidgets AmbientColorSource AmbientCustomColor AmbientSecondaryColor AmbientPalette AmbientDirection AmbientHeight AmbientBalance AmbientSoftness AmbientAudioResponse AmbientSensitivity".Split(' '),
+        ["Ambience"]="CoverAmbient ClosedAmbient ClosedLightColor ClosedLightFollowsMusic ClosedLightKeepsLastCover AmbientStrength AmbientSpread AmbientMotion AmbientScope AmbientWidgets AmbientColorSource AmbientCustomColor AmbientSecondaryColor AmbientPalette AmbientDirection AmbientHeight AmbientBalance AmbientSoftness AmbientAudioResponse AmbientSensitivity".Split(' '),
         ["Motion"]="InteractionMotion AnimationMs ReduceMotion LiveActivity Performance".Split(' '),
         ["Clipboard"]="ClipboardHistory".Split(' '),
         ["Weather"]="WeatherCity WeatherLatitude WeatherLongitude WeatherUnits".Split(' '),
         ["Visibility"]="HideFullscreen HideMaximized HideAppExceptions AlwaysTucked TuckEdge TuckHotkeyEnabled TuckHotkeyKey TuckHotkeyModifiers VisibilityHotkeyEnabled VisibilityHotkeyKey VisibilityHotkeyModifiers SmartActivities BrowserMediaPreviews".Split(' '),
-        ["Notifications"]="ExternalNotifications ExternalNotificationPopup ExternalNotificationText ExternalNotificationQuietHours ExternalNotificationMuted CountdownSound CountdownSoundVolume CountdownSoundFile NotificationSeconds NotificationAnimation QuietHours QuietStart QuietEnd NotificationsSnoozedUntil NotificationDelivery NotifyTimer NotifyFocus NotifyDownloads NotifyUpdates NotifyFailures DownloadsEnabled DownloadsFolder".Split(' '),
-        ["Appearance"]="Preset Radius Background Accent Opacity WindowTheme WindowGlass WindowLargeCorners WindowEffects WindowCompact WindowHoverAccents SettingsMaterial GlassStyle GlassStrength AlbumAccent ControlFill ControlBorder SelectionFill CategoryStyle BoldMediaTitle BoldHeadings RecentColors".Split(' '),
-        ["Layout"]="FollowMonitorAnimation FollowMonitorDuration DockUnlocked PanelAutoHeight Width Height Horizontal DockEdge DockVertical DockInset Top Monitor DisplayMode CompactLayout PanelWidth PanelMaxHeight PanelPadding PanelScale SectionGap".Split(' '),
-        ["Content"]="HoverFollowsWidgets Widgets Tools HoverViews FocusMinutes BreakMinutes TimerDurationSeconds FocusDurationSeconds BreakDurationSeconds".Split(' '),
-        ["Controls"]="HoverPeek TwoStageHover HoverWidth HoverHeight HoverDelayMs HoverDetailDelayMs SwipeDistance PanelSwipe DropReveal DetachablePreviews CoverGestures WheelAction WheelWrapTabs MiddleAction VolumeStep HotkeyEnabled HotkeyKey HotkeyModifiers".Split(' '),
-        ["Audio"]="MediaIntegrationEnabled WaveformSource WaveformSensitivity LyricsEnabled LyricsAnimation LyricsTextMode LyricsOffset ClosedMediaIcon ClosedMediaContent ReactiveFeedback WaveformIdleMotion VolumeFeedback BrightnessFeedback".Split(' '),
+        ["Notifications"]="ExternalNotifications ExternalNotificationPopup ExternalNotificationText ExternalNotificationQuietHours ExternalNotificationMuted CountdownSound CountdownSoundVolume CountdownSoundFile CountdownSoundDuringQuietHours NotificationSeconds NotificationAnimation QuietHours QuietStart QuietEnd NotificationsSnoozedUntil NotificationDelivery NotifyTimer NotifyFocus NotifyDownloads NotifyUpdates NotifyFailures DownloadsEnabled DownloadsFolder".Split(' '),
+        ["Appearance"]="Preset Radius Background PanelBackdrop Accent Opacity GlassStyle GlassStrength AlbumAccent ControlFill ControlBorder SelectionFill CategoryStyle BoldMediaTitle BoldHeadings RecentColors".Split(' '),
+        ["WindowAppearance"]="WindowTheme WindowGlass WindowLargeCorners WindowEffects WindowCompact WindowHoverAccents SettingsMaterial".Split(' '),
+        ["Layout"]="FollowMonitorAnimation FollowMonitorDuration DockUnlocked PanelAutoHeight Width Height Horizontal DockEdge DockVertical DockInset Top Monitor DisplayMode CompactLayout PanelWidth PanelMaxHeight PanelPadding PanelScale SectionGap HoverWidth HoverHeight".Split(' '),
+        ["Content"]="HoverFollowsWidgets Widgets Tools HoverViews".Split(' '),
+        ["Timers"]="FocusMinutes BreakMinutes TimerDurationSeconds FocusDurationSeconds BreakDurationSeconds".Split(' '),
+        ["Controls"]="PanelNavigationStyle HoverPeek TwoStageHover HoverDelayMs HoverDetailDelayMs SwipeDistance PanelSwipe DropReveal DetachablePreviews CoverGestures WheelAction WheelWrapTabs MiddleAction VolumeStep HotkeyEnabled HotkeyKey HotkeyModifiers".Split(' '),
+        ["ClosedDock"]="ClosedIdleContent ClosedMediaIcon ClosedMediaContent".Split(' '),
+        ["Audio"]="MediaIntegrationEnabled WaveformSource WaveformSensitivity LyricsEnabled LyricsAnimation LyricsTextMode LyricsOffset ReactiveFeedback WaveformIdleMotion VolumeFeedback BrightnessFeedback".Split(' '),
         ["System"]="Clock24Hour ClockSeconds ShowDate MonitorNetwork MonitorStorage MonitorProcesses".Split(' '),
         ["Launch"]="LaunchStyle".Split(' '),
         ["AI"]=Array.Empty<string>(),
-        ["Application"]="AutoCheckUpdates AutoDownloadUpdates UiLanguage AccessibilityTextScale AccessibilityHighContrast SettingsShowAll".Split(' ')
+        ["Application"]="AutoCheckUpdates AutoDownloadUpdates UiLanguage AccessibilityTextScale AccessibilityHighContrast".Split(' ')
     };
     internal static string Summary(string? category)
     {
@@ -37,10 +40,13 @@ internal static class PreferenceReset
             "Weather"=>Localization.Text("weather city and temperature units"),
             "Visibility"=>Localization.Text("hide, tuck, automatic previews and visibility shortcuts"),
             "Notifications"=>Localization.Text("notification delivery, sounds, quiet hours and download alerts"),
+            "WindowAppearance"=>Localization.Text("settings window theme, transparency and spacing"),
             "Layout"=>Localization.Text("island position, display and panel sizes"),
-            "Content"=>Localization.Text("widget/tool order, hover pages and focus durations"),
-            "Controls"=>Localization.Text("hover timing, gestures, tuck rules and global shortcuts"),
-            "Audio"=>Localization.Text("closed media display, waveform and feedback"),
+            "Content"=>Localization.Text("widget order and mini panel selection"),
+            "Timers"=>Localization.Text("timer, focus and break duration"),
+            "Controls"=>Localization.Text("tab style, hover timing, mouse gestures and shortcuts"),
+            "ClosedDock"=>Localization.Text("idle and music content in the closed dock"),
+            "Audio"=>Localization.Text("waveform, lyrics and audio feedback"),
             "System"=>Localization.Text("clock format and monitor readings"),
             "Launch"=>Localization.Text("launch appearance"),
             "Application"=>Localization.Text("update checks and automatic downloads, interface language, text size and contrast"),
@@ -66,7 +72,7 @@ internal static class PreferenceReset
         if(json.RootElement.ValueKind!=JsonValueKind.Object || !json.RootElement.TryGetProperty(nameof(Settings.Width),out _))throw new InvalidDataException(Localization.Text("The preference backup is invalid."));
         foreach(string key in Keys(null))
         {
-            if(PremiumPreferences.Keys.Contains(key) || key is "DisplayMode" or "SettingsMaterial" or "HideAppExceptions" or "WheelWrapTabs" or "WindowTheme" or "WindowGlass" or "WindowLargeCorners" or "WindowEffects" or "WindowCompact" or "WindowHoverAccents" || Categories["Application"].Contains(key))continue;
+            if(PremiumPreferences.Keys.Contains(key) || key is "DisplayMode" or "ClosedIdleContent" or "CountdownSoundDuringQuietHours" or "SettingsMaterial" or "HideAppExceptions" or "WheelWrapTabs" or "WindowTheme" or "WindowGlass" or "WindowLargeCorners" or "WindowEffects" or "WindowCompact" or "WindowHoverAccents" || Categories["Application"].Contains(key))continue;
             // Backups made before exact durations use their original minute values.
             if((key is "TimerDurationSeconds" or "FocusDurationSeconds" or "BreakDurationSeconds") && !json.RootElement.TryGetProperty(key,out _))continue;
             bool nullable=Nullable.GetUnderlyingType(typeof(Settings).GetProperty(key)!.PropertyType)!=null;

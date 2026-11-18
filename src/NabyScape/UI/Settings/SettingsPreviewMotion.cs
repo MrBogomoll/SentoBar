@@ -60,7 +60,7 @@ public sealed partial class SettingsWindow
     private void RefreshPreviewClip()
     {
         double width=preview.ActualWidth>0?preview.ActualWidth:preview.Width,height=preview.ActualHeight>0?preview.ActualHeight:preview.Height;
-        if(double.IsFinite(width) && double.IsFinite(height))preview.Clip=IslandGeometry.Create(Math.Max(1,width),Math.Max(1,height),app.Settings.Radius,app.Settings.Preset=="Mac");
+        if(double.IsFinite(width) && double.IsFinite(height))preview.Clip=IslandGeometry.Create(Math.Max(1,width),Math.Max(1,height),GlassDockAppearance.Radius(app.Settings.Radius),app.Settings.Preset=="Mac" && app.Settings.DockEdge=="Top");
     }
     private void AnimatePreviewSize(double width,double height)
     {
@@ -72,9 +72,11 @@ public sealed partial class SettingsWindow
         }
         Resize(WidthProperty,width);Resize(HeightProperty,height);
     }
-    private ActivityVisual PreviewWave(bool slender=false)
+    private ActivityVisual PreviewWave(bool slender=false,bool icon=false)
     {
-        var wave=new ActivityVisual{Width=60,Height=slender?12:14,WaveOnly=true,Slender=slender,Margin=new(0,8,8,0)};
+        var wave=icon
+            ?new ActivityVisual{Margin=new(0,0,9,0)}
+            :new ActivityVisual{Width=60,Height=slender?12:14,WaveOnly=true,Slender=slender,Margin=new(0,8,8,0)};
         hasPreviewWave=true;long sequence=0;
         previewRealtimeFrames.Add(seconds=>
         {

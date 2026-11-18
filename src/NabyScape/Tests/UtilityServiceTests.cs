@@ -68,29 +68,6 @@ public static class UtilityServiceTests
             var thread=new Thread(()=>{try { service.Start(null,false,now); } catch(Exception ex) { error=ex; }});
             thread.Start();thread.Join();Assert(error is InvalidOperationException && calls==0);
         });
-        Check("clean links preserve raw paths, escaping, fragments, order, and repeated functional keys",()=>
-        {
-            Assert(CleanLink.Clean("  https://EXAMPLE.com/a%2fb/../c?q=a%2Bb&q=two+words&utm_SOURCE=ad&empty=&%66bclid=x#part%2F?utm_x=keep  ")
-                =="https://EXAMPLE.com/a%2fb/../c?q=a%2Bb&q=two+words&empty=#part%2F?utm_x=keep");
-            Assert(CleanLink.Clean("https://example.com/?UTM_a=1&GCLID=2#hash")=="https://example.com/#hash");
-            Assert(CleanLink.Clean("https://example.com/#?utm_a=keep")=="https://example.com/#?utm_a=keep");
-            Assert(CleanLink.Clean("https://example.com/?a=1&a=2")=="https://example.com/?a=1&a=2");
-            Assert(CleanLink.Clean("https://example.com/?dclid=x&msclkid=x&mc_cid=x&mc_eid=x&igshid=x&_ga=x&_gl=x")=="https://example.com/");
-        });
-        Check("signed links remain entirely unchanged including tracking parameters",()=>
-        {
-            foreach(var key in new[]{"X-Amz-Signature","x-goog-signature","Signature","%73ig","oauth_signature","hmac"})
-            {
-                string url="https://example.com/p%2f?utm_source=x&"+key+"=a%2Bb#f";
-                Assert(CleanLink.Clean(" "+url+" ")==url);
-            }
-        });
-        Check("clean links reject invalid schemes, credentials, oversized and malformed input",()=>
-        {
-            foreach(var value in new[]{"","abc","ftp://example.com","javascript:alert(1)","https://user:pass@example.com/","https://example.com/%zz","https://example.com/a b","https://example.com/"+new string('a',8192)})
-                Throws<ArgumentException>(()=>CleanLink.Clean(value));
-            Assert(CleanLink.Clean("HTTPS://example.com/?uTm_X=y")=="HTTPS://example.com/");
-        });
         WithStore("calendar saves, reloads, preserves offsets and IDs, and removes",store=>
         {
             var calendar=new CalendarService(store); int changed=0;calendar.Changed+=()=>changed++;

@@ -60,15 +60,23 @@ internal sealed class CountdownView : StackPanel
     private void Refresh()
     {
         if(Window.GetWindow(this)?.WindowState==WindowState.Minimized)return;
-        Refreshes++;var now=DateTimeOffset.UtcNow;var state=State;bool active=state.Remaining(now)>0,complete=!active && state.DurationSeconds>0;
+        Refreshes++;var now=app.UpdateSampleTime;var state=State;bool active=state.Remaining(now)>0,complete=!active && state.DurationSeconds>0;
         syncing=true;
         if(state.DurationSeconds>0 && (shownRun!=state.RunId || shownDuration!=state.DurationSeconds))
         {if(!focus || state.Phase!="break")duration.SetSeconds((int)Math.Round(state.DurationSeconds));shownRun=state.RunId;shownDuration=state.DurationSeconds;}
         int current=focus?app.Settings.FocusSeconds:app.Settings.TimerDurationSeconds;
         if(!active){if(knownDuration!=current && !duration.IsKeyboardFocusWithin && duration.Seconds==knownDuration)duration.SetSeconds(current);if(knownRest!=app.Settings.BreakSeconds && !rest.IsKeyboardFocusWithin && rest.Seconds==knownRest)rest.SetSeconds(app.Settings.BreakSeconds);}
         knownDuration=current;knownRest=app.Settings.BreakSeconds;syncing=false;
-        bool valid=Valid(out _);duration.IsEnabled=rest.IsEnabled=!active;duration.Visibility=active || complete?Visibility.Collapsed:Visibility.Visible;digits.Visibility=active || complete?Visibility.Visible:Visibility.Collapsed;
-        digits.Text=state.Display(now);durationLabel.Text=active || complete?Localization.Text("of ")+Countdown.FormatSeconds(state.DurationSeconds):"";
+        bool valid=Valid(out _);
+        duration.IsEnabled=rest.IsEnabled=!active;
+        duration.Visibility=active?Visibility.Collapsed:Visibility.Visible;
+        digits.Visibility=active?Visibility.Visible:Visibility.Collapsed;
+        durationLabel.Visibility=active?Visibility.Visible:Visibility.Collapsed;
+        if(active)
+        {
+            digits.Text=state.Display(now);
+            durationLabel.Text=Localization.Text("of ")+Countdown.FormatSeconds(state.DurationSeconds);
+        }
         Accessibility.Announce(status,Localization.Text(active?(state.Running?(focus?(state.Phase=="break"?"Break":"Focusing"):"Running"):"Paused"):complete?"Complete":"Ready"));
         string action=Localization.Text(state.Running?"Pause":active?"Resume":"Start");
         if(AutomationProperties.GetItemStatus(primary)!=action){primary.Content=Icons.Create(state.Running?"pause":"play",17,Brushes.Black);AutomationProperties.SetItemStatus(primary,action);}

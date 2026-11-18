@@ -15,7 +15,7 @@ internal static class RussianUiDiagnostics
 {
     internal static async Task Run(App app,OverlayWindow island,string directory,Action<string,bool> check)
     {
-        app.Settings.UiLanguage="ru";app.Settings.SettingsShowAll=true;app.Settings.ReduceMotion=true;
+        app.Settings.UiLanguage="ru";app.Settings.ReduceMotion=true;
         Localization.Configure(app.Settings);Localization.CollectMissing=true;app.ChangeSettings();island.Hide();
         var window=new SettingsWindow(app){Width=1200,Height=850,ShowActivated=false};
         var flags=BindingFlags.Instance|BindingFlags.NonPublic;
@@ -24,6 +24,21 @@ internal static class RussianUiDiagnostics
         try
         {
             window.Show();await Task.Delay(150);
+            var search=Diagnostics.LogicalDescendants(window).OfType<TextBox>().Single(t=>UI.Identity(t)=="Search settings");
+            var results=(StackPanel)typeof(SettingsWindow).GetField("settingsResults",flags)!.GetValue(window)!;
+            foreach(var (query,caption,categoryId) in new[]{
+                ("точки","Вид навигации","Controls"),("цвет панели","Цвет панели","Appearance"),("цвет меню","Тема окна","WindowAppearance")})
+            {
+                search.Text=query;
+                window.UpdateLayout();
+                var result=results.Children.OfType<Button>().FirstOrDefault(b=>b.Content is Panel labels &&
+                    labels.Children.OfType<TextBlock>().FirstOrDefault()?.Text==caption);
+                result?.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                await Task.Delay(60);
+                check("Russian search routes "+query+" to "+categoryId,
+                    result!=null && (string)typeof(SettingsWindow).GetField("current",flags)!.GetValue(window)! == categoryId);
+            }
+            search.Clear();
             foreach(var category in categories)
             {
                 string id=(string)category.GetType().GetProperty("Id")!.GetValue(category)!;
@@ -50,7 +65,7 @@ internal static class RussianUiDiagnostics
             try{sample.Window.Show();await Task.Delay(80);Save(sample.Window,Path.Combine(directory,"russian-"+sample.Name+".png"));}
             finally{sample.Window.Close();}
         }
-        foreach(string id in new[]{"timer","focus","notes","tasks","calendar","weather","system","clips","awake","links","voice","power"})
+        foreach(string id in new[]{"timer","focus","notes","tasks","calendar","weather","system","clips","awake","voice","power"})
         {
             island.Show();island.Reveal(false);island.ShowTools(id,false);await Task.Delay(100);island.UpdateLayout();
             Save(island,Path.Combine(directory,"russian-widget-"+id+".png"));

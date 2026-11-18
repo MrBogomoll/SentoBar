@@ -25,12 +25,39 @@ public sealed partial class OverlayWindow
     {
         if(app.Awake==null)return;
         RefreshCompactOptionalVisibility();
-        if(awakeStatus!=null)
-        {
-            string detail=app.Awake.Until.HasValue?Localization.Format("{0:0} min remaining",Math.Max(0,Math.Ceiling((app.Awake.Until.Value-now).TotalMinutes))):Localization.Text("Until NabyScape quits");
-            awakeStatus.Text=app.Awake.Active?Localization.Format("Awake · {0}\n",detail)+(app.Awake.KeepDisplayOn?Localization.Text("Display stays on"):Localization.Text("Display can turn off")):Localization.Text("Off · Windows power settings apply");
-        }
+        if(awakeStatus!=null)Motion.Text(awakeStatus,AwakeSummary(now));
+        if(peeking && peekId=="awake")refreshPeekAwake?.Invoke();
     }
+
+    private string AwakeSummary(DateTimeOffset now)
+    {
+        if(!app.Awake.Active)return Localization.Text("Off · Windows power settings apply");
+        string detail=app.Awake.Until is {} until
+            ?Localization.Format("{0:0} min remaining",Math.Max(0,Math.Ceiling((until-now).TotalMinutes)))
+            :Localization.Text("Until NabyScape quits");
+        return Localization.Format("Awake · {0}\n",detail)+Localization.Text(app.Awake.KeepDisplayOn?"Display stays on":"Display can turn off");
+    }
+
+    private ComboBox CreateAwakeDuration()
+    {
+        var duration=new ComboBox{ItemsSource=new[]{"30 minutes","1 hour","2 hours","Until NabyScape quits"},SelectedIndex=0};
+        UI.LocalizeOptions(duration);
+        UI.Named(duration,Localization.Text("Keep awake duration"));
+        return duration;
+    }
+
+    private void StartAwake(ComboBox duration,CheckBox display)
+    {
+        TimeSpan? length=duration.SelectedIndex switch
+        {
+            1=>TimeSpan.FromHours(1),
+            2=>TimeSpan.FromHours(2),
+            3=>null,
+            _=>TimeSpan.FromMinutes(30)
+        };
+        app.Awake.Start(length,display.IsChecked==true,DateTimeOffset.UtcNow);
+    }
+
     private void ResizeToolPanel()
     {body.UpdateLayout();Dimensions(true);if(expanded){motion.Go(surface,IslandSurface.SurfaceWidthProperty,expandedWidth,Math.Min(300,app.Settings.AnimationMs));motion.Go(surface,IslandSurface.SurfaceHeightProperty,expandedHeight,Math.Min(300,app.Settings.AnimationMs));}}
     internal void ShowCommands(bool activate=true)
@@ -55,14 +82,14 @@ public sealed partial class OverlayWindow
         yield return (Localization.Text("Notifications"),Localization.Text("See every recent alert, including Downloads · Enter"),()=>{CloseCommands();OpenNotificationCenter();});
         yield return (Localization.Text("Tuck / Return to automatic"),Localization.Text("Toggle the manual tuck latch; hover the edge to preview"),()=>{CloseCommands();ToggleTuck();});
         yield return (Localization.Text("Open Settings"),Localization.Text("Appearance, widgets, and interaction"),app.ShowSettings);
-        foreach(var pair in new[]{("media",Localization.Text("Media controls")),("focus",Localization.Text("Timers & focus")),("status",Localization.Text("System status")),("access",Localization.Text("Quick launch"))})
+        foreach(var pair in new[]{("media",Localization.Text("Media controls")),("timer",Localization.Text("Timer")),("focus",Localization.Text("Focus")),("status",Localization.Text("System status")),("access",Localization.Text("Quick launch"))})
         {
             var page=pair.Item1;if(!app.Settings.Widgets.Any(w=>w.Enabled && PageFor(w.Id)==page))continue;
             yield return (pair.Item2,Localization.Text("Open this island page"),()=>{CloseCommands();if(app.Settings.CompactLayout)SelectPage(page);});
         }
         if(Settings.ToolNames.Keys.Any(ToolOn))
         {
-            foreach(var pair in new[]{("calendar",Localization.Text("Calendar")),("awake",Localization.Text("Keep awake")),("links",Localization.Text("Clean links")),("files",Localization.Text("File shelf")),("notes",Localization.Text("Notes")),("tasks",Localization.Text("Tasks")),("clips",Localization.Text("Clipboard"))})
+            foreach(var pair in new[]{("calendar",Localization.Text("Calendar")),("awake",Localization.Text("Keep awake")),("files",Localization.Text("File shelf")),("notes",Localization.Text("Notes")),("tasks",Localization.Text("Tasks")),("clips",Localization.Text("Clipboard"))})
             {string mode=pair.Item1;if(!ToolOn(mode))continue;yield return(pair.Item2,Localization.Text("Open everyday tool"),()=>ShowTools(mode));}
         }
         if(app.Awake.Active)yield return(Localization.Text("Stop keep awake"),Localization.Text("Restore normal Windows idle behavior"),()=>{app.Awake.Stop();RefreshCommands();});
@@ -87,19 +114,10 @@ public sealed partial class OverlayWindow
         panel.Children.Add(UI.Heading(Localization.Text("Keep awake"),18));var hint=UI.Text(Localization.Text("Temporarily prevent automatic sleep. Your normal power settings return when this stops or NabyScape quits."),12,UI.Muted);hint.Margin=new(0,8,0,14);panel.Children.Add(hint);
         awakeStatus=UI.Text("",14);awakeStatus.Margin=new(0,0,0,16);panel.Children.Add(awakeStatus);UpdateRoadmapStatus(DateTimeOffset.UtcNow);
         if(app.Awake.Active){panel.Children.Add(UI.Button(Localization.Text("Stop keep awake"),()=>MutateUtility(app.Awake.Stop),true));return;}
-        var durations=new ComboBox();foreach(string item in new[]{"30 minutes","1 hour","2 hours","Until NabyScape quits"})durations.Items.Add(item);durations.SelectedIndex=0;UI.LocalizeOptions(durations);UI.Named(durations,Localization.Text("Keep awake duration"));panel.Children.Add(durations);
+        var durations=CreateAwakeDuration();panel.Children.Add(durations);
         var display=new CheckBox{Content=Localization.Text("Keep the display on too"),IsChecked=false,Margin=new(0,10,0,12)};panel.Children.Add(display);
-        panel.Children.Add(UI.Button(Localization.Text("Start keep awake"),()=>MutateUtility(()=>app.Awake.Start(durations.SelectedIndex==3?null:TimeSpan.FromMinutes(new[]{30,60,120}[Math.Clamp(durations.SelectedIndex,0,2)]),display.IsChecked==true,DateTimeOffset.UtcNow)),true));
+        panel.Children.Add(UI.Button(Localization.Text("Start keep awake"),()=>MutateUtility(()=>StartAwake(durations,display)),true));
         panel.Children.Add(UI.Text(Localization.Text("Explicit sleep, locking, and closing the lid remain under Windows control."),11,UI.Muted));
-    }
-    private void BuildCleanLinks(StackPanel panel)
-    {
-        panel.Children.Add(UI.Heading(Localization.Text("Clean links"),18));var hint=UI.Text(Localization.Text("Preview a link without common tracking. Copy it when you're ready."),11,UI.Muted);hint.Margin=new(0,8,0,8);panel.Children.Add(hint);
-        var input=UI.Input(Localization.Text("Link to clean"),"",Localization.Text("Paste an http or https URL"));input.MaxLength=8192;input.Height=36;input.MinHeight=0;input.Padding=new(10,3,10,3);input.Margin=new(0,0,0,4);panel.Children.Add(input);
-        var status=UI.Text("",11,UI.Muted);status.Margin=new(0,8,0,8);panel.Children.Add(status);
-        var result=UI.Input(Localization.Text("Cleaned link"),"");result.IsReadOnly=true;result.TextWrapping=TextWrapping.Wrap;result.Height=44;result.Padding=new(10,3,10,3);result.Margin=new(0,0,0,4);result.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;panel.Children.Add(result);
-        var copy=UI.Button(Localization.Text("Copy cleaned link"),()=>{try{Clipboard.SetText(result.Text);status.Text=Localization.Text("Copied cleaned link.");}catch(Exception ex){app.Store.Log(ex);status.Text=Localization.Text("Could not copy. Try again.");}finally{ResizeToolPanel();}},true);copy.IsEnabled=false;panel.Children.Add(copy);
-        input.TextChanged+=(_,_)=>{try{if(string.IsNullOrWhiteSpace(input.Text)){result.Text="";status.Text="";copy.IsEnabled=false;return;}result.Text=CleanLink.Clean(input.Text);copy.IsEnabled=true;status.Text=result.Text==input.Text.Trim()?Localization.Text("Unchanged · already clean or signature protected"):Localization.Text("Tracking parameters removed · check the result below");}catch(ArgumentException){result.Text="";copy.IsEnabled=false;status.Text=Localization.Format("Enter a complete HTTP or HTTPS URL without credentials (up to {0} characters).",input.MaxLength);}finally{ResizeToolPanel();}};
     }
     private void BuildCalendar(StackPanel panel)
     {
@@ -111,7 +129,7 @@ public sealed partial class OverlayWindow
         for(int i=0;calendarMonthExpanded && i<42;i++)
         {
             long ticks=calendarMonth.Ticks+(long)(i-offset)*TimeSpan.TicksPerDay;if(ticks<DateTime.MinValue.Ticks || ticks>DateTime.MaxValue.Ticks)continue;
-            DateTime day=new(ticks);var button=UI.Button(day.Day.ToString(),()=>{calendarDay=day;calendarMonth=new(day.Year,day.Month,1);calendarMonthExpanded=false;RefreshTools();});button.FontSize=10;button.MinHeight=0;button.Padding=new(0);button.Margin=new(1);button.Tag=new CornerRadius(7);button.Foreground=day==calendarDay?Brushes.Black:day.Month==calendarMonth.Month?Brushes.White:UI.Muted;button.Background=day==calendarDay?Brushes.White:DayEvents(day).Any()?UI.Brush("#2BFFFFFF"):Brushes.Transparent;UI.Named(button,day.ToString("dddd, d MMMM yyyy",Localization.Culture));Grid.SetColumn(button,i%7);Grid.SetRow(button,1+i/7);grid.Children.Add(button);
+            DateTime day=new(ticks);var button=UI.Button(day.Day.ToString(),()=>{calendarDay=day;calendarMonth=new(day.Year,day.Month,1);calendarMonthExpanded=false;RefreshTools();});button.FontSize=10;button.MinHeight=0;button.Padding=new(0);button.Margin=new(1);button.Tag=new CornerRadius(7);button.Foreground=day==calendarDay?Brushes.Black:day.Month==calendarMonth.Month?Brushes.White:UI.Muted;button.Background=day==calendarDay?Brushes.White:DayEvents(day).Any()?UI.Brush("#2BFFFFFF"):Brushes.Transparent;UI.Named(button,day.ToString("dddd, d MMMM yyyy",Localization.Culture));CalendarVisuals.MarkToday(button,day,lightSelection:day==calendarDay);Grid.SetColumn(button,i%7);Grid.SetRow(button,1+i/7);grid.Children.Add(button);
         }
         panel.Children.Add(grid);if(!calendarMonthExpanded)panel.Children.Add(CalendarWeek());
         var events=DayEvents(calendarDay).ToArray();if(events.Length==0)panel.Children.Add(UI.Text(Localization.Text("No events for this day."),12,UI.Muted));

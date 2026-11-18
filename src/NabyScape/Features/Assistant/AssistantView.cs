@@ -76,7 +76,7 @@ internal sealed partial class AssistantView : UserControl,IDisposable
         var attachments=new ScrollViewer{Content=draftFiles,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,MaxHeight=106};Grid.SetColumnSpan(attachments,2);composer.Children.Add(attachments);
         var bar=new DockPanel{Margin=new(0,3,0,0)};DockPanel.SetDock(send,Dock.Right);bar.Children.Add(send);var tools=new StackPanel{Orientation=Orientation.Horizontal};tools.Children.Add(attach);tools.Children.Add(share);bar.Children.Add(tools);Grid.SetRow(bar,2);Grid.SetColumnSpan(bar,2);composer.Children.Add(bar);
         var composerFrame=new Border{Child=composer,BorderThickness=new(1),CornerRadius=new(12),Padding=new(11,4,6,5),Margin=new(0,4,0,3)};
-        composerFrame.SetResourceReference(Border.BackgroundProperty,"ControlFill");composerFrame.SetResourceReference(Border.BorderBrushProperty,"ControlBorder");Row(composerFrame,4);
+        composerFrame.SetResourceReference(Border.BackgroundProperty,"GlassControlFill");composerFrame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");Row(composerFrame,4);
         var session=new StackPanel();
         screenPreview.Content=screenImage;screenPreview.Margin=new(0,3,0,0);screenPreview.Expanded+=(_,_)=>RefreshScreen();session.Children.Add(screenPreview);session.Children.Add(AssistantControls.Connection(app,out connection));Row(session,5);
         input.TextChanged+=(_,_)=>RefreshSendState();

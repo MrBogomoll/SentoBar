@@ -24,14 +24,6 @@ public sealed partial class SettingsWindow
         System.Windows.Automation.AutomationProperties.SetName(row,"NabyScape");
         return row;
     }
-    private FrameworkElement SidebarFooter()
-    {
-        var footer=new StackPanel{Margin=new(0)};
-        var border=new Border{BorderBrush=SettingsTheme.LineSoft,BorderThickness=new(0,1,0,0),Padding=new(22,10,18,10),Child=footer};
-        if(showAllSwitch!=null){if(showAllSwitch.Parent is Panel old)old.Children.Remove(showAllSwitch);showAllSwitch.Margin=new(0);footer.Children.Add(showAllSwitch);}
-        
-        return border;
-    }
     private Border StageFrame(Border previewStage,StackPanel controls,Expander advanced)
     {
         var body=new Grid();body.ColumnDefinitions.Add(new());body.ColumnDefinitions.Add(new(){Width=new GridLength(145)});

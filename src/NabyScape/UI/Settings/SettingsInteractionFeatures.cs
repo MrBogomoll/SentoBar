@@ -7,17 +7,24 @@ namespace NabyScape;
 
 public sealed partial class SettingsWindow
 {
-    private void InteractionFeatureControls()
+    private void VisibilitySettings()
     {
         var s=app.Settings;
         var edge=new StackPanel();AddSlider(edge,"Tucked edge height",s.TuckEdge,0,12,v=>s.TuckEdge=v," px");edge.Children.Add(UI.Caption("0 hides the dock completely. Use the tuck shortcut or hover the screen edge to reveal it.",11,UI.Muted));
         page.Children.Add(Section("Automatic tucking",Check("Always tucked",s.AlwaysTucked,v=>s.AlwaysTucked=v),edge,Check("Tuck above maximized apps",s.HideMaximized,v=>s.HideMaximized=v),Check("Tuck above fullscreen apps",s.HideFullscreen,v=>s.HideFullscreen=v),UI.Caption("Leaves a small edge at the top when Chrome or another app fills this display. Move the pointer to that edge to reveal the preview. Manual hide still hides the whole island.",11,UI.Muted)));
         HideExceptionSettings();
-        page.Children.Add(Section("Panel navigation",Check("Swipe between open panels",s.PanelSwipe,v=>s.PanelSwipe=v),UI.Caption("Swipe empty space or use Shift+wheel to switch panels. Long lists keep vertical scrolling. Keyboard: Ctrl+Tab.",11,UI.Muted)));
+        VisibilityControls();
+        page.Children.Add(Section("Automatic activity",
+            Check("Preview new tracks & sessions ending soon",s.SmartActivities,v=>s.SmartActivities=v),
+            Check("Automatic browser media previews",s.BrowserMediaPreviews,v=>s.BrowserMediaPreviews=v)));
+    }
+    private void InteractionFeatureControls()
+    {
+        var s=app.Settings;
+        page.Children.Add(Section("Detachable previews",
+            Check("Show Detach button",s.DetachablePreviews,v=>s.DetachablePreviews=v)));
         page.Children.Add(Section("Drag to Island",Check("Reveal shelf when dragging files",s.DropReveal,v=>s.DropReveal=v),UI.Caption("Drag files onto the island or its tucked edge. Drop to stage references; select multiple shelf items to drag them out together. Manual hiding stays hidden.",11,UI.Muted)));
-        page.Children.Add(Section("Detachable previews",Check("Allow detachable previews",s.DetachablePreviews,v=>s.DetachablePreviews=v),UI.Caption("Drag the grip to place a mini window, or choose Detach. Supports Music, Timer, Focus, Calendar, Notes, Shelf and System. Closing it keeps music and sessions running.",11,UI.Muted)));
-        page.Children.Add(Section("Closed cover gestures",Check("Control playback from album cover",s.CoverGestures,v=>s.CoverGestures=v),UI.Caption("Choose Album artwork in Audio. Click to play/pause; hold 500 ms to choose a session. Keyboard: Ctrl+Space for playback, Ctrl+M for sessions.",11,UI.Muted)));
-
+        page.Children.Add(Section("Closed cover gestures",Check("Control playback from album cover",s.CoverGestures,v=>s.CoverGestures=v),UI.Caption("In Music & sound, choose album artwork for the closed dock. Click the cover to play or pause; hold to choose a media app.",11,UI.Muted)));
     }
     private FrameworkElement FeaturePreview(string kind)
     {
@@ -30,7 +37,7 @@ public sealed partial class SettingsWindow
             "Drop zone" when !s.DropReveal=>"Drop reveal is off. Open the shelf to add files.",
             "Detached preview" when !s.DetachablePreviews=>"Detachable previews are off.",
             "Cover gestures" when !s.CoverGestures=>"Cover gestures are off. Click to open the panel.",
-            "Cover gestures" when s.ClosedMediaIcon!="Artwork"=>"Choose Artwork in Appearance to use cover gestures.",
+            "Cover gestures" when s.ClosedMediaIcon!="Artwork"=>"Choose album artwork in Music & sound to use cover controls.",
             _=>null
         };
         if(inactive!=null){panel.Children.Add(UI.Caption(inactive,12,UI.Muted));return panel;}

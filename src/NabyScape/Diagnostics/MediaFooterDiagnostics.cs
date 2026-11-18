@@ -99,7 +99,8 @@ internal static class MediaFooterDiagnostics
                     check("Every source row can receive visible keyboard focus at "+width+" × "+height,reachable);
                     Escape();check("Escape restores source focus at "+width+" × "+height,!controls.IsOpen && controls.SourceButton.IsKeyboardFocused);controls.Toggle(mode);await Task.Delay(30);
                 }
-                check(mode+" wheel cannot switch widgets at "+width+" DIP",!island.RoutePanelWheel(-120,false,popup) && !island.RoutePanelWheel(120,true,popup) && island.ActivePage=="media");
+                check(mode+" Ctrl and wheel keeps the current widget at "+width+" DIP",
+                    island.RoutePanelWheel(-120,false,popup,true) && island.ActivePage=="media");
                 Capture("media-"+mode+"-"+width+"-"+height);controls.Close(false);
             }
         }

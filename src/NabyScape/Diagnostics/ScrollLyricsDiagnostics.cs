@@ -26,22 +26,23 @@ internal static class ScrollLyricsDiagnostics
             int width=Math.Min(full.PixelWidth,(int)Math.Ceiling(island.PaintedWidth*dpi)),height=Math.Min(full.PixelHeight,(int)Math.Ceiling(island.PaintedHeight*dpi));var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(new CroppedBitmap(full,new Int32Rect(Math.Max(0,(full.PixelWidth-width)/2),0,width,height))));using var file=File.Create(Path.Combine(directory,name+".png"));png.Save(file);
         }
         var s=app.Settings;s.CompactLayout=true;s.CategoryStyle="Dots";s.Preset="Mac";s.Top=0;s.PanelWidth=526;s.PanelMaxHeight=417;s.PanelScale=1.04;s.PanelPadding=26;s.ReduceMotion=true;s.LiveActivity=true;s.PanelSwipe=true;s.ClipboardHistory=true;s.HideFullscreen=s.HideMaximized=s.AlwaysTucked=false;s.SmartActivities=false;
+        s.WheelWrapTabs=true;
         app.ChangeSettings();app.Media.DiagnosticPlayback(true);app.Audio.DiagnosticPeak=()=>.2f;
         for(int i=0;i<30;i++)app.Productivity.Clips.Add(new ClipItem{Text="Clipboard sample "+(i+1)+" · a local fixture",Timestamp=DateTimeOffset.UtcNow.AddMinutes(-i)});app.Productivity.Save();
-        island.ShowTools("clips",false);await Task.Delay(200);island.UpdateLayout();var inner=Field<ScrollViewer>("clipboardScroll");var outer=Field<ScrollViewer>("scroll");var row=Diagnostics.Descendants(inner).OfType<Button>().First(b=>AutomationProperties.GetName(b).StartsWith("View "));var pause=Diagnostics.Descendants(island).OfType<CheckBox>().Single(box=>System.Windows.Automation.AutomationProperties.GetName(box)=="Pause capture");
+        island.ShowTools("clips",false);await Task.Delay(200);island.UpdateLayout();var inner=Field<ScrollViewer>("clipboardScroll");var outer=Field<ScrollViewer>("scroll");var row=Diagnostics.Descendants(inner).OfType<Button>().First(b=>AutomationProperties.GetName(b)==Localization.Format("View {0}",Localization.Text("Text")));var pause=Diagnostics.Descendants(island).OfType<CheckBox>().Single(box=>System.Windows.Automation.AutomationProperties.GetName(box)==Localization.Text("Pause capture"));
         double headerY=pause.TransformToAncestor(island).Transform(new Point()).Y;
         check("Clipboard list has its own bounded viewport while the panel fits",inner.ScrollableHeight>100 && outer.ScrollableHeight<1);
-        Capture("clipboard-before");Wheel(row,-120);await Task.Delay(100);island.UpdateLayout();
-        check("Wheel inside clipboard scrolls only the history",inner.VerticalOffset>0 && outer.VerticalOffset==0 && island.ActivePage=="clips" && Math.Abs(headerY-pause.TransformToAncestor(island).Transform(new Point()).Y)<.5);
-        Capture("clipboard-scrolled");double singleWheel=inner.VerticalOffset;inner.ScrollToTop();await Task.Delay(80);for(int i=0;i<4;i++)Wheel(row,-30);await Task.Delay(80);check("Fast trackpad deltas accumulate within a single layout frame",Math.Abs(inner.VerticalOffset-singleWheel)<1);
-        inner.ScrollToBottom();await Task.Delay(80);Field<PeekWheelAccumulator>("panelWheel").Reset();Wheel(row,-120);await Task.Delay(80);
+        Capture("clipboard-before");island.RoutePanelWheel(-120,false,row,true);await Task.Delay(100);island.UpdateLayout();
+        check("Ctrl with the wheel scrolls only clipboard history",inner.VerticalOffset>0 && outer.VerticalOffset==0 && island.ActivePage=="clips" && Math.Abs(headerY-pause.TransformToAncestor(island).Transform(new Point()).Y)<.5);
+        Capture("clipboard-scrolled");double singleWheel=inner.VerticalOffset;inner.ScrollToTop();await Task.Delay(80);for(int i=0;i<4;i++)island.RoutePanelWheel(-30,false,row,true);await Task.Delay(80);check("Fast trackpad deltas accumulate within a single layout frame",Math.Abs(inner.VerticalOffset-singleWheel)<1);
+        inner.ScrollToBottom();await Task.Delay(80);Field<PeekWheelAccumulator>("panelWheel").Reset();island.RoutePanelWheel(-120,false,row,true);await Task.Delay(80);
         check("Clipboard bottom consumes vertical wheel without moving the panel or changing page",Math.Abs(inner.VerticalOffset-inner.ScrollableHeight)<1 && outer.VerticalOffset==0 && island.ActivePage=="clips");
-        Field<PeekWheelAccumulator>("panelWheel").Reset();var tabs=Field<System.Collections.Generic.Dictionary<string,Button>>("compactTabs");Wheel(tabs["clips"],-120);await Task.Delay(80);
-        check("Wheel on panel navigation changes slide even with a long clipboard history",island.ActivePage!="clips");
+        Field<PeekWheelAccumulator>("panelWheel").Reset();Wheel(row,-120);await Task.Delay(80);
+        check("Plain wheel over clipboard history switches tabs",island.ActivePage!="clips");
         island.ShowTools("clips",false);await Task.Delay(150);inner=Field<ScrollViewer>("clipboardScroll");check("Returning to clipboard retains its own list position",inner.VerticalOffset>0 && outer.VerticalOffset==0);
-        Field<PeekWheelAccumulator>("panelWheel").Reset();row=Diagnostics.Descendants(inner).OfType<Button>().First(b=>AutomationProperties.GetName(b).StartsWith("View "));check("Horizontal gesture can still leave the clipboard list",island.RoutePanelWheel(120,true,row) && island.ActivePage!="clips");
+        Field<PeekWheelAccumulator>("panelWheel").Reset();row=Diagnostics.Descendants(inner).OfType<Button>().First(b=>AutomationProperties.GetName(b)==Localization.Format("View {0}",Localization.Text("Text")));check("Horizontal gesture can still leave the clipboard list",island.RoutePanelWheel(120,true,row) && island.ActivePage!="clips");
         island.ShowTools("notes",false);await Task.Delay(60);var note=Diagnostics.Descendants(island).OfType<TextBox>().First(text=>text.IsVisible && text.AcceptsReturn);note.Text=string.Join("\n",Enumerable.Range(1,80).Select(i=>"Note line "+i));note.Focus();await Task.Delay(80);island.UpdateLayout();
-        check("An actively edited long note keeps native scrolling",note.ExtentHeight>note.ViewportHeight+1 && !island.RoutePanelWheel(-120,false,note) && island.ActivePage=="notes");island.ShowTools("clips",false);await Task.Delay(80);
+        check("An actively edited long note scrolls with Ctrl and the wheel",note.ExtentHeight>note.ViewportHeight+1 && island.RoutePanelWheel(-120,false,note,true) && island.ActivePage=="notes");island.ShowTools("clips",false);await Task.Delay(80);
         foreach(double width in new[]{300d,526d})
         {
             s.PanelWidth=width;s.PanelMaxHeight=300;app.ChangeSettings();await Task.Delay(100);island.UpdateLayout();inner=Field<ScrollViewer>("clipboardScroll");
@@ -53,7 +54,7 @@ internal static class ScrollLyricsDiagnostics
         string prefix=UI.Identity(minute).Split(' ')[0];
         var increase=Diagnostics.Descendants(countdown).OfType<Button>().First(b=>UI.Identity(b)==prefix+" Minutes up");
         minute.Text="05";increase.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));check("Duration stepper changes editable minutes",minute.Text=="06");
-        Field<PeekWheelAccumulator>("panelWheel").Reset();Wheel(minute,-120);await Task.Delay(80);check("Countdown wheel edits minutes without leaving the widget",island.ActivePage=="focus" && minute.Text=="05");
+        Field<PeekWheelAccumulator>("panelWheel").Reset();island.RoutePanelWheel(-120,false,minute,true);await Task.Delay(80);check("Countdown wheel edits minutes without leaving the widget",island.ActivePage=="focus" && minute.Text=="05");
         s.PanelWidth=526;s.PanelMaxHeight=480;app.ChangeSettings();island.SelectPage("media",false);await Task.Delay(100);
         var lyrics=Field<LyricsView>("mediaLyrics");var result=new LyricResult(new[]{new LyricLine(0,"A little closer to the music"),new LyricLine(4,"One line, right on time"),new LyricLine(8,"Let the next moment arrive")},"Synced lyrics · original sample");
         lyrics.SetFixture(result,5.6,12);lyrics.Visibility=Visibility.Visible;Call("ResizeToolPanel");await Task.Delay(150);island.UpdateLayout();

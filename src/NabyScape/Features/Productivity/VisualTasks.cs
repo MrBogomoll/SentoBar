@@ -7,13 +7,34 @@ using System.Windows.Media;
 namespace NabyScape;
 public sealed partial class OverlayWindow
 {
+    private ScrollViewer? taskViewport;
+
+    private void SizeTaskViewport(double panelHeight)
+    {
+        if(toolsMode!="tasks" || taskViewport?.Parent!=toolsContent || !body.IsAncestorOf(taskViewport))return;
+        double remaining=(panelHeight-PanelFramePadding)/app.Settings.PanelScale;
+        var constraint=new Size(bodyWidth,double.PositiveInfinity);
+        // Reserve room for the composer, title and surrounding panel controls.
+        for(FrameworkElement child=taskViewport;child!=body && child.Parent is Panel parent;child=parent)
+        {
+            if(parent is not StackPanel {Orientation:Orientation.Vertical})continue;
+            foreach(FrameworkElement sibling in parent.Children)
+            {
+                if(sibling==child || sibling.Visibility==Visibility.Collapsed)continue;
+                sibling.Measure(constraint);
+                remaining-=sibling.DesiredSize.Height;
+            }
+        }
+        taskViewport.MaxHeight=Math.Max(22,remaining-2);
+    }
+
     private void BuildVisualTasks()
     {
         var p=app.Productivity;
         var count=UI.Caption("",11,UI.Muted);count.HorizontalAlignment=HorizontalAlignment.Right;
         void Summary(){int done=p.Tasks.Count(t=>t.Done);count.Text=p.Tasks.Count==0?"":Localization.Format("{0} open",p.Tasks.Count-done);UI.Named(count,Localization.Format("{0} of {1} tasks completed",done,p.Tasks.Count));}
         Summary();var heading=new DockPanel{Margin=new(0,0,0,16)};DockPanel.SetDock(count,Dock.Right);heading.Children.Add(count);heading.Children.Add(UI.Heading(Localization.Text("Tasks"),18));toolsContent.Children.Add(heading);
-        var list=new StackPanel();var viewport=UI.Scroll(list);viewport.Tag="panel-content-scroll";viewport.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;viewport.HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled;viewport.MaxHeight=Math.Clamp((app.Settings.PanelMaxHeight-180)/app.Settings.PanelScale,72,360);UI.Named(viewport,Localization.Text("Task list"));toolsContent.Children.Add(viewport);
+        var list=new StackPanel();var viewport=taskViewport=UI.Scroll(list);viewport.Tag="panel-content-scroll";viewport.VerticalScrollBarVisibility=ScrollBarVisibility.Auto;viewport.HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled;UI.Named(viewport,Localization.Text("Task list"));toolsContent.Children.Add(viewport);
         foreach(var item in p.Tasks.ToArray())
         {
             var row=new DockPanel{MinHeight=46,LastChildFill=true};var frame=new Border{Child=row,CornerRadius=new(8),Background=Brushes.Transparent,Padding=new(4,0,4,0)};
@@ -30,7 +51,15 @@ public sealed partial class OverlayWindow
         void Add(){if(string.IsNullOrWhiteSpace(input.Text))return;string text=input.Text;MutateUtility(()=>{if(p.AddTask(text))taskDraft="";else app.Notify(Localization.Text("Tasks"),Localization.Text(p.Tasks.Count>=100?"Remove a task before adding another. Your draft is still here.":"Could not save. Your text is still in the editor."));});}
         var composer=new Grid{Margin=new(0,18,0,0)};composer.ColumnDefinitions.Add(new());composer.ColumnDefinitions.Add(new(){Width=new GridLength(38)});composer.Children.Add(input);
         var placeholder=UI.Caption("Add a task…",12,UI.Muted);placeholder.IsHitTestVisible=false;placeholder.Margin=new(10,0,0,0);composer.Children.Add(placeholder);void Hint()=>placeholder.Visibility=input.Text.Length==0?Visibility.Visible:Visibility.Collapsed;Hint();input.TextChanged+=(_,_)=>Hint();
-        var add=UI.CaptionButton("Add task",Add);add.Content=Icons.Create("plus",15,UI.Muted);add.FontSize=22;add.Background=Brushes.Transparent;add.BorderThickness=new(0);add.Width=34;add.MinHeight=34;add.Padding=new(0);add.Margin=new(4,0,0,0);Grid.SetColumn(add,1);composer.Children.Add(add);toolsContent.Children.Add(new Border{Child=composer,Background=UI.Brush("#14161A"),BorderBrush=UI.Brush("#30343B"),BorderThickness=new(.7),CornerRadius=new(9),Margin=new(0,14,0,0)});composer.Margin=new(0);add.IsEnabled=!string.IsNullOrWhiteSpace(input.Text);input.TextChanged+=(_,_)=>add.IsEnabled=!string.IsNullOrWhiteSpace(input.Text);
+        var add=UI.CaptionButton("Add task",Add);add.Content=Icons.Create("plus",15,UI.Muted);add.FontSize=22;add.Background=Brushes.Transparent;add.BorderThickness=new(0);add.Width=34;add.MinHeight=34;add.Padding=new(0);add.Margin=new(4,0,0,0);Grid.SetColumn(add,1);composer.Children.Add(add);var inputFrame=new Border{Child=composer,BorderThickness=new(1),CornerRadius=new(9),Margin=new(0,14,0,0)};
+        inputFrame.SetResourceReference(Border.BackgroundProperty,"GlassControlFill");
+        inputFrame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
+        input.IsKeyboardFocusWithinChanged+=(_,_) =>
+        {
+            if(!Accessibility.HighContrast && input.IsKeyboardFocusWithin)inputFrame.BorderBrush=GlassDockAppearance.Accent;
+            else inputFrame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
+        };
+        toolsContent.Children.Add(inputFrame);composer.Margin=new(0);add.IsEnabled=!string.IsNullOrWhiteSpace(input.Text);input.TextChanged+=(_,_)=>add.IsEnabled=!string.IsNullOrWhiteSpace(input.Text);
         input.KeyDown+=(_,e)=>{if(e.Key==Key.Enter){Add();e.Handled=true;}};
     }
 }

@@ -36,6 +36,25 @@ internal sealed partial class IslandSurface : FrameworkElement
     public static readonly DependencyProperty GlassLiftProperty=DependencyProperty.Register(nameof(GlassLift),typeof(double),typeof(IslandSurface),new FrameworkPropertyMetadata(0d,FrameworkPropertyMetadataOptions.AffectsRender));
     public double GlassLift {get=>(double)GetValue(GlassLiftProperty);set=>SetValue(GlassLiftProperty,value);}
     public bool GlassStyle {get;set;}=true;
+    internal bool UseGlassDock {get;init;}
+    internal bool SuppressGlassDock {get;set;}
+    private (Color Background,Color Light)? glassDockPalette;
+    private Brush? glassDockFill;
+    private PanelBackdropPaint? panelBackdrop;
+    internal void SetPanelBackdrop(PanelBackdropPaint? backdrop)
+    {
+        if(ReferenceEquals(panelBackdrop,backdrop))return;
+        panelBackdrop=backdrop;InvalidateVisual();
+    }
+    internal double ContourRadius=>UseGlassDock?GlassDockAppearance.Radius(Radius):Radius;
+    internal void SetGlassDockPalette(Color background,Color light)
+    {
+        var palette=(background,light);
+        if(glassDockPalette==palette)return;
+        glassDockPalette=palette;
+        glassDockFill=GlassDockAppearance.Material(background,light);
+        InvalidateVisual();
+    }
     private Brush? albumBrush;
     private Color albumTint;
     public Color AlbumTint {get=>albumTint;set{if(albumTint==value)return;albumTint=value;albumBrush=new RadialGradientBrush(value,Colors.Transparent){Center=new(.1,.35),GradientOrigin=new(.1,.35),RadiusX=1,RadiusY=1};albumBrush.Freeze();InvalidateVisual();}}
@@ -75,7 +94,7 @@ internal sealed partial class IslandSurface : FrameworkElement
     public void Refresh()
     {
         if(updateDepth>0){refreshPending=true;return;}
-        var key=(SurfaceWidth,SurfaceHeight,Radius,Notch,Math.Max(0,(ActualWidth-SurfaceWidth)/2));
+        var key=(SurfaceWidth,SurfaceHeight,Radius:ContourRadius,Notch,Math.Max(0,(ActualWidth-SurfaceWidth)/2));
         if(contourKey!=key){contourKey=key;Contour=IslandGeometry.Create(key.SurfaceWidth,key.SurfaceHeight,key.Radius,key.Notch,key.Item5);ContourChanged?.Invoke();}
         InvalidateVisual();
     }
@@ -85,6 +104,36 @@ internal sealed partial class IslandSurface : FrameworkElement
         {
             // The dock text uses WindowText; keep its painted material opaque and paired.
             context.DrawGeometry(SystemColors.WindowBrush,new Pen(SystemColors.WindowTextBrush,1),Contour);
+            return;
+        }
+        if(panelBackdrop!=null)
+        {
+            panelBackdrop.Draw(context,Contour);
+            context.PushClip(Contour);
+            context.PushOpacity(GlassDockAppearance.GlowOpacity(AmbientColor));
+            DrawAmbient(context);
+            context.Pop();
+            context.DrawGeometry(null,GlassDockAppearance.Edge,Contour);
+            context.Pop();
+            return;
+        }
+        if(UseGlassDock && glassDockFill!=null && !SuppressGlassDock)
+        {
+            context.DrawGeometry(glassDockFill,null,Contour);
+            context.PushClip(Contour);
+            if(GlassStyle && GlassStrength>0)
+            {
+                context.PushOpacity(.35*GlassStrength);
+                reflection.Center=reflection.GradientOrigin=new Point(lightX,lightY);
+                context.DrawRectangle(reflection,null,Contour.Bounds);
+                context.Pop();
+            }
+            if(albumBrush!=null)context.DrawRectangle(albumBrush,null,Contour.Bounds);
+            context.PushOpacity(GlassDockAppearance.GlowOpacity(AmbientColor));
+            DrawAmbient(context);
+            context.Pop();
+            context.DrawGeometry(null,GlassDockAppearance.Edge,Contour);
+            context.Pop();
             return;
         }
         context.DrawGeometry(Fill,null,Contour);

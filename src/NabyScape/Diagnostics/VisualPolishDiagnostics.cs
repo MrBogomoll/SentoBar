@@ -38,7 +38,7 @@ internal static class VisualPolishDiagnostics
         app.Productivity.AddTask("Review the cover artwork");app.Productivity.AddTask("Keep the next step clear");
         for(int i=0;i<12;i++)app.Productivity.Clips.Add(new ClipItem{Text=i==0?"https://example.com/design-notes":"Local design note "+(i+1),Timestamp=new DateTimeOffset(2026,10,20,12,0,0,TimeSpan.Zero).AddMinutes(-i)});
         app.Productivity.Save();island.Reveal(false);await Task.Delay(100);
-        var tabs=Field<Dictionary<string,Button>>("compactTabs");string[] originalPages={"voice","media","focus","stopwatch","status","access","files","notes","tasks","clips","calendar","awake","links","weather"};
+        var tabs=Field<Dictionary<string,Button>>("compactTabs");string[] originalPages={"voice","media","focus","stopwatch","status","access","files","notes","tasks","clips","calendar","awake","weather"};
         check("Existing page groups and dot navigation are retained",tabs.Keys.SequenceEqual(originalPages) && tabs.Values.All(b=>b.Content is System.Windows.Shapes.Rectangle));
         foreach(double width in new[]{526d,300d})
         {
@@ -69,7 +69,7 @@ internal static class VisualPolishDiagnostics
             var navigate=typeof(SettingsWindow).GetMethod("Navigate",flags)!;
             foreach(string category in nav.Keys){navigate.Invoke(window,new object[]{category});await Task.Delay(40);Capture(window,"settings-"+category.ToLowerInvariant());}
             navigate.Invoke(window,new object[]{"Appearance"});await Task.Delay(40);
-            check("Panel navigation uses dots with no obsolete style selector",app.Settings.CategoryStyle=="Dots" && !Diagnostics.Descendants(window).OfType<ComboBox>().Any(c=>AutomationProperties.GetName(c)=="Category appearance"));
+            check("Settings omit the obsolete category style selector",!Diagnostics.Descendants(window).OfType<ComboBox>().Any(c=>AutomationProperties.GetName(c)=="Category appearance"));
             navigate.Invoke(window,new object[]{"Layout"});window.Width=600;window.Height=520;await Task.Delay(60);Capture(window,"settings-compact");
         }
         finally{window.Close();}

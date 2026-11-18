@@ -66,7 +66,23 @@ public sealed partial class OverlayWindow
         assistantCharacterButton.MouseLeave+=(_,_)=>{closedAssistant.SetHover(false);closedAssistant.Press(false);};
         assistantCharacterButton.PreviewMouseLeftButtonDown+=(_,_)=>closedAssistant.Press(true);
         assistantCharacterButton.PreviewMouseLeftButtonUp+=(_,_)=>closedAssistant.Press(false);
-        assistantCharacterHost.Children.Add(assistantCharacterButton);visuals.Children.Add(assistantCharacterHost);
+        assistantCharacterHost.Children.Add(assistantCharacterButton);
+        idlePrompt=UI.CaptionButton("Ask Naby",()=>OpenAssistant());
+        var promptLabel=UI.Caption("Ask Naby",11);
+        promptLabel.FontWeight=FontWeights.SemiBold;
+        promptLabel.TextWrapping=TextWrapping.NoWrap;
+        promptLabel.TextTrimming=TextTrimming.CharacterEllipsis;
+        idlePrompt.Content=promptLabel;
+        idlePrompt.Background=Brushes.Transparent;
+        idlePrompt.BorderThickness=new(0);
+        idlePrompt.Padding=new(6,0,6,0);
+        idlePrompt.Margin=new(8,0,0,0);
+        idlePrompt.MinHeight=24;
+        idlePrompt.HorizontalAlignment=HorizontalAlignment.Left;
+        idlePrompt.VerticalAlignment=VerticalAlignment.Center;
+        idlePrompt.Visibility=Visibility.Collapsed;
+        assistantCharacterHost.Children.Add(idlePrompt);
+        visuals.Children.Add(assistantCharacterHost);
         assistantPeek.Visibility=Visibility.Collapsed;assistantPeek.Opacity=0;assistantPeek.HorizontalAlignment=HorizontalAlignment.Center;assistantPeek.VerticalAlignment=VerticalAlignment.Top;
         assistantPeek.RowDefinitions.Add(new());assistantPeek.RowDefinitions.Add(new(){Height=GridLength.Auto});
         var hero=new Grid();hero.ColumnDefinitions.Add(new(){Width=GridLength.Auto});hero.ColumnDefinitions.Add(new());hero.Children.Add(peekAssistant);
@@ -118,7 +134,20 @@ public sealed partial class OverlayWindow
         SyncAssistantVisibility();
         RefreshAssistantVisuals();RefreshIdleDock();
     }
-    private void SyncAssistantVisibility(){assistantCharacterHost.Visibility=AssistantCharacterAvailable && !expanded && !peeking?Visibility.Visible:Visibility.Collapsed;if(closedAssistant.IsVisible)closedAssistant.Music=AssistantSpotifyPlaying;ConfigureDisplayFollow();}
+    private void RefreshClosedAssistantVisibility()
+    {
+        bool character=AssistantCharacterAvailable;
+        bool prompt=idleClosed && app.Settings.ClosedIdleContent=="Assistant";
+        assistantCharacterButton.Visibility=character?Visibility.Visible:Visibility.Collapsed;
+        idlePrompt.Visibility=prompt?Visibility.Visible:Visibility.Collapsed;
+        assistantCharacterHost.Visibility=(character || prompt) && !expanded && !peeking?Visibility.Visible:Visibility.Collapsed;
+    }
+    private void SyncAssistantVisibility()
+    {
+        RefreshClosedAssistantVisibility();
+        if(closedAssistant.IsVisible)closedAssistant.Music=AssistantSpotifyPlaying;
+        ConfigureDisplayFollow();
+    }
     internal void PreviewAssistant(bool reply=false)
     {
         if(expanded || userHidden || !AssistantCharacterAvailable || (TuckRequested && !tuckPreview))return;

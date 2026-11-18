@@ -2,9 +2,9 @@
 
 Панель для Windows с музыкой, текстами песен, заметками, задачами и таймерами. Русский интерфейс, светлая и тёмная темы, настройки под себя.
 
-**Первый релиз нашего форка — 1.0.** Основан на [BillyNabil/nabyscape](https://github.com/BillyNabil/nabyscape), версия оригинала 2.26.1.
+**Актуальный релиз нашего форка — 1.2.0.** Основан на [BillyNabil/nabyscape](https://github.com/BillyNabil/nabyscape), версия оригинала 2.26.1.
 
-[**Скачать установщик для Windows x64**](https://github.com/MrBogomoll/nabyscape/releases/download/v1.0.0/NabyScape-win-x64-Setup.exe) · [Portable ZIP](https://github.com/MrBogomoll/nabyscape/releases/download/v1.0.0/NabyScape-win-x64-Portable.zip) · [Все файлы релиза](https://github.com/MrBogomoll/nabyscape/releases/tag/v1.0.0)
+[**Скачать установщик для Windows x64**](https://github.com/MrBogomoll/nabyscape/releases/latest/download/NabyScape-win-x64-Setup.exe) · [Portable ZIP](https://github.com/MrBogomoll/nabyscape/releases/latest/download/NabyScape-win-x64-Portable.zip) · [Все файлы релиза](https://github.com/MrBogomoll/nabyscape/releases/latest)
 
 ## Сама панель
 
@@ -22,7 +22,7 @@
 
 Это снимки реального интерфейса версии 1.0 с демонстрационными музыкальными данными. Цвета и размеры в примерах настроены для показа; оформление панели выбирается отдельно от темы окна настроек.
 
-В исходниках версии 1.1 также доступны лайки Spotify из средней и раскрытой музыкальной панели. [Как подключить](docs/spotify.md). В файлы релиза 1.0 эта функция не включена.
+В средней и раскрытой музыкальной панели можно добавлять песни Spotify в «Любимые» и удалять их оттуда. [Как подключить Spotify](docs/spotify.md).
 
 ## Два оформления
 
@@ -47,13 +47,13 @@
 
 ## Установка
 
-Релиз 1.0 содержит сборку для **Windows 10/11 x64**. Среда .NET включена в приложение.
+Релиз содержит сборку для **Windows 10/11 x64**. Среда .NET включена в приложение.
 
-1. Скачайте `NabyScape-win-x64-Setup.exe` из [нашего релиза](https://github.com/MrBogomoll/nabyscape/releases/tag/v1.0.0).
+1. Скачайте `NabyScape-win-x64-Setup.exe` из [последнего релиза](https://github.com/MrBogomoll/nabyscape/releases/latest).
 2. Если NabyScape уже работает, завершите его через значок в области уведомлений.
 3. Запустите установщик. Для запуска без установки скачайте Portable ZIP, распакуйте его и откройте `NabyScape.exe`.
 
-Существующим пользователям наших сборок `2.26.1-ru.*` не требуется удалять профиль перед установкой 1.0. Номер 1.0 обозначает первый публичный релиз форка.
+Для обновления с предыдущей версии или локальной беты установите релиз поверх имеющейся копии. Настройки, заметки и задачи хранятся в профиле Windows.
 
 Portable означает запуск без установки: настройки всё равно хранятся в профиле Windows, а не рядом с EXE. Сборка не подписана цифровым сертификатом.
 
@@ -79,7 +79,7 @@ Portable означает запуск без установки: настрой
 ./artifacts/NabyScape.exe --diagnostics ./artifacts/ui-checks --isolated-diagnostics --settings-themes-only
 ```
 
-В релизе опубликованы установщик, Portable ZIP, архив лицензий и файл `SHA256SUMS` для проверки целостности. Исходники доступны по тегу `v1.0.0`. В первом релизе не публикуется ARM64-сборка.
+В релизе опубликованы установщик, Portable ZIP, архив лицензий и файл `SHA256SUMS` для проверки целостности. Тег на странице релиза указывает на исходники соответствующей сборки.
 
 ## Обратная связь и лицензия
 

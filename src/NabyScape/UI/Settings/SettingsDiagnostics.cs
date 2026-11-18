@@ -16,7 +16,7 @@ public sealed partial class SettingsWindow
         {
             IsReadOnly=true,AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,
             VerticalScrollBarVisibility=ScrollBarVisibility.Auto,MinHeight=180,MaxHeight=320,
-            Text=PrivateDiagnostics.CreateReport(app.Store)
+            Text=""
         };
         UI.LocalizedName(preview,"Private diagnostics report preview");
         var notice=UI.Caption("Review the preview before copying or exporting. Nothing is uploaded automatically.",11,UI.Muted);
@@ -63,11 +63,25 @@ public sealed partial class SettingsWindow
                 Accessibility.Announce(notice,Localization.Text("Could not export the report. Try another location."));
             }
         });
-        page.Children.Add(Section("Private diagnostics",
+        var section=Section("Private diagnostics",
             UI.Caption("Includes app and runtime versions, architecture, coarse storage and service status, and up to 64 controlled diagnostic events. No usernames, paths, endpoints, models, device names, keys, conversations, screenshots, audio or saved profile content are included.",11,UI.Muted),
             UI.Caption("The existing local errors.log may contain private details and is never included in this report.",11,UI.Muted),
             preview,refresh,copy,export,notice,
             UI.Caption("Storage recovery",13),
-            UI.Caption("When a document is unreadable or from a newer version, it stays protected from automatic saves. Temporary defaults may be shown. Quit NabyScape and preserve the original JSON file and its matching .schema.json sidecar before recovery. Use a compatible app version, or restore a known-good matching document and schema backup. For a legacy backup without a sidecar, preserve and move aside the current sidecar too. Keep the original and migration backup until recovery is verified. Reset preferences does not unlock protected documents.",11,UI.Muted)));
+            UI.Caption("When a document is unreadable or from a newer version, it stays protected from automatic saves. Temporary defaults may be shown. Quit NabyScape and preserve the original JSON file and its matching .schema.json sidecar before recovery. Use a compatible app version, or restore a known-good matching document and schema backup. For a legacy backup without a sidecar, preserve and move aside the current sidecar too. Keep the original and migration backup until recovery is verified. Reset preferences does not unlock protected documents.",11,UI.Muted));
+        var content=(StackPanel)section.Child;
+        var heading=(FrameworkElement)content.Children[0];
+        content.Children.RemoveAt(0);
+        heading.Margin=new(0);
+        content.Margin=new(0,8,0,0);
+        section.Child=null;
+        var disclosure=new Expander{Header=heading,Content=content};
+        UI.LocalizedName(disclosure,"Private diagnostics");
+        disclosure.Expanded+=(_,_) =>
+        {
+            if(preview.Text.Length==0)preview.Text=PrivateDiagnostics.CreateReport(app.Store);
+        };
+        section.Child=disclosure;
+        page.Children.Add(section);
     }
 }

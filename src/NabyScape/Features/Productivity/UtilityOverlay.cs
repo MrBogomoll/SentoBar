@@ -54,7 +54,7 @@ public sealed partial class OverlayWindow
     private string toolsMode="home";
     private string taskDraft="";
     private bool utilityMutating;
-    private static readonly (string mode,string title)[] toolChoices={ ("files","File shelf"),("notes","Notes"),("tasks","Tasks"),("clips","Clipboard"),("calendar","Calendar"),("awake","Keep awake"),("links","Clean links"),("weather","Weather"),("power","Power plan") };
+    private static readonly (string mode,string title)[] toolChoices={ ("files","File shelf"),("notes","Notes"),("tasks","Tasks"),("clips","Clipboard"),("calendar","Calendar"),("awake","Keep awake"),("weather","Weather"),("power","Power plan") };
     private bool ToolOn(string id)=>app.Settings.ToolEnabled(id) || app.Settings.HoverViews.Any(view=>view.Id==id && view.Enabled && HoverPagePolicy.Available(app.Settings,id));
     private readonly DispatcherTimer noteSave=new(){Interval=TimeSpan.FromMilliseconds(350)};
     private ContextMenu? audioMenu;
@@ -141,7 +141,14 @@ public sealed partial class OverlayWindow
         if(utilityMutating || toolsMode is not ("files" or "notes" or "tasks" or "clips") || (toolsMode=="notes" && Keyboard.FocusedElement is TextBox))return;
         RefreshTools();
     }
-    private void FlushNotes(){noteSave.Stop();if(app.Productivity!=null){utilityMutating=true;try{app.Productivity.Save();}finally{utilityMutating=false;}}}
+    private void FlushNotes()
+    {
+        noteSave.Stop();
+        if(app.Productivity is not {DraftNeedsSave:true} productivity)return;
+        utilityMutating=true;
+        try{productivity.Save();}
+        finally{utilityMutating=false;}
+    }
     private void MutateUtility(Action action){utilityMutating=true;try{action();}catch(Exception ex){app.Store.Log(ex);app.Notify(Localization.Text("Could not complete the action"),ex.Message);}finally{utilityMutating=false;}RefreshTools();}
     internal void ShowTools(string mode,bool activate=true)
     {if(mode!="home" && !ToolOn(mode))return;if(commandOpen)CloseCommands();FlushNotes();toolsMode=mode;calendarEditing=false;scroll.ScrollToTop();if(mode=="home")mode=app.Settings.Widgets.FirstOrDefault(w=>w.Enabled && Settings.ToolNames.ContainsKey(w.Id))?.Id??"notes";toolsMode=mode;OpenHoverPanel(mode,activate);RefreshTools();}
@@ -163,11 +170,10 @@ public sealed partial class OverlayWindow
         {
             BuildNotes();
         }
-        else if(toolsMode=="power")toolsContent.Children.Add(new PowerPlanView());
+        else if(toolsMode=="power")toolsContent.Children.Add(new PowerPlanView(ResizeToolPanel));
         else if(toolsMode=="weather")toolsContent.Children.Add(BuildWeatherPage());
         else if(toolsMode=="calendar")BuildCalendar(toolsContent);
         else if(toolsMode=="awake")BuildAwake(toolsContent);
-        else if(toolsMode=="links")BuildCleanLinks(toolsContent);
         else
         {
             BuildSmartClipboard(toolsContent);
@@ -178,7 +184,7 @@ public sealed partial class OverlayWindow
     internal ContextMenu? AudioPopup=>audioMenu;
     internal void OpenAudioMenu()
     {
-        audioMenu=new ContextMenu{Background=UI.Brush("#191A1E"),Foreground=Brushes.White,BorderBrush=UI.Brush("#42434B"),Padding=new(5),HasDropShadow=false};
+        audioMenu=new ContextMenu{HasDropShadow=false};
         if(mediaControls?.IsVisible==true){audioMenu.PlacementTarget=mediaControls.VolumeButton;audioMenu.Placement=System.Windows.Controls.Primitives.PlacementMode.Top;}
         var mixerItem=new MenuItem{Header=Localization.Text("Volume mixer"),Foreground=Brushes.White};mixerItem.Click+=(_,_)=>OpenMixer();audioMenu.Items.Add(mixerItem);audioMenu.Items.Add(new Separator{Style=(Style)FindResource(typeof(Separator))});
         foreach(var device in app.Audio.Outputs())

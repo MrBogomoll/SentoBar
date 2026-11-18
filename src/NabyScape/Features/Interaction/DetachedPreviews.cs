@@ -83,21 +83,24 @@ public sealed class DetachedPreviewManager : IDisposable
 }
 internal sealed class DetachedPreviewWindow : Window
 {
+    private const double FrameRadius=16;
     private readonly App app;
     private readonly string kind;
     private readonly DetachedPreviewView view;
     private readonly Border surface;
     private readonly AmbientPresenter ambientPresenter;
+    private PanelBackdropPaint? paneBackdrop;
     private readonly DispatcherTimer saveGeometry=new(){Interval=TimeSpan.FromMilliseconds(400)};
     private HwndSource? source;
     private bool clamping,restored,placed;
     internal DetachedPreviewWindow(App app,string kind,Action openMain)
     {
-        this.app=app;this.kind=kind;
+        this.app=app;this.kind=kind;GlassDockAppearance.ApplyControls(this);
         Title="NabyScape · "+NameFor(kind);Width=350;Height=330;MinWidth=280;MinHeight=220;
-        WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.CanResize;ShowInTaskbar=true;Topmost=false;Background=UI.Brush("#101114");Foreground=Brushes.White;
+        WindowStyle=WindowStyle.None;AllowsTransparency=true;ResizeMode=ResizeMode.CanResize;ShowInTaskbar=true;Topmost=false;Background=Brushes.Transparent;Foreground=Brushes.White;
         FontFamily=new FontFamily("Segoe UI Variable Text, Segoe UI");UseLayoutRounding=true;
-        WindowChrome.SetWindowChrome(this,new WindowChrome{CaptionHeight=0,ResizeBorderThickness=new(6),CornerRadius=new(16),GlassFrameThickness=new(0),UseAeroCaptionButtons=false});
+        // The layered client paints the rounded edge; WindowChrome only supplies resize hit testing.
+        WindowChrome.SetWindowChrome(this,new WindowChrome{CaptionHeight=0,ResizeBorderThickness=new(6),CornerRadius=new(0),GlassFrameThickness=new(0),UseAeroCaptionButtons=false});
         UI.Named(this,Title);var layout=new DockPanel();
         var header=new DockPanel{Margin=new(8,4,2,10),LastChildFill=true,Background=Brushes.Transparent};DockPanel.SetDock(header,Dock.Top);layout.Children.Add(header);
         Button WindowButton(string symbol,string name,Action action)
@@ -108,11 +111,19 @@ internal sealed class DetachedPreviewWindow : Window
         var handle=UI.Heading(NameFor(kind),13);handle.FontWeight=FontWeights.SemiBold;handle.Cursor=Cursors.SizeAll;handle.ToolTip=Localization.Text("Drag to move · Alt+Space for window controls");header.Children.Add(handle);
         header.MouseLeftButtonDown+=(_,e)=>{if(e.OriginalSource is not DependencyObject target || IsControl(target,header))return;if(e.ClickCount==1){BeginPointerDrag();e.Handled=true;}};
         view=new(app,kind,openMain);layout.Children.Add(view.Content);
-        var lighting=new IslandSurface{Fill=Brushes.Transparent,IsHitTestVisible=false,Notch=false,Radius=16};
+        const double innerRadius=FrameRadius-1;
+        var lighting=new IslandSurface{Fill=Brushes.Transparent,GlassStyle=false,Opacity=.3,IsHitTestVisible=false,Notch=false,Radius=innerRadius};
         var layers=new Grid();layers.Children.Add(lighting);layout.Margin=new(10);layers.Children.Add(layout);
-        layers.SizeChanged+=(_,_)=>{lighting.SurfaceWidth=layers.ActualWidth;lighting.SurfaceHeight=layers.ActualHeight;};
+        layers.SizeChanged+=(_,e)=>
+        {
+            lighting.SurfaceWidth=e.NewSize.Width;lighting.SurfaceHeight=e.NewSize.Height;
+            layers.Clip=new RectangleGeometry(new Rect(e.NewSize),innerRadius,innerRadius);
+        };
         ambientPresenter=new(app,lighting,kind);
-        surface=new Border{CornerRadius=new(16),BorderThickness=new(1),Child=layers};surface.SetResourceReference(Border.BorderBrushProperty,"ControlBorder");Content=surface;ApplySettings();
+        surface=new Border{CornerRadius=new(FrameRadius),BorderThickness=new(1),Child=layers};
+        surface.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");Content=surface;
+        surface.SizeChanged+=(_,e)=>{if(paneBackdrop!=null)surface.Background=paneBackdrop.ForSize(e.NewSize.Width,e.NewSize.Height);};
+        ApplySettings();
         try{if(File.Exists(Path.Combine(app.Store.DirectoryPath,"detached-"+kind+".json"))){var stored=app.Store.Load<DetachedPreviewGeometry>("detached-"+kind);var rect=SafeRect(stored);Left=rect.Left;Top=rect.Top;Width=rect.Width;Height=rect.Height;restored=true;}}catch(Exception ex){app.Store.Log(ex);}
         saveGeometry.Tick+=(_,_)=>{ClampToMonitor();PersistGeometry();};LocationChanged+=(_,_)=>ScheduleSave();SizeChanged+=(_,_)=>ScheduleSave();
         IsVisibleChanged+=(_,_)=>{view.SetVisible(IsVisible && WindowState!=WindowState.Minimized);if(!IsVisible){view.Flush();PersistGeometry();}};
@@ -186,7 +197,14 @@ internal sealed class DetachedPreviewWindow : Window
             if(rect!=candidate)SetPhysicalBounds(rect,scale);
         }finally{clamping=false;}
     }
-    internal void ApplySettings(){surface.Background=Accessibility.HighContrast?SystemColors.WindowBrush:UI.Brush(app.Settings.Background);surface.Opacity=Accessibility.HighContrast?1:app.Settings.Opacity;ambientPresenter.Refresh();view?.ApplySettings();}
+    internal void ApplySettings()
+    {
+        paneBackdrop=app.PanelBackground.Get(app.Settings,app.Store.DirectoryPath);
+        surface.Background=Accessibility.HighContrast?SystemColors.WindowBrush:
+            paneBackdrop?.ForSize(surface.ActualWidth,surface.ActualHeight)??GlassDockAppearance.Material(UI.Brush(app.Settings.Background).Color,Colors.Transparent);
+        surface.Opacity=Accessibility.HighContrast || paneBackdrop!=null?1:app.Settings.Opacity;
+        ambientPresenter.Refresh();view.ApplySettings();
+    }
     private void ScheduleSave(){if(clamping)return;saveGeometry.Stop();if(IsVisible)saveGeometry.Start();}
     private void PersistGeometry()
     {

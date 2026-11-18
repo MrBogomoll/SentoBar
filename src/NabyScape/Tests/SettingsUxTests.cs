@@ -110,7 +110,7 @@ internal static class SettingsUxTests
             Assert(SettingsBackdrop.Resolve("Simulated glass",ready,Apply).Actual=="Simulated glass" && calls==0);
             Assert(SettingsBackdrop.Requested(new Settings())=="Solid" && SettingsBackdrop.Requested(new Settings{GlassStyle=false})=="Solid");
             Assert(SettingsBackdrop.Resolve("unknown",ready,Apply).Actual=="Solid" && calls==0);
-            Assert(CustomizationProfile.CustomizationKeys.Contains("SettingsMaterial") && PreferenceReset.Categories["Appearance"].Contains("SettingsMaterial"));
+            Assert(CustomizationProfile.CustomizationKeys.Contains("SettingsMaterial") && PreferenceReset.Categories["WindowAppearance"].Contains("SettingsMaterial"));
         });
         test("Settings material persists independently and old layouts preserve the selection",()=>
         {
@@ -218,7 +218,7 @@ internal static class SettingsUxTests
         });
         test("Layout and visibility settings have concrete explanations",()=>
         {
-            foreach(string name in new[]{"Content size","Content inset","Two-stage reveal","Tuck above maximized apps","Reduce motion","Glass intensity"})Assert(SettingsWindow.SettingDescription(name).Length>30);
+            foreach(string name in new[]{"Content size","Content inset","Two-stage reveal","Tuck above maximized apps","Reduce motion","Reflection strength"})Assert(SettingsWindow.SettingDescription(name).Length>30);
         });
         test("Color picker constructs and applies its hue template under the application theme",()=>
         {

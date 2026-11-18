@@ -175,9 +175,9 @@ internal static class InteractionDiagnostics
             foreach(var kind in new[]{SmartClipKind.Text,SmartClipKind.Link,SmartClipKind.Image,SmartClipKind.Color})
             {
                 FindButton(overlay,"View "+kind).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));await Settle();Capture(overlay,"smart-clipboard-"+kind.ToString().ToLowerInvariant());
-                if(kind==SmartClipKind.Link)Check("cleaned link is previewed before any copy action",Entry(overlay,"Original link").Text.Contains("utm_source=diagnostic") && Entry(overlay,"Cleaned link preview").Text=="https://example.com/review?keep=yes#section");
+                if(kind==SmartClipKind.Link)Check("links retain the original address in clipboard history",Entry(overlay,"Original link").Text.Contains("utm_source=diagnostic") && !Tree(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Copy cleaned link"));
                 if(kind==SmartClipKind.Color)Check("color details expose canonical HEX and RGB",Tree(overlay).OfType<TextBlock>().Any(t=>t.Text=="#2A6F9B · rgb(42, 111, 155)"));
-                Check("clipboard "+kind+" exposes contextual details",Tree(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)==(kind==SmartClipKind.Image?"Save as PNG…":kind==SmartClipKind.Link?"Copy cleaned link":kind==SmartClipKind.Color?"Copy HEX":"Copy plain text")));
+                Check("clipboard "+kind+" exposes contextual details",Tree(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)==(kind==SmartClipKind.Image?"Save as PNG…":kind==SmartClipKind.Link?"Copy original":kind==SmartClipKind.Color?"Copy HEX":"Copy plain text")));
             }
             p.SetClipboardEnabled(false);await Settle();Check("disabling clipboard clears open content and selected detail",p.Clips.Count==0 && !Tree(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b).StartsWith("View ",StringComparison.Ordinal)) && Tree(overlay).OfType<Button>().Any(b=>AutomationProperties.GetName(b)=="Enable history"));Capture(overlay,"smart-clipboard-disabled");
             foreach(var window in created.Distinct().Where(w=>Application.Current.Windows.Cast<Window>().Contains(w)).ToArray())window.Close();Check("closed previews release all Updated subscriptions",Subscribers()==0);

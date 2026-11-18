@@ -75,7 +75,7 @@ internal static class Stage6Diagnostics
             }
             var imported=new Settings();CustomizationProfile.Import(CustomizationProfile.Export(app.Settings),imported);check("Stage6 layout round-trips Settings material",imported.SettingsMaterial==app.Settings.SettingsMaterial);
             CustomizationProfile.Import("{\"format\":\"luma.layout.v1\",\"values\":{\"GlassStyle\":false}}",imported);check("Stage6 legacy layout imports without replacing independent Settings material",!imported.GlassStyle && imported.SettingsMaterial==app.Settings.SettingsMaterial);
-            PreferenceReset.Reset(app.Store,app.Settings,"Appearance");app.ChangeSettings();check("Stage6 Appearance reset restores legacy solid Settings and island glass",window.MaterialResult.Actual=="Solid" && app.Settings.GlassStyle);
+            PreferenceReset.Reset(app.Store,app.Settings,"Appearance");PreferenceReset.Reset(app.Store,app.Settings,"WindowAppearance");app.ChangeSettings();check("Stage6 separate resets restore legacy solid Settings and island glass",window.MaterialResult.Actual=="Solid" && app.Settings.GlassStyle);
             File.WriteAllText(Path.Combine(directory,"native-environment.txt"),$"OS {Environment.OSVersion}\nConditions {SettingsBackdrop.ReadConditions()}. Native Settings use DWM with a dark translucent client foundation.\nIsland native backdrop not shipped: layered custom contour; notch transparency, hit testing, animated resize, DPI and performance gates are unproven.\n");
         }
         finally{window.Close();}

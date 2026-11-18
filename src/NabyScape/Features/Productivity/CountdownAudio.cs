@@ -12,6 +12,11 @@ internal sealed class CountdownAudio : IDisposable
     private WaveStream? stream;
     private readonly Dispatcher dispatcher=Dispatcher.CurrentDispatcher;
     internal string? LastError {get;private set;}
+    internal static bool EnabledForCompletion(Settings settings,bool focus,DateTimeOffset now)
+        => (focus?settings.NotifyFocus:settings.NotifyTimer) && settings.CountdownSound!="Off" && settings.CountdownSoundVolume>0 &&
+           (settings.NotificationsSnoozedUntil is not {} until || until<=now) &&
+           (settings.CountdownSoundDuringQuietHours || !NotificationPolicy.Quiet(settings,now));
+
     internal void Play(Settings settings)
     {
         Dispose();LastError=null;if(settings.CountdownSound=="Off" || settings.CountdownSoundVolume<=0)return;

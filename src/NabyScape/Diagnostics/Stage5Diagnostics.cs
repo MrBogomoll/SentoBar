@@ -54,7 +54,7 @@ internal static class Stage5Diagnostics
         foreach(double width in new[]{300d,340d,600d})
         {
             s.PanelWidth=width;Invoke("ReflowDisplay");island.UpdateLayout();
-            var surface=(IslandSurface)Field("surface");var safe=PeekLayout.SafeBounds(surface.SurfaceWidth,s.HoverHeight,s.Radius,surface.Notch);
+            var surface=(IslandSurface)Field("surface");var safe=PeekLayout.SafeBounds(surface.SurfaceWidth,s.HoverHeight,s.Radius,surface.Notch,bottomInset:16);
             check("Stage5 display reflow fits actual hover viewport and children at "+width,Math.Abs(panel.ActualWidth-safe.Width)<.1 && Math.Abs(viewport.ActualWidth-safe.Width)<.1 && views.Values.All(v=>Math.Abs(v.Width-safe.Width)<.1) && Math.Abs(noteView.ActualWidth-safe.Width)<.1);
             check($"Stage5 display reflow retains editor draft and body at {width} (draft={note.Text.Length}/{noteDraft.Length}, builds={island.BodyBuilds}/{reflowBuilds}, page={island.PeekPage})",ReferenceEquals(note,Field("peekNote")) && ReferenceEquals(noteView,views["notes"]) && note.Text==noteDraft && island.BodyBuilds==reflowBuilds && island.PeekPage=="notes");
             check($"Stage5 display reflow retains editor focus at {width} (focus={note.IsKeyboardFocusWithin})",note.IsKeyboardFocusWithin);

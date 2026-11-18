@@ -65,36 +65,20 @@ public sealed class KeepAwakeService : IDisposable
     }
 }
 
-public static class CleanLink
+internal static class WebLink
 {
-    private static readonly HashSet<string> TrackingKeys=new(StringComparer.OrdinalIgnoreCase)
-    { "fbclid","gclid","dclid","msclkid","mc_cid","mc_eid","igshid","_ga","_gl" };
-    private static readonly HashSet<string> SignatureKeys=new(StringComparer.OrdinalIgnoreCase)
-    { "X-Amz-Signature","X-Goog-Signature","Signature","sig","oauth_signature","hmac" };
+    internal static bool IsValid(string value,int maximumLength)
+        =>value.Length>0 && value.Length<=maximumLength &&
+          Uri.TryCreate(value,UriKind.Absolute,out var uri) &&
+          (uri.Scheme==Uri.UriSchemeHttp || uri.Scheme==Uri.UriSchemeHttps) &&
+          uri.Host.Length>0 && uri.UserInfo.Length==0 && uri.IsWellFormedOriginalString();
 
     internal static string ValidateUrl(string input,int maximumLength,string parameter)
     {
-        var value=input?.Trim() ?? "";
-        if(value.Length==0 || value.Length>maximumLength ||
-            !Uri.TryCreate(value,UriKind.Absolute,out var uri) ||
-            (uri.Scheme!=Uri.UriSchemeHttp && uri.Scheme!=Uri.UriSchemeHttps) ||
-            uri.Host.Length==0 || uri.UserInfo.Length!=0 || !uri.IsWellFormedOriginalString())
+        string value=input?.Trim()??"";
+        if(!IsValid(value,maximumLength))
             throw new ArgumentException(Localization.Format("Enter a complete HTTP or HTTPS URL without credentials, up to {0} characters.",maximumLength),parameter);
         return value;
-    }
-    public static string Clean(string input)
-    {
-        var value=ValidateUrl(input,8192,nameof(input));
-        int fragment=value.IndexOf('#');
-        int end=fragment<0?value.Length:fragment;
-        int query=value.IndexOf('?');
-        if(query<0 || query>end)return value;
-        var parameters=value.Substring(query+1,end-query-1).Split('&');
-        var keys=parameters.Select(part=>Uri.UnescapeDataString(part.Split('=',2)[0])).ToArray();
-        if(keys.Any(SignatureKeys.Contains))return value;
-        var remaining=parameters.Where((_,index)=>!keys[index].StartsWith("utm_",StringComparison.OrdinalIgnoreCase) && !TrackingKeys.Contains(keys[index])).ToArray();
-        if(remaining.Length==parameters.Length)return value;
-        return value[..query]+(remaining.Length>0?"?"+string.Join("&",remaining):"")+(fragment<0?"":value[fragment..]);
     }
 }
 
@@ -141,7 +125,7 @@ public sealed class CalendarService
         if(end<=start || end-start>TimeSpan.FromDays(31))
             throw new ArgumentException(Localization.Text("Choose an end after the start, within 31 days."),nameof(end));
         meetingUrl=meetingUrl?.Trim() ?? "";
-        if(meetingUrl.Length>0)meetingUrl=CleanLink.ValidateUrl(meetingUrl,2048,nameof(meetingUrl));
+        if(meetingUrl.Length>0)meetingUrl=WebLink.ValidateUrl(meetingUrl,2048,nameof(meetingUrl));
         return new CalendarEvent { Id=string.IsNullOrWhiteSpace(id)?Guid.NewGuid().ToString("N"):id,
             Title=title,Start=start,End=end,MeetingUrl=meetingUrl };
     }

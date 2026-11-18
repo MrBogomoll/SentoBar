@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Threading;
 using System.Media;
 using Forms=System.Windows.Forms;
@@ -14,11 +15,14 @@ public sealed partial class App : Application
     private EventWaitHandle? openEvent,exitEvent;
     private RegisteredWaitHandle? openWait,exitWait;
     private Forms.NotifyIcon? tray;
-    private DispatcherTimer? tick;
+    private DispatcherTimer? tick,countdownTick;
+    private DateTimeOffset? updateSample;
+    internal DateTimeOffset UpdateSampleTime=>updateSample??DateTimeOffset.UtcNow;
     private SettingsWindow? settingsWindow;
     private OverlayWindow? overlay;
     private bool quitting;
     internal InternalNotifications Notifications {get;}=new();
+    internal PanelBackdropRenderer PanelBackground {get;}=new();
     internal ExternalNotificationWatcher? ExternalNotifications {get;private set;}
     internal LyricsService Lyrics {get;}=new();
     internal WeatherService Weather {get;private set;}=null!;
@@ -75,7 +79,7 @@ public sealed partial class App : Application
     internal DetachedPreviewManager Previews {get;private set;}=null!;
     public CalendarService Calendar {get;private set;}=null!;
     public KeepAwakeService Awake {get;private set;}=null!;
-    public string HotkeyStatus=>!Settings.HotkeyEnabled?Localization.Text("Hotkey off"):overlay?.HotkeyError.Length>0?overlay.HotkeyError:Localization.Format("Active · {0}+{1}",Settings.HotkeyModifiers,Settings.HotkeyKey);
+    public string HotkeyStatus=>!Settings.HotkeyEnabled?Localization.Text("Hotkey off"):overlay?.HotkeyError.Length>0?overlay.HotkeyError:overlay?.HasGlobalHotkey==true?Localization.Format("Active · {0}+{1}",Settings.HotkeyModifiers,Settings.HotkeyKey):Localization.Text("The open / close shortcut is waiting to register.");
     public string VisibilityHotkeyStatus=>!Settings.VisibilityHotkeyEnabled?Localization.Text("Visibility shortcut off"):overlay?.VisibilityHotkeyError.Length>0?overlay.VisibilityHotkeyError:Localization.Format("Hide / show · {0}+{1}",Settings.VisibilityHotkeyModifiers,Settings.VisibilityHotkeyKey);
     public string TuckHotkeyStatus=>!Settings.TuckHotkeyEnabled?Localization.Text("Tuck shortcut off"):overlay?.TuckHotkeyError.Length>0?overlay.TuckHotkeyError:Localization.Format("Tuck / return to automatic · {0}+{1}",Settings.TuckHotkeyModifiers,Settings.TuckHotkeyKey);
     internal void FlushPreferenceEditors()=>overlay?.FlushPreferenceEditors();
@@ -84,7 +88,15 @@ public sealed partial class App : Application
     public event Action? SettingsChanged;
     public event Action? Updated;
     internal RuntimeChange CurrentUpdate {get;private set;}=RuntimeChange.All;
-    internal void PublishUpdate(RuntimeChange change){var previous=CurrentUpdate;CurrentUpdate=change;try{Updated?.Invoke();}finally{CurrentUpdate=previous;}}
+    internal void PublishUpdate(RuntimeChange change)
+    {
+        var previous=CurrentUpdate;
+        var previousSample=updateSample;
+        CurrentUpdate=change;
+        updateSample=DateTimeOffset.UtcNow;
+        try{Updated?.Invoke();}
+        finally{CurrentUpdate=previous;updateSample=previousSample;}
+    }
     public (double cpu,double used,double total) Usage { get; private set; }
     public static new App Current=>(App)Application.Current;
     [STAThread] public static void Main(string[] args)
@@ -108,6 +120,9 @@ public sealed partial class App : Application
         PrivateDiagnostics.SetServiceState(DiagnosticService.Application,DiagnosticServiceState.Starting);
         InitializeAppBranding();
         base.OnStartup(e);
+        ToolTipEventHandler suppressHoverToolTip=(_,args)=>args.Handled=true;
+        EventManager.RegisterClassHandler(typeof(FrameworkElement),ToolTipService.ToolTipOpeningEvent,suppressHoverToolTip);
+        EventManager.RegisterClassHandler(typeof(FrameworkContentElement),ToolTipService.ToolTipOpeningEvent,suppressHoverToolTip);
         bool assistantFixture=Array.Exists(e.Args,a=>a=="--assistant-only") && Array.Exists(e.Args,a=>a=="--diagnostics");
         bool showcaseFixture=Array.Exists(e.Args,a=>a=="--showcase") && Array.Exists(e.Args,a=>a=="--diagnostics");
         bool isolatedFixture=Array.Exists(e.Args,a=>a=="--isolated-diagnostics") && Array.IndexOf(e.Args,"--diagnostics") is int diagnosticAt && diagnosticAt>=0 && diagnosticAt+1<e.Args.Length;
@@ -178,13 +193,21 @@ public sealed partial class App : Application
         if(assistantFixture || isolatedFixture || Array.Exists(e.Args,a=>a is "--performance-benchmark" or "--performance-checks-only" or "--stage1-only" or "--stage2-only" or "--stage3-only" or "--stage4-only" or "--stage5-only" or "--stage6-only" or "--integration-settings-only" or "--interaction-hotfix-only" or "--interaction-tuck-hide-only" or "--interaction-classic-mixer-only") || diagnosticPath!=null && Array.Exists(e.Args,a=>a=="--showcase"))Media.DiagnosticFixture=true;else Media.SetEnabled(MediaFeaturesWanted);
         Audio.Read();Usage=Native.SystemUsage();
         int counter=0;
+        countdownTick=new DispatcherTimer(DispatcherPriority.Input);
+        countdownTick.Tick+=(_,_)=>
+        {
+            countdownTick.Stop();
+            CheckCountdowns();
+            PublishUpdate(RuntimeChange.Countdown);
+            ScheduleCountdownUpdate();
+        };
         tick=new DispatcherTimer{Interval=TimeSpan.FromSeconds(1)};
         tick.Tick+=(_,_)=>
         {
-            CheckCountdowns();if(NotificationPolicy.Quiet(Settings,DateTimeOffset.UtcNow) && Notifications.Count>0 && Notifications.Current?.Kind!="preview" && !(Notifications.Current?.Kind=="external" && Settings.ExternalNotificationQuietHours))Notifications.Clear();else Notifications.Tick(DateTimeOffset.UtcNow,overlay.NotificationBusy,Settings.NotificationSeconds);
+            if(NotificationPolicy.Quiet(Settings,DateTimeOffset.UtcNow) && Notifications.Count>0 && Notifications.Current?.Kind!="preview" && !(Notifications.Current?.Kind=="external" && Settings.ExternalNotificationQuietHours))Notifications.Clear();else Notifications.Tick(DateTimeOffset.UtcNow,overlay.NotificationBusy,Settings.NotificationSeconds);
             try{Awake.Tick(DateTimeOffset.UtcNow);}catch(Exception ex){Store.Log(ex);Notify(Localization.Text("Could not update keep awake"),ex.Message);}
             var changed=RuntimeChange.Clock;
-            if(Session.Timer.Running || Session.Focus.Running || Session.Stopwatch.Running)changed|=RuntimeChange.Countdown;
+            if(Session.Stopwatch.Running)changed|=RuntimeChange.Countdown;
             if(++counter%2==0)
             {
                 Audio.Poll();Audio.TrimIdleMedia();bool system=overlay.SystemSummaryVisible || Previews.AnyVisible("system") || settingsWindow?.NeedsSystemSample==true;
@@ -195,7 +218,7 @@ public sealed partial class App : Application
             if(counter%10==0){Productivity.DisplayThumbnails.TrimIdle();AssistantPreviewCache.TrimIdle(Assistant);}
             PublishUpdate(changed);
         };
-        tick.Start();CheckCountdowns();
+        tick.Start();CheckCountdowns();ScheduleCountdownUpdate();
         if(Store.Warning!=null) Notify(Localization.Text("Settings recovered"),Store.Warning);
         if(!Array.Exists(e.Args,a=>a=="--background")) Notify(Localization.Text("NabyScape is ready"), Localization.Text("Click the island for your widgets. Right-click the tray icon for settings."));
         InitializeRuntimeRecovery();
@@ -213,10 +236,28 @@ public sealed partial class App : Application
         }
     }
     private void RefreshAssistantTray(){PrivateDiagnostics.SetServiceState(DiagnosticService.Assistant,!Assistant.Options.Enabled?DiagnosticServiceState.Disabled:Assistant.State==AssistantState.Error?DiagnosticServiceState.Failed:Assistant.Busy?DiagnosticServiceState.Busy:DiagnosticServiceState.Ready);if(tray!=null)tray.Text=Assistant.VoiceConnected?Localization.Text("NabyScape · Voice microphone on"):Assistant.WakeListening?Localization.Text("NabyScape · Wake microphone on"):Assistant.WakeArmed?Localization.Text("NabyScape · Wake word preparing"):"NabyScape";}
+    private void ScheduleCountdownUpdate()
+    {
+        if(countdownTick==null)return;
+        countdownTick.Stop();
+        if(Quitting)return;
+        var now=DateTimeOffset.UtcNow;
+        var timer=Session.Timer.UntilDisplayChanges(now);
+        var focus=Session.Focus.UntilDisplayChanges(now);
+        var next=timer.HasValue && focus.HasValue?(timer.Value<focus.Value?timer:focus):timer??focus;
+        if(!next.HasValue)return;
+        countdownTick.Interval=TimeSpan.FromTicks(Math.Max(TimeSpan.TicksPerMillisecond,next.Value.Ticks));
+        countdownTick.Start();
+    }
     public void CheckCountdowns()
     {
-        var now=DateTimeOffset.UtcNow;bool changed=false;
-        if(Session.Timer.Complete(now)) { changed=true;PostNotice(new("timer",Localization.Text("Timer finished"),Localization.Text("Your timer has finished.")));if(Settings.NotifyTimer && !NotificationPolicy.Quiet(Settings,now))CountdownAudio.Play(Settings); }
+        var now=DateTimeOffset.UtcNow;bool changed=false,soundDue=false;
+        if(Session.Timer.Complete(now))
+        {
+            changed=true;
+            soundDue=CountdownAudio.EnabledForCompletion(Settings,false,now);
+            PostNotice(new("timer",Localization.Text("Timer finished"),Localization.Text("Your timer has finished.")));
+        }
         var focusDeadline=Session.Focus.Deadline;
         if(Session.Focus.Complete(now))
         {
@@ -230,12 +271,13 @@ public sealed partial class App : Application
                 else { Session.Focus.Reset();PostNotice(new("focus",Localization.Text("Focus session complete"),Localization.Text("Your focus session and break have finished."))); }
             }
             else { Session.Focus.Reset();PostNotice(new("focus",Localization.Text("Break finished"),Localization.Text("Ready for your next focus session."))); }
-            if(Settings.NotifyFocus && !NotificationPolicy.Quiet(Settings,now))CountdownAudio.Play(Settings);
+            soundDue|=CountdownAudio.EnabledForCompletion(Settings,true,now);
         }
+        if(soundDue)CountdownAudio.Play(Settings);
         if(changed) SaveSession();
     }
     internal void OpenMixer()=>overlay?.OpenMixer();
-    public void SaveSession() { try { Session.Stopwatch.Checkpoint();Store.Save("session",Session); } catch(Exception ex) { Store.Log(ex);Notify(Localization.Text("Not saved yet"), Localization.Text("Could not save the timer state.")); } PublishUpdate(RuntimeChange.Countdown); }
+    public void SaveSession() { try { Session.Stopwatch.Checkpoint();Store.Save("session",Session); } catch(Exception ex) { Store.Log(ex);Notify(Localization.Text("Not saved yet"), Localization.Text("Could not save the timer state.")); } ScheduleCountdownUpdate();PublishUpdate(RuntimeChange.Countdown); }
     internal bool SettingsSaveSucceeded {get;private set;}
     public void ChangeSettings()
     {
@@ -263,7 +305,7 @@ public sealed partial class App : Application
         DisposeRuntimeRecovery();
         Spotify?.Dispose();
         if(Assistant!=null)Assistant.Changed-=RefreshAssistantTray;Assistant?.Dispose();assistantWindow?.Close();
-        welcomeWindow?.Close();tick?.Stop();Weather?.Dispose();AmbientAudio?.Dispose();Lyrics.Dispose();CountdownAudio.Dispose();Downloads?.Dispose();ExternalNotifications?.Dispose();Updates?.Dispose();
+        welcomeWindow?.Close();tick?.Stop();countdownTick?.Stop();Weather?.Dispose();AmbientAudio?.Dispose();Lyrics.Dispose();CountdownAudio.Dispose();Downloads?.Dispose();ExternalNotifications?.Dispose();Updates?.Dispose();
         if(Session!=null) SaveSession();
         Previews?.Dispose();overlay?.Cleanup();try{Awake?.Dispose();}catch(Exception ex){Store?.Log(ex);}Productivity?.Dispose();Media?.Dispose();Audio?.Dispose();Brightness?.Dispose();
         if(tray!=null) { tray.Visible=false;tray.Dispose(); }

@@ -11,6 +11,9 @@ public sealed partial class Settings
     public string AmbientMotion {get;set;}="Drift";
     public string AmbientScope {get;set;}="All widgets";
     public List<string> AmbientWidgets {get;set;}=Names.Keys.Where(id=>id!="tools").Concat(new[]{"closed","ai"}).ToList();
+    public string ClosedLightColor {get;set;}="#7AA8DC";
+    public bool ClosedLightFollowsMusic {get;set;}=true;
+    public bool ClosedLightKeepsLastCover {get;set;}
     public string AmbientColorSource {get;set;}="Album cover";
     public string AmbientCustomColor {get;set;}="#7AA8DC";
     public string AmbientAudioResponse {get;set;}="Responsive";
@@ -31,6 +34,7 @@ public sealed partial class Settings
         if(AmbientMotion is not ("Still" or "Breathe" or "Drift"))AmbientMotion="Drift";
         if(AmbientScope is not ("All widgets" or "Music only" or "Selected widgets"))AmbientScope="All widgets";
         AmbientWidgets=(AmbientWidgets??new()).Where(id=>id!=null && (id is "closed" or "ai" || Names.ContainsKey(id) && id!="tools")).Distinct().ToList();
+        if(!ValidColor(ClosedLightColor))ClosedLightColor="#7AA8DC";
         if(AmbientColorSource is not ("Album cover" or "Accent color" or "Custom color" or "Custom blend"))AmbientColorSource="Album cover";
         if(AmbientCustomColor==null || AmbientCustomColor.Length!=7 || AmbientCustomColor[0]!='#' || !uint.TryParse(AmbientCustomColor.AsSpan(1),System.Globalization.NumberStyles.HexNumber,null,out _))AmbientCustomColor="#7AA8DC";
         if(AmbientAudioResponse is not ("Off" or "Soft" or "Responsive" or "Punchy"))AmbientAudioResponse="Responsive";
@@ -41,7 +45,7 @@ public sealed partial class Settings
 }
 internal static class PremiumPreferences
 {
-    internal static readonly string[] Keys="CoverAmbient ClosedAmbient AmbientStrength AmbientSpread AmbientMotion AmbientScope AmbientWidgets AmbientColorSource AmbientCustomColor AmbientSecondaryColor AmbientPalette AmbientDirection AmbientHeight AmbientBalance AmbientSoftness AmbientAudioResponse AmbientSensitivity InteractionMotion NotificationSeconds NotificationAnimation QuietHours QuietStart QuietEnd NotificationsSnoozedUntil".Split(' ');
+    internal static readonly string[] Keys="CoverAmbient ClosedAmbient ClosedLightColor ClosedLightFollowsMusic ClosedLightKeepsLastCover AmbientStrength AmbientSpread AmbientMotion AmbientScope AmbientWidgets AmbientColorSource AmbientCustomColor AmbientSecondaryColor AmbientPalette AmbientDirection AmbientHeight AmbientBalance AmbientSoftness AmbientAudioResponse AmbientSensitivity InteractionMotion NotificationSeconds NotificationAnimation QuietHours QuietStart QuietEnd NotificationsSnoozedUntil".Split(' ');
 }
 
 internal static class NotificationPolicy

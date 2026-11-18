@@ -12,7 +12,7 @@ public sealed partial class SettingsWindow
         ColorControl(colors,"Control background",s.ControlFill,v=>Changed(()=>s.ControlFill=v),new[]{"#16171B","#101010","#15202A","#211E1B"});
         ColorControl(colors,"Control outlines",s.ControlBorder,v=>Changed(()=>s.ControlBorder=v),new[]{"#303238","#202125","#4B5664","#645C50"});
         ColorControl(colors,"Selected controls",s.SelectionFill,v=>Changed(()=>s.SelectionFill=v),new[]{"#34373E","#22252B","#304455","#514A3D"});
-        page.Children.Add(Section("Controls & outlines",UI.Caption("Color buttons, input fields, selected tabs and mini-window outlines. Open a picker to see the change beside these controls. Island and accent colors are separate.",11,UI.Muted),colors));
+        page.Children.Add(Section("Controls & outlines",UI.Caption("Colors for standard buttons, fields and selections on the dock.",11,UI.Muted),colors));
     }
     private FrameworkElement DetachedExample()
     {
@@ -32,7 +32,7 @@ public sealed partial class SettingsWindow
         var label=UI.Caption("Image · just now",12);var marker=new Border{Width=42,Height=42,CornerRadius=new(8),Background=UI.Brush(app.Settings.ControlFill),Child=Icons.Create("image",23)};
         var row=new DockPanel{Margin=new(0,8,0,12)};marker.Margin=new(0,0,12,0);row.Children.Add(marker);row.Children.Add(label);panel.Children.Add(row);
         var kinds=new WrapPanel();panel.Children.Add(kinds);var status=UI.Caption("Example items · your clipboard is untouched",10,UI.Muted);status.Margin=new(0,10,0,0);panel.Children.Add(status);
-        foreach(string kind in new[]{"Text","Link","Image","Color"}){var button=UI.CaptionButton(kind,()=>{label.Text=Localization.Text(kind switch{"Link"=>"example.com · cleaned preview","Color"=>"#8E9AAF · rgb(142, 154, 175)","Text"=>"A thought worth keeping",_=>"Image · just now"});marker.Background=UI.Brush(kind=="Color"?"#8E9AAF":app.Settings.ControlFill);marker.Child=kind=="Color"?null:Icons.Create(kind=="Link"?"link":kind=="Image"?"image":"file-text",23);status.Text=Localization.Text(kind switch{"Link"=>"Review the cleaned link before copying","Image"=>"Copy image · Save as PNG","Color"=>"Copy HEX · Copy RGB",_=>"Copy · Copy plain text"});});button.FontSize=10;button.Padding=new(7,5,7,5);kinds.Children.Add(button);}
+        foreach(string kind in new[]{"Text","Link","Image","Color"}){var button=UI.CaptionButton(kind,()=>{label.Text=Localization.Text(kind switch{"Link"=>"example.com · link","Color"=>"#8E9AAF · rgb(142, 154, 175)","Text"=>"A thought worth keeping",_=>"Image · just now"});marker.Background=UI.Brush(kind=="Color"?"#8E9AAF":app.Settings.ControlFill);marker.Child=kind=="Color"?null:Icons.Create(kind=="Link"?"link":kind=="Image"?"image":"file-text",23);status.Text=Localization.Text(kind switch{"Link"=>"Copy original link","Image"=>"Copy image · Save as PNG","Color"=>"Copy HEX · Copy RGB",_=>"Copy · Copy plain text"});});button.FontSize=10;button.Padding=new(7,5,7,5);kinds.Children.Add(button);}
         return panel;
     }
     private FrameworkElement ControlExample(string kind)
@@ -45,10 +45,30 @@ public sealed partial class SettingsWindow
         }
         if(kind=="Panel navigation")
         {
-            var tabs=new Grid();for(int i=0;i<4;i++)tabs.ColumnDefinitions.Add(new());var state=UI.Caption("Media",18);state.Margin=new(0,18,0,8);int active=0;string[] names={"Media","Status","Launch","Tools"};Button[] buttons=new Button[4];
-            void Select(int index){active=(index+4)%4;state.Text=Localization.Text(names[active]);for(int i=0;i<4;i++){buttons[i].Background=i==active?UI.Brush(s.SelectionFill):Brushes.Transparent;buttons[i].Foreground=i==active?UI.ContrastText(s.SelectionFill):Brushes.White;}}
-            for(int i=0;i<4;i++){int index=i;var button=UI.CaptionButton(names[i],()=>Select(index));button.Padding=new(3,6,3,6);button.FontSize=10;button.Margin=new(0,0,3,0);buttons[i]=button;Grid.SetColumn(button,i);tabs.Children.Add(button);}
-            panel.Children.Add(tabs);panel.Children.Add(state);var arrows=UI.Row(UI.CaptionButton("Previous",()=>Select(active-1)),UI.CaptionButton("Next",()=>Select(active+1)));panel.Children.Add(arrows);panel.Children.Add(UI.Caption("Try the tabs · Shift+wheel on the real panel",11,UI.Muted));Select(0);return panel;
+            var tabs=new WrapPanel();
+            var state=UI.Caption("Music",18);state.Margin=new(0,18,0,8);
+            int active=0;
+            string[] names={"Music","Timer","Focus"};
+            string[] pages={"media","timer","focus"};
+            var buttons=new Button[names.Length];
+            void Select(int index)
+            {
+                active=(index+names.Length)%names.Length;
+                state.Text=Localization.Text(names[active]);
+                for(int i=0;i<buttons.Length;i++)
+                {
+                    OverlayWindow.StyleNavigationTab(buttons[i],Localization.Text(names[i]),pages[i],i==active,s.PanelNavigationStyle,18,28);
+                }
+            }
+            for(int i=0;i<names.Length;i++)
+            {
+                int index=i;
+                var button=UI.CaptionButton(names[i],()=>Select(index));
+                button.Padding=new(10,4,10,4);button.FontSize=11;button.MinHeight=28;button.Margin=new(0,0,4,0);
+                button.Tag=new CornerRadius(14);
+                buttons[i]=button;tabs.Children.Add(button);
+            }
+            panel.Children.Add(tabs);panel.Children.Add(state);var arrows=UI.Row(UI.CaptionButton("Previous",()=>Select(active-1)),UI.CaptionButton("Next",()=>Select(active+1)));panel.Children.Add(arrows);Select(0);return panel;
         }
         panel.Children.Add(UI.Caption("Controls & outlines",16));
         var buttonSample=UI.CaptionButton("Example button",()=>{});buttonSample.Background=UI.Brush(s.ControlFill);buttonSample.Foreground=UI.ContrastText(s.ControlFill);buttonSample.BorderBrush=UI.Brush(s.ControlBorder);buttonSample.BorderThickness=new(1);panel.Children.Add(buttonSample);

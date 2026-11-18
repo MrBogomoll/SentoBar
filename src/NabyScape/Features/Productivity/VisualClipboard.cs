@@ -11,7 +11,15 @@ public sealed partial class OverlayWindow
     {
         var p=app.Productivity;var kind=SmartClipboard.Classify(item);
         var layout=new Grid{Height=142};layout.RowDefinitions.Add(new());layout.RowDefinitions.Add(new(){Height=new GridLength(28)});
-        var preview=new Grid{Background=Brushes.Transparent,ClipToBounds=true};layout.Children.Add(preview);
+        var preview=new Grid{Background=Brushes.Transparent,ClipToBounds=true};
+        var frame=new Border{Child=preview,CornerRadius=new(8)};
+        if(kind.Kind!=SmartClipKind.Color)
+        {
+            frame.BorderThickness=new(1);
+            frame.SetResourceReference(Border.BackgroundProperty,"GlassControlFill");
+            frame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
+        }
+        layout.Children.Add(frame);
         Image? image=null;
         if(kind.Kind==SmartClipKind.Image)
         {
@@ -26,8 +34,9 @@ public sealed partial class OverlayWindow
         else
         {
             string value=item.Text.Length>170?item.Text[..170]+"…":item.Text;
-            var text=UI.Text(value,12,Brushes.White);text.Margin=new(12);text.VerticalAlignment=VerticalAlignment.Top;text.TextWrapping=TextWrapping.Wrap;text.TextTrimming=TextTrimming.CharacterEllipsis;text.MaxHeight=86;
-            preview.Children.Add(new Border{Child=text,CornerRadius=new(8),BorderThickness=new(1),BorderBrush=UI.Brush("#24282F"),Background=UI.Brush("#15171B")});
+            var text=UI.Text(value,12);text.SetResourceReference(TextBlock.ForegroundProperty,"GlassControlText");
+            text.Margin=new(12);text.VerticalAlignment=VerticalAlignment.Top;text.TextWrapping=TextWrapping.Wrap;text.TextTrimming=TextTrimming.CharacterEllipsis;text.MaxHeight=86;
+            preview.Children.Add(text);
         }
         var metadata=new DockPanel{Margin=new(6,4,6,0)};
         var icon=Icons.Create(kind.Kind switch{SmartClipKind.Image=>"image",SmartClipKind.Link=>"link",_=>"file-text"},13,UI.Muted);icon.Margin=new(0,0,8,0);metadata.Children.Add(icon);
@@ -38,10 +47,10 @@ public sealed partial class OverlayWindow
             selectedClipId=selectedClipId==item.Id?null:item.Id;RefreshTools();ResizeToolPanel();
             Dispatcher.BeginInvoke(()=>{if(clipboardScroll?.Content is Panel content)foreach(FrameworkElement part in content.Children)if(part.Tag as string=="clip-detail"){part.BringIntoView();break;}});
         });
-        view.Content=layout;view.Padding=new(0);view.Margin=new(0);view.MinHeight=0;view.HorizontalContentAlignment=HorizontalAlignment.Stretch;view.Background=Brushes.Transparent;view.BorderThickness=new(selectedClipId==item.Id?1:0);view.BorderBrush=UI.Brush("#59616F");view.ToolTip=Localization.Text("Open details · copy, pin or remove");
+        view.Content=layout;view.Padding=new(0);view.Margin=new(0);view.MinHeight=0;view.HorizontalContentAlignment=HorizontalAlignment.Stretch;view.Background=Brushes.Transparent;view.BorderThickness=new(selectedClipId==item.Id?1:0);view.SetResourceReference(Control.BorderBrushProperty,"GlassControlBorder");view.ToolTip=Localization.Text("Open details · copy, pin or remove");
         var tile=new Grid();tile.Children.Add(view);
         Button? copy=null;copy=Icons.Button("copy",Localization.Format("Quick copy {0}",Localization.Text(kind.Kind.ToString())),()=>{copy!.ToolTip=p.TryCopyClip(item)?Localization.Text("Copied"):Localization.Text("Clipboard is busy. Try again.");},false,27);
-        copy.Margin=new(7);copy.HorizontalAlignment=HorizontalAlignment.Right;copy.VerticalAlignment=VerticalAlignment.Top;copy.Background=UI.Brush("#DA1A1D23");copy.ToolTip=Localization.Format("Copy {0}",Localization.Text(kind.Kind.ToString()));tile.Children.Add(copy);MinimalWidgets.Reveal(copy,tile);
+        copy.Margin=new(7);copy.HorizontalAlignment=HorizontalAlignment.Right;copy.VerticalAlignment=VerticalAlignment.Top;copy.ToolTip=Localization.Format("Copy {0}",Localization.Text(kind.Kind.ToString()));tile.Children.Add(copy);MinimalWidgets.Reveal(copy,tile);
         if(image!=null)thumbnails.Add(tile,image,pixels=>Task.FromResult(p.LoadClipImage(item,pixels)));
         return tile;
     }

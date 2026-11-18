@@ -19,10 +19,9 @@ public sealed partial class SettingsWindow
     private static string[] CategorySections(string id)=>Category(id).Sections??(id switch
     {
         "Layout"=>new[]{"Display","Dock placement","Move & resize","Closed island","Open panel","Hover preview","Layout profile"},
-        "Content"=>new[]{"Feature usage","Enabled widgets & order","Individual tools","Hover pages"},
+        "Content"=>new[]{"Enabled widgets & order","Hover pages","Feature usage"},
         "Notes"=>new[]{"Quick draft","Saved notes"},"Tasks"=>new[]{"Tasks"},
-        "Controls"=>new[]{"Hover & swipe","Panel navigation","Drag to Island","Detachable previews","Closed cover gestures","Notch gestures","Global hotkey"},
-        "Audio"=>new[]{"Spotify","Visualizer","Lyrics","Closed media display","Volume mixer","Waveform source","Live signal","Live feedback","Audio behavior","Header wheel"},
+        "Audio"=>new[]{"Spotify","Music on the dock","Visualizer","Lyrics","Volume mixer","Waveform source","Live signal","Live feedback","Audio behavior","Header wheel"},
         "System"=>new[]{"Clock","Monitor details"},"Launch"=>new[]{"Launch display","Shortcuts"},"AI"=>new[]{"AI companion"},
         "Application"=>new[]{"Language & accessibility","Updates","Behavior","Local storage","Private diagnostics","Reset preferences","About NabyScape"},_=>Array.Empty<string>()
     });
@@ -34,16 +33,28 @@ public sealed partial class SettingsWindow
             items.Add(new(category.Title,category.Id,"","",category.Terms+" "+category.Description));
             foreach(string section in CategorySections(category.Id))items.Add(new(FriendlySection(section),category.Id,section,"",section+" "+category.Title));
         }
-        void Add(string title,string category,string section,string control,string terms)=>items.Add(new(title,category,section,control,terms));
-        Add("Live lyrics on closed dock","Audio","Closed media display","Closed media content","lyrics lirik youtube apple song title none waveform");
+        void Add(string title,string category,string section,string control,string terms)
+        {
+            int existing=items.FindIndex(item=>item.Title==title && item.Category==category && item.Section==section);
+            if(existing<0)items.Add(new(title,category,section,control,terms));
+            else items[existing]=items[existing] with {Control=control,Keywords=items[existing].Keywords+" "+terms};
+        }
+        Add("Panel navigation style","Controls","Panel navigation","Panel navigation style","dots labels icons tabs points точки точек подписи значки иконки переключение вкладок");
+        Add("Separate widget windows","Controls","Detachable previews","Show Detach button","detach preview window отдельное окно превью отделить");
+        Add("Island color","Appearance","Color & material","Island color","background fill panel dock color цвет панели выреза фон");
+        Add("Window theme","WindowAppearance","Window theme","","theme settings window menu color цвет окна настроек цвет меню светлая тёмная");
+        Add("Live lyrics on closed dock","ClosedDock","Closed media display","Live lyrics","lyrics lirik youtube apple song title none waveform");
+        Add("Idle dock content","ClosedDock","When idle","Idle dock content","clock date ask naby вырез простой надпись часы дата спросить наби");
         Add("Feature usage","Content","Feature usage","Connect to music apps","resource ram essentials background disable features music download");
-        Add("Light on the closed dock","Ambience","Ambient light","Show ambience on closed dock","closed compact dock ambience tertutup hitam tuck glow");
+        Add("Light on the closed dock","Ambience","Closed dock lighting","Show ambience on closed dock","closed compact dock ambience tertutup hitam tuck glow");
+        Add("Closed dock light color","Ambience","Closed dock lighting","Closed dock light color","idle color album paused cover цвет простой обложка");
         Add("Ambient brightness","Ambience","Ambient light","Ambient intensity","intensity brightness terang cahaya warna");
         Add("Light color & cover palette","Ambience","Ambient light","Ambient color source","single satu warna color cover blend spotify album custom");
         Add("Light spread","Ambience","Ambient light","Ambient spread","spread lebar luas sebar cahaya");
         Add("Light reach","Ambience","Ambient light","Light reach","height tinggi reach full panel");
         Add("Light direction","Ambience","Ambient light","Light direction","direction arah glow atas bawah kiri kanan surround");
         Add("Light softness","Ambience","Ambient light","Ambient softness","softness lembut fade gradient");
+        Add("Custom panel background","Appearance","Surface","Custom panel background","gradient wallpaper picture blur background градиент обои картинка фон размытие");
         Add("Color balance","Ambience","Ambient light","Color balance","balance campur gabungan warna blend");
         Add("Light reacts to music","Ambience","Ambient light","Ambient audio response","audio reactive react beat lagu musik responsive punchy");
         Add("Ambient movement","Ambience","Ambient light","Ambient movement","motion breathe drift gerak animasi");
@@ -117,11 +128,12 @@ public sealed partial class SettingsWindow
     }
     private void OpenSettingsSearchResult(SettingsSearchItem item)
     {
-        settingsSearch?.Clear();revealAllNext=!app.Settings.SettingsShowAll && !EssentialSetting(item.Category,item.Section);if(revealAllNext && item.Category==current)revealAllSettings=false;Navigate(item.Category);
+        settingsSearch?.Clear();Navigate(item.Category);
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded,()=>
         {
             if(current!=item.Category)return;if(item.Category=="Weather")SettingTree(page).OfType<WeatherView>().FirstOrDefault()?.OpenLocationEditor();
             var section=SettingTree(page).OfType<Border>().FirstOrDefault(b=>b.Tag as string==item.Section);
+            if(section?.Child is Expander disclosure)disclosure.IsExpanded=true;
             var target=SettingTree((DependencyObject?)section??page).OfType<Control>().FirstOrDefault(c=>item.Control.Length>0 && UI.Identity(c)==item.Control);
             if(target!=null)
             {

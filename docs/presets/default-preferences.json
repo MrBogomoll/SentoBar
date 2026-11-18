@@ -3,6 +3,9 @@
   "FollowMonitorAnimation": true,
   "FollowMonitorDuration": 360,
   "ClosedAmbient": true,
+  "ClosedLightColor": "#7AA8DC",
+  "ClosedLightFollowsMusic": true,
+  "ClosedLightKeepsLastCover": false,
   "DockEdge": "Top",
   "DockVertical": 90,
   "DockInset": 0,
@@ -28,6 +31,7 @@
   "LyricsOffset": 0,
   "CountdownSound": "Bell",
   "CountdownSoundVolume": 1,
+  "CountdownSoundDuringQuietHours": true,
   "NotificationDelivery": "Both",
   "NotifyTimer": true,
   "NotifyFocus": true,
@@ -51,10 +55,10 @@
   "CoverGestures": true,
   "GlassStyle": false,
   "SettingsMaterial": "Solid",
-  "SettingsShowAll": false,
   "LiveActivity": true,
   "ClosedMediaIcon": "Artwork",
   "ClosedMediaContent": "Waveform",
+  "ClosedIdleContent": "Clock",
   "ReactiveFeedback": true,
   "SmartActivities": true,
   "AlbumAccent": true,
@@ -142,10 +146,6 @@
       "Enabled": true
     },
     {
-      "Id": "links",
-      "Enabled": true
-    },
-    {
       "Id": "voice",
       "Enabled": true
     }
@@ -177,10 +177,6 @@
       "Enabled": true
     },
     {
-      "Id": "links",
-      "Enabled": true
-    },
-    {
       "Id": "weather",
       "Enabled": true
     }
@@ -197,6 +193,19 @@
   "Top": 0,
   "DisplayMode": "Primary",
   "Background": "#000000",
+  "PanelBackdrop": {
+    "Enabled": false,
+    "Opacity": 0.88,
+    "Gradient": "Two soft lights",
+    "FirstColor": "#345F9E",
+    "SecondColor": "#AD8930",
+    "FirstPosition": "Bottom left",
+    "SecondPosition": "Bottom right",
+    "Strength": 0.65,
+    "Image": "No image",
+    "ImageOpacity": 0.5,
+    "Blur": 12
+  },
   "Accent": "#FFFFFF",
   "ControlFill": "#16171B",
   "ControlBorder": "#303238",
@@ -217,6 +226,7 @@
   "VisibilityHotkeyKey": "H",
   "VisibilityHotkeyModifiers": "Ctrl+Alt",
   "CategoryStyle": "Dots",
+  "PanelNavigationStyle": "Dots",
   "LaunchStyle": "Icons",
   "BoldMediaTitle": true,
   "BoldHeadings": true,
@@ -293,10 +303,6 @@
       "Enabled": true
     },
     {
-      "Id": "links",
-      "Enabled": true
-    },
-    {
       "Id": "voice",
       "Enabled": false
     }
@@ -322,7 +328,6 @@
     "clips",
     "calendar",
     "awake",
-    "links",
     "closed",
     "ai"
   ],

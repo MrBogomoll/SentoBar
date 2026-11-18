@@ -19,13 +19,15 @@ public sealed partial class SettingsWindow
             var text=new StackPanel();var name=UI.Caption(title,14);name.FontFamily=SettingsTheme.Display;name.FontWeight=FontWeights.Bold;text.Children.Add(name);var hint=UI.Caption(detail,12,UI.Muted);hint.Margin=new(0,3,0,0);text.Children.Add(hint);Grid.SetColumn(text,1);content.Children.Add(text);
             button.Content=content;tiles.Children.Add(button);
         }
-        Tile("Change the look","Shape, colors and glow.","image","Appearance");
+        Tile("Dock colors & shape","Background and shape of the dock.","image","Appearance");
+        Tile("Dock content","Clock, Naby and music on the dock.","nav-media","ClosedDock");
+        Tile("Tabs & controls","Labels, dots, mouse and hover.","mouse","Controls");
+        Tile("Settings window","Light or dark theme for this window.","screen","WindowAppearance");
         Tile("Move or resize","Screen, edge and size.","screen","Layout");
         Tile("Auto-hide the dock","Stay out of the way of apps.","eye","Visibility");
         Tile("Pick your widgets","Show only what you use.","nav-tools","Content");
         Tile("Music & lyrics","What plays on the dock.","nav-media","Audio");
         Tile("Notifications","Alerts and quiet hours.","bell","Notifications");
-        Tile("Talk to Naby AI","Chat or voice assistant.","chat","AI");
         Tile("App & updates","Startup, language, updates.","nav-settings","Application");
         page.Children.Add(tiles);
         // Readiness of each feature follows the tasks, so newcomers see what to do first.

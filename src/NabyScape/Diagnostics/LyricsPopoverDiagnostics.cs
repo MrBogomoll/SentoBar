@@ -50,26 +50,43 @@ internal static class LyricsPopoverDiagnostics
         }
         try
         {
-            var trigger=Diagnostics.Descendants(view).OfType<Button>().Single(b=>AutomationProperties.GetName(b)=="Choose lyrics provider");
+            var trigger=Diagnostics.Descendants(view).OfType<Button>().Single(b=>AutomationProperties.GetName(b)==Localization.Text("Choose lyrics provider"));
             check("Lyrics footer has one compact disclosure instead of three competing actions",Diagnostics.Descendants(view).OfType<Button>().Count(b=>b.IsVisible)==1 && trigger.ActualHeight>=28);
             var credit=(TextBlock)typeof(LyricsView).GetField("credit",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(view)!;
             check("Lyrics status stays readable and inside the panel",credit.FontSize>=11 && credit.TransformToAncestor(view).Transform(new Point()).Y+credit.ActualHeight<=view.ActualHeight+1);
             Capture(view,"lyrics-empty");trigger.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(150);
             var control=Diagnostics.Descendants(view).OfType<LyricsSourcesControl>().Single();var popup=(Popup)typeof(LyricsSourcesControl).GetField("popup",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(control)!;
             var border=(Border)popup.Child;var viewport=(ScrollViewer)border.Child;
+            check("Lyrics popover reuses the dock's gradient material and glass field styles",border.Background is LinearGradientBrush &&
+                ReferenceEquals(border.TryFindResource(typeof(TextBox)),app.FindResource("GlassPanelInput")));
             var names=Diagnostics.Descendants(border).OfType<Button>().Select(b=>AutomationProperties.GetName(b)).ToArray();
-            check("Lyrics popover contains all fourteen requested provider choices",LyricsProviders.Names.All(names.Contains));
-            check("Automatic lyrics is available alongside all manual sources",names.Contains("Automatic"));
-            check("Lyrics writing system is available directly in the compact menu",names.Contains("Lyric text"));
-            check("Lyrics popover preserves Retry and Local LRC",names.Contains("Retry lyrics") && names.Contains("Local LRC…"));
+            check("Lyrics popover contains all fourteen requested provider choices",LyricsProviders.Names.Select(Localization.Text).All(names.Contains));
+            check("Automatic lyrics is available alongside all manual sources",names.Contains(Localization.Text("Automatic")));
+            check("Lyrics writing system is available directly in the compact menu",names.Contains(Localization.Text("Lyric text")));
+            check("Lyrics popover preserves Retry and Local LRC",names.Contains(Localization.Text("Retry lyrics")) && names.Contains(Localization.Text("Local LRC…")));
             check("Lyrics popover escapes the clipped panel and remains bounded",popup.IsOpen && border.ActualWidth<=280 && border.ActualHeight<=350 && viewport.ScrollableHeight>0);
             check("Lyrics popover holds the dock interaction open",LyricsSourcesControl.MenuOpen);
             Capture(border,"lyrics-provider-top");viewport.ScrollToEnd();await Task.Delay(80);Capture(border,"lyrics-provider-bottom");
             check("Provider list scrolls to its final actions",viewport.VerticalOffset>0);
-            Diagnostics.Descendants(border).OfType<Button>().Single(b=>AutomationProperties.GetName(b)=="Lyric text").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(60);viewport.ScrollToTop();await Task.Delay(30);
+            Diagnostics.Descendants(border).OfType<Button>().Single(b=>AutomationProperties.GetName(b)==Localization.Text("Lyric text")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(60);viewport.ScrollToTop();await Task.Delay(30);
             var modes=Diagnostics.Descendants(border).OfType<Button>().Select(b=>AutomationProperties.GetName(b)).ToArray();
-            check("Original and Japanese Romaji have explicit selectable labels",modes.Contains("Original") && modes.Contains("Japanese Romaji"));Capture(border,"lyrics-text-modes");
+            check("Original and Japanese Romaji have explicit selectable labels",modes.Contains(Localization.Text("Original")) && modes.Contains(Localization.Text("Japanese Romaji")));Capture(border,"lyrics-text-modes");
             popup.IsOpen=false;await Task.Delay(50);check("Closing lyrics menu releases the dock interaction guard",!LyricsSourcesControl.MenuOpen);
+            view.SetFixture(new LyricResult(LyricTiming.Parse("[00:00]Previous line\n[00:06]Current line\n[00:12]Next line"),"Synchronized lyrics · LRCLIB · Automatic"),8,180);
+            await Task.Delay(310);view.UpdateLayout();
+            check("Playing lyrics hide provider status from the reading area",credit.Visibility==Visibility.Collapsed &&
+                Diagnostics.Descendants(view).OfType<TextBlock>().Any(t=>t.IsVisible && t.Text=="Current line"));
+            Rect Bounds(string text)
+            {
+                var block=Diagnostics.Descendants(view).OfType<TextBlock>().First(t=>t.IsVisible && t.Text==text);
+                return block.TransformToAncestor(view).TransformBounds(new Rect(block.RenderSize));
+            }
+            var previous=Bounds("Previous line");var current=Bounds("Current line");var next=Bounds("Next line");
+            double previousGap=current.Top-previous.Bottom,nextGap=next.Top-current.Bottom;
+            check($"Synced lyrics keep adjacent lines close to the larger active line ({previousGap:F1}, {nextGap:F1})",
+                previousGap is >=4 and <=8 && nextGap is >=4 and <=8 &&
+                current.Height>previous.Height && current.Height>next.Height);
+            Capture(view,"lyrics-reading-area");
         }
         finally{host.Close();}
     }

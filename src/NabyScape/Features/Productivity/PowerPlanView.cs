@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,8 +20,10 @@ internal sealed class PowerPlanView : StackPanel
     private readonly TextBlock status=UI.Text("",12,UI.Muted);
     private readonly Button apply,refresh;
     private CancellationTokenSource? lifetime;
-    internal PowerPlanView()
+    private readonly Action reflow;
+    internal PowerPlanView(Action reflow)
     {
+        this.reflow=reflow;
         Children.Add(UI.Heading(Localization.Text("Power plan"),19));Children.Add(UI.Text(Localization.Text("Choose from the power plans available on this PC."),12,UI.Muted));
         UI.Named(choices,Localization.Text("Available Windows power plans"));Children.Add(choices);
         apply=UI.Button(Localization.Text("Apply power plan"),async()=>await Apply());refresh=UI.Button(Localization.Text("Refresh plans"),async()=>await Refresh());Children.Add(apply);Children.Add(refresh);Children.Add(status);
@@ -35,10 +39,28 @@ internal sealed class PowerPlanView : StackPanel
         }
         return plans.ToArray();
     }
+    [DllImport("kernel32.dll")]
+    private static extern uint GetOEMCP();
+
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerReadFriendlyName(IntPtr root,in Guid scheme,IntPtr subgroup,IntPtr setting,[Out] byte[]? name,ref uint size);
+
+    private static string ReadPlanName(PowerPlan plan)
+    {
+        uint size=0;
+        if(PowerReadFriendlyName(IntPtr.Zero,plan.Id,IntPtr.Zero,IntPtr.Zero,null,ref size)!=0 || size is <2 or >65536)return plan.Name;
+        var buffer=new byte[size];
+        if(PowerReadFriendlyName(IntPtr.Zero,plan.Id,IntPtr.Zero,IntPtr.Zero,buffer,ref size)!=0)return plan.Name;
+        string name=Encoding.Unicode.GetString(buffer,0,(int)size).TrimEnd('\0');
+        return string.IsNullOrWhiteSpace(name) || name.StartsWith('@')?plan.Name:name;
+    }
+
     private static async Task<string> Run(string argument,CancellationToken token)
     {
         using var timeout=CancellationTokenSource.CreateLinkedTokenSource(token);timeout.CancelAfter(TimeSpan.FromSeconds(8));
-        using var process=new Process{StartInfo=new(){FileName=System.IO.Path.Combine(Environment.SystemDirectory,"powercfg.exe"),Arguments=argument,UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true}};
+        int codePage=(int)GetOEMCP();
+        var encoding=CodePagesEncodingProvider.Instance.GetEncoding(codePage)??Encoding.UTF8;
+        using var process=new Process{StartInfo=new(){FileName=System.IO.Path.Combine(Environment.SystemDirectory,"powercfg.exe"),Arguments=argument,UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=encoding,StandardErrorEncoding=encoding}};
         process.Start();
         try
         {
@@ -56,12 +78,13 @@ internal sealed class PowerPlanView : StackPanel
         try
         {
             var plans=Parse(await Run("/list",lifetime.Token));if(lifetime.IsCancellationRequested)return;
+            for(int i=0;i<plans.Length;i++)plans[i]=plans[i] with{Name=ReadPlanName(plans[i])};
             choices.ItemsSource=plans;choices.SelectedItem=Array.Find(plans,p=>p.Active);if(choices.SelectedIndex<0 && plans.Length>0)choices.SelectedIndex=0;
             status.Text=plans.Length==0?Localization.Text("No selectable plans were returned by Windows."):plans.Length==1?Localization.Text("This PC exposes one power plan. Additional power modes may be managed by Windows or your manufacturer."):Localization.Text("Select a plan, then Apply. Changes affect the whole PC.");
         }
         catch(OperationCanceledException){if(!lifetime.IsCancellationRequested)status.Text=Localization.Text("Windows took too long to respond. Try Refresh.");}
         catch(Exception ex){if(!lifetime.IsCancellationRequested)status.Text=ex.Message;}
-        finally{Busy(false);}
+        finally{Busy(false);if(IsVisible)reflow();}
     }
     private async Task Apply()
     {
@@ -69,6 +92,6 @@ internal sealed class PowerPlanView : StackPanel
         try{await Run("/setactive "+selected.Id.ToString("D"),lifetime.Token);if(lifetime.IsCancellationRequested)return;await Refresh();status.Text=Localization.Text("Applied · ")+selected.Name;}
         catch(OperationCanceledException){if(!lifetime.IsCancellationRequested)status.Text=Localization.Text("Change timed out. Refresh to check the active plan.");}
         catch(Exception ex){if(!lifetime.IsCancellationRequested)status.Text=Localization.Text("Not applied · ")+ex.Message;}
-        finally{Busy(false);}
+        finally{Busy(false);if(IsVisible)reflow();}
     }
 }

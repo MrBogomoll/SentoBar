@@ -18,17 +18,19 @@ internal static class SettingsPalette
     }
     internal static void BindTree(DependencyObject root)
     {
-        if((bool)root.GetValue(PreserveProperty))return;
         if(root is FrameworkElement element)BindElement(element);
+        if((bool)root.GetValue(PreserveProperty))return;
         foreach(var child in LogicalTreeHelper.GetChildren(root))if(child is DependencyObject node)BindTree(node);
     }
     private static void OnLoaded(object sender,RoutedEventArgs args)
     {
-        if(sender is not FrameworkElement element || (bool)element.GetValue(PreserveProperty) || Window.GetWindow(element) is not (SettingsWindow or WelcomeWindow))return;
+        if(sender is not FrameworkElement element || Window.GetWindow(element) is not (SettingsWindow or WelcomeWindow))return;
         BindElement(element);
     }
     private static void BindElement(FrameworkElement element)
     {
+        if(ToolTipService.GetIsEnabled(element))ToolTipService.SetIsEnabled(element,false);
+        if((bool)element.GetValue(PreserveProperty))return;
         if(element is Button primary && (bool)primary.GetValue(UI.PrimaryActionProperty))
         {
             primary.SetResourceReference(Control.BackgroundProperty,"SettingsPrimaryFill");primary.SetResourceReference(Control.ForegroundProperty,"SettingsPrimaryText");primary.SetResourceReference(Control.BorderBrushProperty,"SettingsPrimaryBorder");primary.BorderThickness=new Thickness(1);
@@ -100,7 +102,7 @@ internal static class SettingsPalette
         }
         glass.Freeze();d["SettingsCanvas"]=glass;
         d["SettingsRowPadding"]=s.WindowCompact?new Thickness(18,5,16,5):new Thickness(20,10,18,10);
-        Add("PopupFill",light?"#F7F7F7":"#303030");Add("SettingsFooter",light?"#20FFFFFF":"#12000000");
+        Add("PopupFill",light?"#F7F7F7":"#303030");d["MenuBorder"]=d["ControlBorder"];Add("SettingsFooter",light?"#20FFFFFF":"#12000000");
         Add("SettingsCaption",light?"#40FFFFFF":"#25000000");
         if(Accessibility.HighContrast)
         {
@@ -109,6 +111,7 @@ internal static class SettingsPalette
             d["Accent"]=d["CheckedFill"]=d["SettingsSelected"]=d["SelectionFill"]=SystemColors.HighlightBrush;
             d["SettingsPrimaryFill"]=SystemColors.HighlightBrush;d["SettingsPrimaryText"]=SystemColors.HighlightTextBrush;d["SettingsPrimaryBorder"]=SystemColors.WindowTextBrush;d["SettingsMapFill"]=SystemColors.WindowBrush;d["SettingsMapGuide"]=SystemColors.WindowTextBrush;
             d["AccentText"]=d["CheckedText"]=d["SettingsSelectedText"]=d["SelectionText"]=SystemColors.HighlightTextBrush;
+            d["PopupFill"]=SystemColors.WindowBrush;d["MenuBorder"]=SystemColors.WindowTextBrush;
         }
         return d;
     }
