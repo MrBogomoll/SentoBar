@@ -116,7 +116,7 @@ public sealed partial class OverlayWindow
         var selectedHeader=new DockPanel();var close=Icons.Button("x",Localization.Text("Close clipboard selection"),()=>{selectedClipId=null;RefreshTools();ResizeToolPanel();},false,24);close.Background=Brushes.Transparent;close.Margin=new(0);DockPanel.SetDock(close,Dock.Right);selectedHeader.Children.Add(close);selectedHeader.Children.Add(UI.Text(Localization.Format("Selected {0}",Localization.Text(detail.Kind.ToString())),10,UI.Muted));selectedTools.Children.Add(selectedHeader);
         selectedTools.Children.Add(actions);selectedTools.Children.Add(status);
         var selectedBar=new Border{Child=selectedTools,BorderThickness=new(.7),CornerRadius=new(10),Padding=new(9,5,9,5),Margin=new(0,7,0,5)};
-        selectedBar.SetResourceReference(Border.BackgroundProperty,"GlassControlFill");
+        selectedBar.SetResourceReference(Border.BackgroundProperty,"GlassFieldFill");
         selectedBar.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
         UI.Named(selectedBar,Localization.Text("Clipboard selection actions"));
         panel.Children.Insert(panel.Children.IndexOf(clipboardScroll),selectedBar);selectedBar.SizeChanged+=(_,_)=>{if(clipboardHeader==panel){SizeClipboardViewport();Dispatcher.BeginInvoke(()=>{if(expanded && toolsMode=="clips")ResizeToolPanel();});}};SizeClipboardViewport();

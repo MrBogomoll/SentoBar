@@ -473,7 +473,9 @@ public sealed partial class OverlayWindow
             app.ChangeSettings();
             PromotePeek();
             UpdatePeekDeck();
-        },true);
+        });
+        GlassDockAppearance.Emphasize(done);
+        done.FontWeight=FontWeights.SemiBold;
         void Validate()=>done.IsEnabled=duration.Seconds>0 && (rest==null || rest.Seconds>0);
         duration.Changed+=Validate;
         if(rest!=null)rest.Changed+=Validate;

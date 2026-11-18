@@ -23,15 +23,17 @@ internal static class UI
     private static (string Background,string Tint) popupColors;
     private static Brush? popupMaterial;
     public static void ApplyControlTheme(Settings settings)
-    {if(Application.Current==null)return;GlassDockAppearance.UpdateControlColors(settings);if(Accessibility.HighContrast){ResourceBrush("ControlFill",SystemColors.WindowBrush);ResourceBrush("ControlBorder",SystemColors.WindowTextBrush);ResourceBrush("PopupFill",SystemColors.WindowBrush);ResourceBrush("PopupText",SystemColors.WindowTextBrush);ResourceBrush("MenuBorder",SystemColors.WindowTextBrush);ResourceBrush("ControlText",SystemColors.WindowTextBrush);ResourceBrush("SelectionFill",SystemColors.HighlightBrush);ResourceBrush("SelectionText",SystemColors.HighlightTextBrush);ResourceBrush("Accent",SystemColors.HighlightBrush);ResourceBrush("AccentText",SystemColors.HighlightTextBrush);ResourceBrush("CheckedFill",SystemColors.HighlightBrush);ResourceBrush("CheckedText",SystemColors.HighlightTextBrush);ResourceBrush("SwitchKnob",SystemColors.WindowTextBrush);ResourceBrush("TrackFill",SystemColors.WindowTextBrush);ResourceBrush("ProgressFill",SystemColors.HighlightBrush);ResourceBrush("ProgressTrack",SystemColors.WindowBrush);return;}
+    {if(Application.Current==null)return;GlassDockAppearance.UpdateControlColors(settings);if(Accessibility.HighContrast){ResourceBrush("ControlFill",SystemColors.WindowBrush);ResourceBrush("ControlBorder",SystemColors.WindowTextBrush);ResourceBrush("PopupFill",SystemColors.WindowBrush);ResourceBrush("PopupText",SystemColors.WindowTextBrush);ResourceBrush("PopupActiveText",SystemColors.HighlightTextBrush);ResourceBrush("MenuBorder",SystemColors.WindowTextBrush);ResourceBrush("ControlText",SystemColors.WindowTextBrush);ResourceBrush("SelectionFill",SystemColors.HighlightBrush);ResourceBrush("SelectionText",SystemColors.HighlightTextBrush);ResourceBrush("Accent",SystemColors.HighlightBrush);ResourceBrush("AccentText",SystemColors.HighlightTextBrush);ResourceBrush("CheckedFill",SystemColors.HighlightBrush);ResourceBrush("CheckedText",SystemColors.HighlightTextBrush);ResourceBrush("SwitchKnob",SystemColors.WindowTextBrush);ResourceBrush("TrackFill",SystemColors.WindowTextBrush);ResourceBrush("ProgressFill",SystemColors.HighlightBrush);ResourceBrush("ProgressTrack",SystemColors.WindowBrush);return;}
         var colors=(settings.Background,settings.PanelBackdrop.Enabled?settings.PanelBackdrop.SecondColor:settings.ControlBorder);
         if(popupColors!=colors || popupMaterial==null)
         {
             popupColors=colors;
-            popupMaterial=GlassDockAppearance.Material(Brush(popupColors.Background).Color,Brush(popupColors.Tint).Color,.93);
+            popupMaterial=GlassDockAppearance.Material(Brush(popupColors.Background).Color,Brush(popupColors.Tint).Color);
         }
         ResourceBrush("PopupFill",popupMaterial);
-        ResourceBrush("PopupText",ContrastText(settings.Background));
+        var popupText=ContrastText(settings.Background);
+        ResourceBrush("PopupText",popupText);
+        ResourceBrush("PopupActiveText",popupText);
         ResourceBrush("MenuBorder",settings.ControlBorder.Equals("#303238",StringComparison.OrdinalIgnoreCase)?UI.Brush("#536781"):UI.Brush(settings.ControlBorder));
         foreach(var entry in new[]{("ControlFill",settings.ControlFill),("ControlBorder",settings.ControlBorder),("SelectionFill",settings.SelectionFill.Equals("#34373E",StringComparison.OrdinalIgnoreCase)?"#303B4D":settings.SelectionFill)})ResourceBrush(entry.Item1,Brush(entry.Item2));ResourceBrush("ControlText",ContrastText(settings.ControlFill));ResourceBrush("SelectionText",ContrastText(settings.SelectionFill));ResourceBrush("CheckedText",Brush(settings.ControlFill)); }
     public static readonly Brush Muted=Brush("#A6ABB4");

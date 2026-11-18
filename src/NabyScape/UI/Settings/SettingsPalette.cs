@@ -114,6 +114,10 @@ internal static class SettingsPalette
             d["PopupFill"]=SystemColors.WindowBrush;d["MenuBorder"]=SystemColors.WindowTextBrush;
         }
         d["PopupText"]=d["ControlText"];
+        d["PopupActiveText"]=d["SelectionText"];
+        d["PopupHoverFill"]=Accessibility.HighContrast?SystemColors.HighlightBrush:d["HoverOverlay"];
+        d["PopupFocusBorder"]=d["MenuBorder"];
+        d["GlassEmphasisFill"]=d["SelectionFill"];
         return d;
     }
 }

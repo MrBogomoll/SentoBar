@@ -9,7 +9,11 @@ internal static class Stage5Tests
         var watch=new StopwatchState();watch.UseClock(()=>wall,()=>steady);watch.Toggle();
         steady+=65000;wall=wall.AddSeconds(-100);
         test("running elapsed uses monotonic time across backwards wall clock",watch.Elapsed==65 && watch.Display=="01:05");
+        steady+=480;
+        test("stopwatch schedules the next whole second from the elapsed clock",watch.UntilDisplayChanges() is {TotalMilliseconds:>=520 and <=521});
+        steady-=480;
         watch.Toggle();steady+=4000;wall=wall.AddHours(1);test("pause freezes elapsed across sleep",watch.Elapsed==65 && !watch.Running);
+        test("paused stopwatch has no scheduled display update",watch.UntilDisplayChanges()==null);
         watch.Toggle();steady+=3600000;wall=wall.AddHours(1);watch.Checkpoint();
         test("uptime includes sleep while running and formats hours",watch.Elapsed==3665 && watch.Display=="1:01:05");
         var json=JsonSerializer.Serialize(watch);var recovered=JsonSerializer.Deserialize<StopwatchState>(json)!;

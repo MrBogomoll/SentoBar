@@ -42,6 +42,14 @@ internal static class GlassDockAppearance
         host.Resources["TaskToggle"]=host.FindResource("GlassPanelTaskToggle");
     }
 
+    internal static void Emphasize(Button button)
+    {
+        button.SetResourceReference(Button.BackgroundProperty,"GlassEmphasisFill");
+        button.SetResourceReference(Button.ForegroundProperty,"GlassEmphasisText");
+        button.SetResourceReference(Button.BorderBrushProperty,"GlassFieldHover");
+        button.BorderThickness=new Thickness(1);
+    }
+
     internal static void UpdateControlColors(Settings settings)
     {
         string fill=settings.ControlFill.Equals("#16171B",StringComparison.OrdinalIgnoreCase)?"#263244":settings.ControlFill;
@@ -56,6 +64,12 @@ internal static class GlassDockAppearance
         var surface=customTint?UI.Brush(Color.FromArgb(28,tint.R,tint.G,tint.B).ToString()):Brushes.Transparent;
         var ink=(SolidColorBrush)UI.ContrastText((customTint?Blend(panel,tint,28d/255):panel).ToString());
         var outline=UI.Brush(border).Color;
+        var selection=settings.SelectionFill.Equals("#34373E",StringComparison.OrdinalIgnoreCase)
+            ?outline:UI.Brush(settings.SelectionFill).Color;
+        UI.ResourceBrush("GlassEmphasisFill",Accessibility.HighContrast?SystemColors.HighlightBrush:UI.Brush(Color.FromArgb(56,selection.R,selection.G,selection.B).ToString()));
+        UI.ResourceBrush("GlassEmphasisText",Accessibility.HighContrast?SystemColors.HighlightTextBrush:ink);
+        UI.ResourceBrush("PopupHoverFill",Accessibility.HighContrast?SystemColors.HighlightBrush:UI.Brush(Color.FromArgb(22,outline.R,outline.G,outline.B).ToString()));
+        UI.ResourceBrush("PopupFocusBorder",Accessibility.HighContrast?SystemColors.WindowTextBrush:UI.Brush(Blend(outline,ink.Color,.35).ToString()));
         UI.ResourceBrush("GlassFieldFill",Accessibility.HighContrast?SystemColors.WindowBrush:surface);
         UI.ResourceBrush("GlassFieldText",Accessibility.HighContrast?SystemColors.WindowTextBrush:ink);
         UI.ResourceBrush("GlassFieldHover",Accessibility.HighContrast?SystemColors.WindowTextBrush:UI.Brush(Blend(outline,ink.Color,.3).ToString()));
@@ -64,14 +78,14 @@ internal static class GlassDockAppearance
 
     internal static double Radius(double radius)=>radius>0?radius+10:0;
 
-    internal static LinearGradientBrush Material(Color background,Color light,double opacity=1)
+    internal static LinearGradientBrush Material(Color background,Color light)
     {
         bool standard=background==Colors.Black;
         var top=standard?Color.FromRgb(0x15,0x1a,0x23):background;
         var baseColor=standard?Color.FromRgb(0x17,0x1c,0x25):background;
         Color bottom=light.A==0?baseColor:Blend(baseColor,light,HasColor(light)?.13:.045);
         var brush=new LinearGradientBrush(new GradientStopCollection{new(top,0),new(top,.28),new(bottom,1)},new Point(.5,0),new Point(.5,1));
-        brush.Opacity=opacity;brush.Freeze();
+        brush.Freeze();
         return brush;
     }
 

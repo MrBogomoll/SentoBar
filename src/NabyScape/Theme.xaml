@@ -4,6 +4,11 @@
   <LinearGradientBrush x:Key="PopupFill" StartPoint="0.5,0" EndPoint="0.5,1">
     <GradientStop Color="#151A23" Offset="0"/><GradientStop Color="#222E40" Offset="1"/>
   </LinearGradientBrush>
+  <SolidColorBrush x:Key="GlassEmphasisFill" Color="#38536781"/>
+  <SolidColorBrush x:Key="GlassEmphasisText" Color="#F4F7FC"/>
+  <SolidColorBrush x:Key="PopupHoverFill" Color="#16536781"/>
+  <SolidColorBrush x:Key="PopupFocusBorder" Color="#8598B5"/>
+  <SolidColorBrush x:Key="PopupActiveText" Color="#F4F7FC"/>
   <SolidColorBrush x:Key="MenuBorder" Color="#536781"/>
   <SolidColorBrush x:Key="PopupText" Color="#F4F7FC"/>
   <SolidColorBrush x:Key="GlassFieldFill" Color="Transparent"/>
@@ -17,7 +22,36 @@
   <SolidColorBrush x:Key="ProgressFill" Color="#FFFFFF"/><SolidColorBrush x:Key="ProgressTrack" Color="#3A3A3C"/>
   <SolidColorBrush x:Key="ControlText" Color="#FFFFFF"/><SolidColorBrush x:Key="SelectionText" Color="#FFFFFF"/>
   <SolidColorBrush x:Key="ControlFill" Color="#16171B"/><SolidColorBrush x:Key="ControlBorder" Color="#303238"/><SolidColorBrush x:Key="SelectionFill" Color="#303B4D"/>
-  <Style TargetType="MenuItem"><Setter Property="Foreground" Value="{DynamicResource PopupText}"/><Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="10,8"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem"><Border x:Name="MenuFrame" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="7"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Path x:Name="CheckMark" Data="M1,6 L5,10 13,2" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.5" Width="12" Height="10" Stretch="Uniform" Visibility="Hidden"/><ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center"/></Grid></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="MenuFrame" Property="Background" Value="{DynamicResource SelectionFill}"/><Setter Property="Foreground" Value="{DynamicResource SelectionText}"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+  <Style TargetType="MenuItem">
+    <Setter Property="Foreground" Value="{DynamicResource PopupText}"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Padding" Value="10,8"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="MenuItem">
+          <Border x:Name="MenuFrame" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"
+                  BorderThickness="1" BorderBrush="Transparent" CornerRadius="8">
+            <Grid>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Path x:Name="CheckMark" Data="M1,6 L5,10 13,2" Stroke="{TemplateBinding Foreground}"
+                    StrokeThickness="1.5" Width="12" Height="10" Stretch="Uniform" Visibility="Hidden"/>
+              <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center"/>
+            </Grid>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="MenuFrame" Property="Background" Value="{DynamicResource PopupHoverFill}"/>
+              <Setter TargetName="MenuFrame" Property="BorderBrush" Value="{DynamicResource PopupFocusBorder}"/>
+              <Setter Property="Foreground" Value="{DynamicResource PopupActiveText}"/>
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True"><Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".4"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
   <Style TargetType="Window"><Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI"/><Setter Property="FontSize" Value="13"/><Setter Property="Foreground" Value="{DynamicResource ControlText}"/><Setter Property="Background" Value="#000000"/></Style>
 <Style x:Key="KeyboardFocusOutline" TargetType="Control"><Setter Property="Template"><Setter.Value><ControlTemplate><Border Margin="2" CornerRadius="8" BorderThickness="2" BorderBrush="{DynamicResource Accent}" IsHitTestVisible="False"/></ControlTemplate></Setter.Value></Setter></Style>
   <Style TargetType="Button">
@@ -28,6 +62,31 @@
       <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, TargetNullValue=8}"><Grid><Border x:Name="HoverFill" Background="{DynamicResource HoverOverlay}" Opacity="0" IsHitTestVisible="False" CornerRadius="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, TargetNullValue=8}"/><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/></Grid></Border>
       <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="HoverFill" Property="Opacity" Value="1"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Frame" Property="Opacity" Value="0.92"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Frame" Property="Opacity" Value="0.4"/></Trigger></ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="GlassMenuRow" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource PopupText}"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Frame" CornerRadius="8" BorderThickness="1" BorderBrush="{TemplateBinding BorderBrush}"
+                  Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Frame" Property="Background" Value="{DynamicResource PopupHoverFill}"/>
+              <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource PopupFocusBorder}"/>
+              <Setter Property="Foreground" Value="{DynamicResource PopupActiveText}"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource PopupFocusBorder}"/></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".4"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
   <Style TargetType="TextBox"><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusOutline}"/>
     <Setter Property="Background" Value="{DynamicResource ControlFill}"/><Setter Property="Foreground" Value="{DynamicResource ControlText}"/><Setter Property="CaretBrush" Value="{DynamicResource ControlText}"/>
@@ -84,7 +143,34 @@
       </Track></Grid><ControlTemplate.Triggers><Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Opacity" Value="0.8"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger></ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value></Setter>
   </Style>
-  <Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="{DynamicResource PopupText}"/><Setter Property="Padding" Value="10,8"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Border x:Name="Item" Padding="{TemplateBinding Padding}" Background="Transparent" CornerRadius="8" BorderThickness="1" BorderBrush="Transparent"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource SelectionFill}"/><Setter TargetName="Item" Property="BorderBrush" Value="{DynamicResource MenuBorder}"/><Setter Property="Foreground" Value="{DynamicResource SelectionText}"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource SelectionFill}"/><Setter TargetName="Item" Property="BorderBrush" Value="{DynamicResource MenuBorder}"/><Setter Property="Foreground" Value="{DynamicResource SelectionText}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+  <Style TargetType="ComboBoxItem">
+    <Setter Property="Foreground" Value="{DynamicResource PopupText}"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Padding" Value="10,8"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ComboBoxItem">
+          <Border x:Name="Item" Padding="{TemplateBinding Padding}" Background="Transparent" CornerRadius="8" BorderThickness="1" BorderBrush="Transparent">
+            <ContentPresenter/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="Item" Property="Background" Value="{DynamicResource PopupHoverFill}"/>
+              <Setter TargetName="Item" Property="BorderBrush" Value="{DynamicResource PopupFocusBorder}"/>
+              <Setter Property="Foreground" Value="{DynamicResource PopupActiveText}"/>
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Item" Property="Background" Value="{DynamicResource GlassEmphasisFill}"/>
+              <Setter TargetName="Item" Property="BorderBrush" Value="{DynamicResource MenuBorder}"/>
+              <Setter Property="Foreground" Value="{DynamicResource PopupActiveText}"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Item" Property="BorderBrush" Value="{DynamicResource PopupFocusBorder}"/></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".4"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
   <Style TargetType="ComboBox"><Setter Property="Background" Value="{DynamicResource ControlFill}"/><Setter Property="BorderBrush" Value="{DynamicResource ControlBorder}"/><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusOutline}"/><Setter Property="Margin" Value="0,4,0,8"/><Setter Property="MinHeight" Value="34"/><Setter Property="Foreground" Value="{DynamicResource ControlText}"/><Setter Property="FontSize" Value="12"/>
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox"><Grid>
       <ToggleButton Focusable="False" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" Foreground="{TemplateBinding Foreground}" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" ClickMode="Press"><ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8"><Path Data="M1,1 L4,4 7,1" Width="7" Height="4" Stroke="{TemplateBinding Foreground}" Opacity="0.65" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Margin="0,0,13,0" HorizontalAlignment="Right" VerticalAlignment="Center"/></Border></ControlTemplate></ToggleButton.Template></ToggleButton>

@@ -207,7 +207,6 @@ public sealed partial class App : Application
             if(NotificationPolicy.Quiet(Settings,DateTimeOffset.UtcNow) && Notifications.Count>0 && Notifications.Current?.Kind!="preview" && !(Notifications.Current?.Kind=="external" && Settings.ExternalNotificationQuietHours))Notifications.Clear();else Notifications.Tick(DateTimeOffset.UtcNow,overlay.NotificationBusy,Settings.NotificationSeconds);
             try{Awake.Tick(DateTimeOffset.UtcNow);}catch(Exception ex){Store.Log(ex);Notify(Localization.Text("Could not update keep awake"),ex.Message);}
             var changed=RuntimeChange.Clock;
-            if(Session.Stopwatch.Running)changed|=RuntimeChange.Countdown;
             if(++counter%2==0)
             {
                 Audio.Poll();Audio.TrimIdleMedia();bool system=overlay.SystemSummaryVisible || Previews.AnyVisible("system") || settingsWindow?.NeedsSystemSample==true;
@@ -246,6 +245,8 @@ public sealed partial class App : Application
         var timer=Session.Timer.UntilDisplayChanges(now);
         var focus=Session.Focus.UntilDisplayChanges(now);
         var next=timer.HasValue && focus.HasValue?(timer.Value<focus.Value?timer:focus):timer??focus;
+        var stopwatch=Session.Stopwatch.UntilDisplayChanges();
+        if(stopwatch.HasValue && (!next.HasValue || stopwatch.Value<next.Value))next=stopwatch;
         if(!next.HasValue)return;
         countdownTick.Interval=TimeSpan.FromTicks(Math.Max(TimeSpan.TicksPerMillisecond,next.Value.Ticks));
         countdownTick.Start();

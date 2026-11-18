@@ -20,6 +20,7 @@ internal static class VoiceLayoutDiagnostics
     internal static async Task Run(App app,OverlayWindow island,string directory,Action<string,bool> check)
     {
         var ai=app.Assistant;var settings=app.Settings;var evidence=new List<string>();
+        settings.UiLanguage="en";Localization.Configure(settings);
         void Set(string name,object? value)=>typeof(AssistantRuntime).GetField(name,Fields)!.SetValue(ai,value);
         T Field<T>(object target,string name)=>(T)target.GetType().GetField(name,Fields)!.GetValue(target)!;
         void Invoke(object target,string method)=>target.GetType().GetMethod(method,Fields)!.Invoke(target,null);

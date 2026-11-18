@@ -300,7 +300,7 @@ internal static class PanelPolishDiagnostics
         check("Clipboard history tiles use the shared glass fill and border",
             Diagnostics.Descendants(Field<ScrollViewer>("clipboardScroll")).OfType<Border>()
                 .Any(b=>b.Child is Grid tile && tile.Children.OfType<TextBlock>().Any(t=>t.Text.StartsWith("Clipboard entry ",StringComparison.Ordinal))
-                    && Equals(b.Background,glassFill) && Equals(b.BorderBrush,island.FindResource("GlassControlBorder"))));
+                    && Equals(b.Background,island.FindResource("GlassFieldFill")) && Equals(b.BorderBrush,island.FindResource("GlassControlBorder"))));
         foreach(double width in new[]{526d,300d})
         {
             s.PanelWidth=width;app.ChangeSettings();await Settle();

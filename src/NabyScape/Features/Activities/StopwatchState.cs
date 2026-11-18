@@ -25,6 +25,12 @@ public sealed class StopwatchState
     }
     [JsonIgnore] public double Elapsed {get{Recover();return ElapsedSeconds+(Running?Math.Max(0,(monotonic()-stamp)/1000d):0);}}
     [JsonIgnore] public string Display {get{var seconds=Math.Floor(Elapsed);long total=(long)Math.Min(seconds,long.MaxValue/2);return total>=3600?$"{total/3600}:{total/60%60:00}:{total%60:00}":$"{total/60:00}:{total%60:00}";}}
+    internal TimeSpan? UntilDisplayChanges()
+    {
+        if(!Running)return null;
+        double elapsed=Elapsed;
+        return TimeSpan.FromMilliseconds(Math.Ceiling((Math.Floor(elapsed)+1-elapsed)*1000));
+    }
     public void Checkpoint(){ElapsedSeconds=Elapsed;stamp=monotonic();UtcAnchor=Running?utc():null;}
     public void Toggle(){Checkpoint();Running=!Running;UtcAnchor=Running?utc():null;}
     public void Reset(){ElapsedSeconds=0;Running=false;UtcAnchor=null;stamp=monotonic();recovered=true;}
@@ -44,8 +50,12 @@ internal sealed class StopwatchView : StackPanel
         var reset=UI.Button(Localization.Text("Reset"),()=>{app.Session.Stopwatch.Reset();app.SaveSession();});UI.Named(reset,Localization.Text("Reset stopwatch"));
         foreach(var button in new[]{toggle,reset}){button.FontSize=11;button.Padding=new(9,4,9,4);button.MinHeight=30;button.ToolTip=Localization.Text("Tab to select; Space or Enter to activate");}
         Children.Add(UI.Row(toggle,reset));
-        IsVisibleChanged+=(_,_)=>{app.Updated-=Refresh;if(IsVisible){app.Updated+=Refresh;Refresh();}};
+        IsVisibleChanged+=(_,_)=>{app.Updated-=OnUpdated;if(IsVisible){app.Updated+=OnUpdated;Refresh();}};
         Refresh();
+    }
+    private void OnUpdated()
+    {
+        if((app.CurrentUpdate & (RuntimeChange.Countdown|RuntimeChange.Settings))!=0)Refresh();
     }
     private void Refresh(){if(Window.GetWindow(this)?.WindowState==WindowState.Minimized)return;Refreshes++;digits.Text=app.Session.Stopwatch.Display;toggle.Content=app.Session.Stopwatch.Running?Localization.Text("Pause"):app.Session.Stopwatch.Elapsed>0?Localization.Text("Resume"):Localization.Text("Start");}
 }

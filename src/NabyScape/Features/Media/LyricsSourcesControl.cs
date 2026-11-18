@@ -69,23 +69,24 @@ internal sealed class LyricsSourcesControl : StackPanel
     private Button Row(string name,string detail,Action click,bool selected=false)
     {
         var button=UI.Button(name,click);
+        button.SetResourceReference(FrameworkElement.StyleProperty,"GlassMenuRow");
         button.Margin=new(0,1,0,1);button.Padding=new(8,5,8,5);button.Tag=new CornerRadius(8);
         button.MinHeight=32;button.BorderThickness=new(0);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;
-        button.Background=Brushes.Transparent;
         var row=new DockPanel();
         if(selected)
         {
-            button.SetResourceReference(Control.BackgroundProperty,"SelectionFill");
+            button.SetResourceReference(Control.BackgroundProperty,"GlassEmphasisFill");
+            button.SetResourceReference(Control.BorderBrushProperty,"MenuBorder");
+            button.SetResourceReference(Control.ForegroundProperty,"PopupActiveText");
             System.Windows.Automation.AutomationProperties.SetItemStatus(button,Localization.Text("Selected"));
-            var check=UI.Text("✓",13);check.SetResourceReference(TextBlock.ForegroundProperty,"SelectionText");
+            var check=UI.Text("✓",13);check.ClearValue(TextBlock.ForegroundProperty);
             check.Width=20;DockPanel.SetDock(check,Dock.Right);row.Children.Add(check);
         }
         var labels=new StackPanel();
-        string ink=selected?"SelectionText":"PopupText";
-        var title=UI.Text(name,12);title.SetResourceReference(TextBlock.ForegroundProperty,ink);labels.Children.Add(title);
+        var title=UI.Text(name,12);title.ClearValue(TextBlock.ForegroundProperty);labels.Children.Add(title);
         if(detail.Length>0)
         {
-            var caption=UI.Text(detail,10);caption.SetResourceReference(TextBlock.ForegroundProperty,ink);caption.Opacity=.76;labels.Children.Add(caption);
+            var caption=UI.Text(detail,10);caption.ClearValue(TextBlock.ForegroundProperty);caption.Opacity=.76;labels.Children.Add(caption);
         }
         row.Children.Add(labels);button.Content=row;menu.Children.Add(button);return button;
     }

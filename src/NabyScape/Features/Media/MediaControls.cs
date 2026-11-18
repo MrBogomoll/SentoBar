@@ -72,7 +72,7 @@ internal sealed class MediaControls : Grid
     {
         if(IsOpen && kind==next){Close();return;}
         Close(false);kind=next;anchor=next=="source"?source:level;
-        anchor.SetResourceReference(Control.BackgroundProperty,"SelectionFill");AutomationProperties.SetItemStatus(anchor,Localization.Text("Expanded"));
+        anchor.SetResourceReference(Control.BackgroundProperty,"GlassEmphasisFill");AutomationProperties.SetItemStatus(anchor,Localization.Text("Expanded"));
         if(next=="volume")popover.Child=volumeContent();
         else
         {
@@ -82,15 +82,19 @@ internal sealed class MediaControls : Grid
             foreach(var item in choices)
             {
                 var button=UI.Button(Localization.Text("Use media source ")+item.Name,()=>{Close(false);item.Select();source.Focus();});button.Padding=new(6);button.Margin=new(0);button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.BorderThickness=new(0);
+                button.SetResourceReference(FrameworkElement.StyleProperty,"GlassMenuRow");
                 bool isSelected=item.Id==selected();
-                if(isSelected)button.SetResourceReference(Control.BackgroundProperty,"SelectionFill");
-                else button.Background=Brushes.Transparent;
-                string ink=isSelected?"SelectionText":"PopupText";
+                if(isSelected)
+                {
+                    button.SetResourceReference(Control.BackgroundProperty,"GlassEmphasisFill");
+                    button.SetResourceReference(Control.BorderBrushProperty,"MenuBorder");
+                    button.SetResourceReference(Control.ForegroundProperty,"PopupActiveText");
+                }
                 if(item.Id==MediaSourceSelection.NoneId)button.ToolTip=Localization.Text("Show idle, focus or timer activity. Playback in other apps continues.");else if(item.Id==MediaSourceSelection.AutoId)button.ToolTip=Localization.Text("Automatically follow the current Windows media app.");
                 var row=new DockPanel{LastChildFill=true};var check=UI.Text(isSelected?"✓":"",14);check.Width=22;check.HorizontalAlignment=HorizontalAlignment.Right;DockPanel.SetDock(check,Dock.Right);row.Children.Add(check);
                 var glyph=SourceGlyph(item.Id);glyph.Margin=new(0,0,10,0);DockPanel.SetDock(glyph,Dock.Left);row.Children.Add(glyph);
                 var name=UI.Text(item.Name,12);name.TextTrimming=TextTrimming.CharacterEllipsis;name.TextWrapping=TextWrapping.NoWrap;
-                name.SetResourceReference(TextBlock.ForegroundProperty,ink);check.SetResourceReference(TextBlock.ForegroundProperty,ink);
+                name.ClearValue(TextBlock.ForegroundProperty);check.ClearValue(TextBlock.ForegroundProperty);
                 row.Children.Add(name);button.Content=row;AutomationProperties.SetItemStatus(button,isSelected?Localization.Text("Selected"):Localization.Text("Available"));list.Children.Add(button);
             }
             popover.Child=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};

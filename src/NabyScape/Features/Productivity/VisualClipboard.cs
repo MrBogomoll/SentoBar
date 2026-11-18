@@ -16,7 +16,7 @@ public sealed partial class OverlayWindow
         if(kind.Kind!=SmartClipKind.Color)
         {
             frame.BorderThickness=new(1);
-            frame.SetResourceReference(Border.BackgroundProperty,"GlassControlFill");
+            frame.SetResourceReference(Border.BackgroundProperty,"GlassFieldFill");
             frame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
         }
         layout.Children.Add(frame);
@@ -34,7 +34,7 @@ public sealed partial class OverlayWindow
         else
         {
             string value=item.Text.Length>170?item.Text[..170]+"…":item.Text;
-            var text=UI.Text(value,12);text.SetResourceReference(TextBlock.ForegroundProperty,"GlassControlText");
+            var text=UI.Text(value,12);text.SetResourceReference(TextBlock.ForegroundProperty,"GlassFieldText");
             text.Margin=new(12);text.VerticalAlignment=VerticalAlignment.Top;text.TextWrapping=TextWrapping.Wrap;text.TextTrimming=TextTrimming.CharacterEllipsis;text.MaxHeight=86;
             preview.Children.Add(text);
         }

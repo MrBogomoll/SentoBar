@@ -15,7 +15,14 @@ internal static class AssistantControls
         foreach(var item in new[]{("Chat",false),("Voice",true)})
         {
             bool selected=item.Item2==voice;var button=Action(item.Item1,item.Item2?"mic":"chat",()=>{if(!selected){if(item.Item2)app.OpenVoice();else app.ShowAssistant();}});
-            button.MinWidth=72;if(selected){button.SetResourceReference(Control.BackgroundProperty,"SelectionFill");button.SetResourceReference(Control.ForegroundProperty,"SelectionText");}else button.Foreground=UI.Muted;button.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;button.BorderThickness=new(0);button.ToolTip=item.Item2?Localization.Text("Voice conversation · the microphone starts only when you choose Start"):Localization.Text("Text conversation");
+            button.MinWidth=72;
+            if(selected)
+            {
+                GlassDockAppearance.Emphasize(button);
+                button.Padding=new(11,6,11,6);
+            }
+            else button.Foreground=UI.Muted;
+            button.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;button.ToolTip=item.Item2?Localization.Text("Voice conversation · the microphone starts only when you choose Start"):Localization.Text("Text conversation");
             if(button.Content is StackPanel content && content.Children[1] is TextBlock label)label.FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal;
             System.Windows.Automation.AutomationProperties.SetHelpText(button,selected?Localization.Text("Current mode"):Localization.Text("Switch conversation mode"));row.Children.Add(button);
         }
@@ -67,7 +74,9 @@ internal static class AssistantControls
             foreach(var button in modes.Children.OfType<Button>().ToArray()){modes.Children.Remove(button);actions.Children.Add(button);}
             actions.Children.Add(options);footer=actions;
         }
-        return new Border{Child=footer,BorderBrush=UI.Brush("#24282E"),BorderThickness=new(0,1,0,0),Padding=new(0,7,0,0),Margin=new(0,7,0,0)};
+        var frame=new Border{Child=footer,BorderThickness=new(0,1,0,0),Padding=new(0,7,0,0),Margin=new(0,7,0,0)};
+        frame.SetResourceReference(Border.BorderBrushProperty,"GlassControlBorder");
+        return frame;
     }
     private static MenuItem Option(string title,string subtitle,string icon,Action action)
     {

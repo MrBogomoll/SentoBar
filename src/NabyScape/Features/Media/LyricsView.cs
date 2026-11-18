@@ -116,7 +116,24 @@ public sealed partial class OverlayWindow
         bool compatible=LyricTiming.CanUse(app.Media);
         bool changed=false;
         if(mediaLyrics!=null){var visible=app.Settings.LyricsEnabled && compatible?Visibility.Visible:Visibility.Collapsed;changed=mediaLyrics.Visibility!=visible;mediaLyrics.Visibility=visible;}
-        if(lyricsButton!=null){lyricsButton.Visibility=compatible?Visibility.Visible:Visibility.Collapsed;lyricsButton.Background=app.Settings.LyricsEnabled?UI.Brush(app.Settings.SelectionFill):Brushes.Transparent;lyricsButton.ToolTip=app.Settings.LyricsEnabled?Localization.Text("Hide lyrics"):Localization.Text("Show synced lyrics · looks up track details with LRCLIB");System.Windows.Automation.AutomationProperties.SetItemStatus(lyricsButton,app.Settings.LyricsEnabled?Localization.Text("On"):Localization.Text("Off"));}
+        if(lyricsButton!=null)
+        {
+            lyricsButton.Visibility=compatible?Visibility.Visible:Visibility.Collapsed;
+            bool enabled=app.Settings.LyricsEnabled;
+            string state=Localization.Text(enabled?"On":"Off");
+            if(System.Windows.Automation.AutomationProperties.GetItemStatus(lyricsButton)!=state)
+            {
+                if(enabled)GlassDockAppearance.Emphasize(lyricsButton);
+                else
+                {
+                    lyricsButton.Background=Brushes.Transparent;
+                    lyricsButton.ClearValue(Control.ForegroundProperty);
+                    lyricsButton.ClearValue(Control.BorderBrushProperty);
+                }
+                lyricsButton.ToolTip=Localization.Text(enabled?"Hide lyrics":"Show synced lyrics · looks up track details with LRCLIB");
+                System.Windows.Automation.AutomationProperties.SetItemStatus(lyricsButton,state);
+            }
+        }
         if(changed && mediaLyricsLayout?.IsLoaded==true)ResizeToolPanel();
     }
 }

@@ -99,6 +99,32 @@ internal static class CountdownPanelDiagnostics
         check("Real timer completion starts audio output during scheduled quiet hours",
             !app.Session.Timer.Running && audioPlayer?.PlaybackState==NAudio.Wave.PlaybackState.Playing);
         app.CountdownAudio.Dispose();s.CountdownSound="Off";
+        s.Widgets.Single(widget=>widget.Id=="stopwatch").Enabled=true;
+        app.ChangeSettings();island.SelectPage("stopwatch",false);await Task.Delay(100);
+        var stopwatchView=Diagnostics.Descendants(island).OfType<StopwatchView>().Single(view=>view.IsVisible);
+        var stopwatchDigits=stopwatchView.Children.OfType<TextBlock>().Last();
+        var stopwatch=app.Session.Stopwatch;
+        stopwatch.ElapsedSeconds=.7;
+        var displayed=new System.Collections.Generic.List<string>();
+        void ObserveStopwatch()
+        {
+            if((app.CurrentUpdate & RuntimeChange.Countdown)==0)return;
+            string digits=stopwatchDigits.Text;
+            if(displayed.Count==0 || displayed[^1]!=digits)displayed.Add(digits);
+        }
+        app.Updated+=ObserveStopwatch;
+        try
+        {
+            stopwatch.Toggle();app.SaveSession();
+            await Task.Delay(3650);
+            check("A resumed stopwatch displays each whole second in order",
+                displayed.Take(5).SequenceEqual(new[]{"00:00","00:01","00:02","00:03","00:04"}));
+        }
+        finally
+        {
+            app.Updated-=ObserveStopwatch;
+            stopwatch.Reset();app.SaveSession();
+        }
         s.CompactLayout=false;app.ChangeSettings();island.Reveal(false);await Task.Delay(100);check("Classic panel uses the same duration picker",Diagnostics.Descendants(island).OfType<DurationPicker>().Any(p=>p.IsVisible));
     }
 }

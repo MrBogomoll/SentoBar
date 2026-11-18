@@ -29,7 +29,10 @@ internal sealed class AssistantVoiceView : UserControl
         var head=UI.Heading(Localization.Text("Naby voice"),18);head.Margin=new(0,0,0,8);Add(head);
         halo.RenderTransform=pulse;halo.RenderTransformOrigin=new(.5,.5);var hero=new Grid{Width=180,Height=180};hero.Children.Add(halo);hero.Children.Add(orb);stage.Children.Add(new Viewbox{Child=hero,Stretch=Stretch.Uniform});Add(stage);
         phase.HorizontalAlignment=HorizontalAlignment.Center;phase.Margin=new(0,0,0,6);Add(phase);caption.TextAlignment=TextAlignment.Center;caption.MaxHeight=46*Accessibility.TextScale;caption.LineHeight=23*Accessibility.TextScale;Add(caption);heard.TextAlignment=TextAlignment.Center;heard.MaxHeight=19*Accessibility.TextScale;heard.Margin=new(0,4,0,5);Add(heard);
-        primary=AssistantControls.Action("Start conversation","mic",()=>_=Toggle(),true);primary.MinHeight=40;primary.MaxWidth=260;primary.HorizontalAlignment=HorizontalAlignment.Stretch;primary.Margin=new(0,12,0,6);
+        primary=AssistantControls.Action("Start conversation","mic",()=>_=Toggle());
+        GlassDockAppearance.Emphasize(primary);
+        primary.Padding=new(11,6,11,6);
+        primary.FontWeight=FontWeights.SemiBold;primary.MinHeight=40;primary.MaxWidth=260;primary.HorizontalAlignment=HorizontalAlignment.Stretch;primary.Margin=new(0,12,0,6);
         // A finite grid lets the action label wrap at high text/panel scales.
         if(primary.Content is StackPanel action && action.Children[1] is TextBlock label){var glyph=action.Children[0];action.Children.Clear();var content=new Grid();content.ColumnDefinitions.Add(new(){Width=GridLength.Auto});content.ColumnDefinitions.Add(new());content.Children.Add(glyph);label.TextWrapping=TextWrapping.Wrap;label.TextAlignment=TextAlignment.Center;Grid.SetColumn(label,1);content.Children.Add(label);primary.Content=content;}
         error.Margin=new(0,2,0,4);error.TextAlignment=TextAlignment.Center;error.MaxHeight=30*Accessibility.TextScale;Add(error);privacy.TextAlignment=TextAlignment.Center;privacy.Margin=new(0,4,0,0);Add(privacy);
